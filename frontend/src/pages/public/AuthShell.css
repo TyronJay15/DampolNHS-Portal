@@ -1,0 +1,207 @@
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+}
+
+.auth-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(11, 43, 90, 0.38), rgba(11, 43, 90, 0.68)),
+    url('/landingpage/dampolzz.jpg') center / cover no-repeat;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: min(450px, 100%);
+  max-width: 100%;
+  min-width: 0;
+  padding: 2.4rem 2rem 1.8rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 40px rgba(11, 43, 90, 0.35);
+  animation: authIn 0.45s ease both;
+}
+
+.auth-shell.is-wide .auth-card {
+  width: min(720px, 100%);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.auth-head {
+  text-align: center;
+  margin-bottom: 1.6rem;
+}
+
+.auth-logo {
+  width: 108px;
+  height: 108px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.auth-school,
+.auth-head h1,
+.auth-motto {
+  color: #ffd700;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.auth-school {
+  margin: 1rem 0 0.2rem;
+  font-weight: 700;
+  font-size: 1.35rem;
+}
+
+.auth-head h1 {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 600;
+}
+
+.auth-motto {
+  margin: 0.55rem 0 0;
+  font-family: Georgia, serif;
+  font-style: italic;
+  font-size: 0.98rem;
+}
+
+.auth-shell .form-field {
+  color: #f4f7f5;
+  min-width: 0;
+}
+
+.auth-shell .form-field input,
+.auth-shell .form-field select,
+.auth-shell .form-field textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.14);
+  color: #1f2937;
+}
+
+.auth-shell .form-field input::placeholder,
+.auth-shell .form-field textarea::placeholder {
+  color: #6b7280;
+}
+
+.auth-shell .form-field input:focus,
+.auth-shell .form-field select:focus,
+.auth-shell .form-field textarea:focus,
+.auth-shell .password-wrap input:focus {
+  outline: none;
+  border-color: #ffd700;
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.28);
+}
+
+.auth-shell .password-wrap {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+}
+
+.auth-shell .password-wrap input {
+  flex: 1;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.14);
+  color: #1f2937;
+}
+
+.auth-shell .password-toggle {
+  flex: 0 0 auto;
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.14);
+  color: #1f2937;
+}
+
+.auth-shell .btn {
+  width: 100%;
+  margin-top: 0.35rem;
+}
+
+.auth-shell .btn-secondary {
+  width: 100%;
+  margin: 0.15rem 0 0.7rem;
+}
+
+.auth-shell .btn-ghost {
+  margin-top: 0.75rem;
+  background: transparent;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.auth-shell .alert-error {
+  background: rgba(183, 28, 28, 0.28);
+  color: #ffc9c2;
+}
+
+.auth-shell .alert-info {
+  background: rgba(255, 215, 0, 0.18);
+  color: #fff4c4;
+}
+
+.auth-shell .form-error {
+  color: #ffc9c2;
+}
+
+.auth-shell .recaptcha-label {
+  color: #f4f7f5;
+}
+
+.auth-foot {
+  margin: 1.2rem 0 0;
+  padding-top: 1.1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.auth-foot a,
+.auth-shell .auth-link {
+  color: #ffd700;
+  font-weight: 700;
+}
+
+.auth-hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+@keyframes authIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .auth-logo {
+    width: 88px;
+    height: 88px;
+  }
+
+  .auth-card {
+    padding: 1.6rem 1.15rem 1.3rem;
+  }
+}

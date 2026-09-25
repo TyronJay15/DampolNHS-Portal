@@ -1,0 +1,9 @@
+Django>=5.1,<5.3
+djangorestframework>=3.15,<3.17
+djangorestframework-simplejwt>=5.3,<5.6
+django-cors-headers>=4.4,<4.8
+django-filter>=24.3,<26
+python-dotenv>=1.0,<2
+Pillow>=11,<12
+gunicorn>=23,<24
+whitenoise>=6.7,<7

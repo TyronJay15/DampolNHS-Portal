@@ -1,0 +1,5 @@
+.login-page .auth-card {
+  width: min(450px, 100%);
+  max-width: 100%;
+  min-width: 0;
+}

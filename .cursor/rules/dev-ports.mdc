@@ -1,0 +1,16 @@
+---
+description: Local API and Vite ports are fixed. Never switch them.
+alwaysApply: true
+---
+
+# Local ports (fixed)
+
+This project always uses:
+
+- Django API: `http://localhost:8000` — `python manage.py runserver 8000`
+- Vite: `http://localhost:5173` (`strictPort: true`)
+- Frontend API base: `http://localhost:8000/api` (`VITE_API_BASE_URL` and `api.js` fallback)
+
+Do **not** use port 8001. Do **not** retarget the frontend if another app already occupies 8000. Tell the user 8000 is taken and leave this project's ports unchanged.
+
+Keep README, `.env`, `.env.example`, and `api.js` on these same numbers. Never leave them out of sync.

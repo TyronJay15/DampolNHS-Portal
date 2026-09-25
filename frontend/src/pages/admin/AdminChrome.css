@@ -1,0 +1,138 @@
+.admin-chrome h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.admin-chrome > p,
+.admin-lede {
+  margin: 6px 0 18px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--dash-muted);
+}
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.admin-stat {
+  border-radius: 18px;
+  padding: 16px 18px;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.admin-stat > span:not(.desk-stat-top) {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dash-muted);
+  letter-spacing: 0.03em;
+}
+
+.admin-stat strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--dash-green-dark);
+}
+
+.admin-stat.is-pending strong {
+  color: var(--dash-gold-ink);
+}
+
+.admin-stat.is-ok strong {
+  color: var(--dash-green);
+}
+
+.admin-toolbar {
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-chrome .admin-tab {
+  background: var(--dash-field);
+  color: var(--dash-ink);
+  border: 2px solid var(--dash-line);
+  border-radius: 12px;
+  padding: 8px 14px;
+  text-decoration: none;
+}
+
+.admin-chrome .admin-tab.is-active {
+  background: var(--dash-green);
+  color: #fff;
+  border-color: var(--dash-green);
+}
+
+.admin-chrome .btn-danger,
+.admin-mini-reject {
+  background: #f8eaea;
+  border: 2px solid #e2b4b4;
+  color: #8f1d16;
+}
+
+.admin-mini-approve,
+.admin-mini-reject {
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-mini-approve {
+  background: #dceee1;
+  border: 2px solid #8fbf9a;
+  color: var(--dash-green-dark);
+}
+
+.admin-mini-approve:disabled,
+.admin-mini-reject:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.admin-panel {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.admin-panel-head {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--dash-line);
+}
+
+.admin-panel-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.admin-panel-head p {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--dash-muted);
+}
+
+.admin-chrome table th,
+.admin-chrome table td {
+  border-bottom-color: var(--dash-line);
+}
+
+.admin-chrome .admin-meta,
+.admin-chrome .admin-reviewed,
+.admin-chrome .admin-empty {
+  color: var(--dash-muted);
+}
+

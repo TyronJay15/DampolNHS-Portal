@@ -1,0 +1,16 @@
+.waiting-lead {
+  color: #fff;
+  line-height: 1.5;
+  margin: 0 0 0.85rem;
+}
+
+.waiting-steps {
+  margin: 0 0 0.4rem;
+  padding-left: 1.2rem;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.5;
+}
+
+.waiting-steps li + li {
+  margin-top: 0.35rem;
+}

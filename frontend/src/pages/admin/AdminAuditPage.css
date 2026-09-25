@@ -1,0 +1,59 @@
+.audit-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.audit-day {
+  margin-bottom: 1.2rem;
+}
+
+.audit-day h2 {
+  margin: 0 0 0.7rem;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dash-muted);
+}
+
+.audit-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.audit-card {
+  padding: 1.05rem 1.15rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.audit-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(22, 53, 35, 0.08);
+}
+
+.audit-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.audit-card-head span,
+.audit-card p {
+  color: var(--dash-muted);
+}
+
+.audit-card p {
+  margin: 0.15rem 0 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .audit-filters,
+  .audit-list {
+    grid-template-columns: 1fr;
+  }
+}

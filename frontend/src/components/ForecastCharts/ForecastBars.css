@@ -1,0 +1,69 @@
+.forecast-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.forecast-bars li {
+  animation: forecast-in 0.35s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.forecast-bars-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.88rem;
+}
+
+.forecast-bars-meta strong {
+  color: var(--dash-green-dark);
+}
+
+.forecast-bars-meta span {
+  color: var(--dash-muted);
+  font-weight: 600;
+}
+
+.forecast-bars-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--dash-field);
+  overflow: hidden;
+}
+
+.forecast-bars-track i {
+  display: block;
+  height: 100%;
+  width: var(--fill, 0%);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--dash-green), var(--dash-gold));
+  transform-origin: left;
+  animation: forecast-fill 0.55s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.forecast-empty {
+  margin: 0;
+  color: var(--dash-muted);
+}
+
+@keyframes forecast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes forecast-fill {
+  from {
+    width: 0;
+  }
+}

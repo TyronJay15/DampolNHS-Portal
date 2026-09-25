@@ -1,0 +1,224 @@
+.program-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1.4rem;
+}
+
+.program-section {
+  margin-bottom: 6rem;
+}
+
+.program-section h2 {
+  margin: 0 0 2rem;
+  color: var(--lp-green-900);
+  font-size: 1.50rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.program-grid > li {
+  grid-column: span 2;
+  display: flex;
+}
+
+.program-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  overflow: visible;
+  z-index: 1;
+  border-top: 4px solid var(--lp-green-600);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.program-card:hover,
+.program-card:focus-within,
+.program-card.is-open {
+  z-index: 5;
+  transform: translateY(-4px);
+  border-color: var(--lp-green-600);
+  box-shadow: 0 16px 36px rgba(45, 80, 22, 0.16);
+}
+
+.program-card-hit {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100%;
+  padding: 1.4rem 1.35rem 1.2rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.program-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.program-card .school-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #e8f1eb;
+  color: var(--lp-green-900);
+  display: grid;
+  place-items: center;
+}
+
+.program-card .school-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.program-track {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: #eef4f0;
+  color: var(--lp-green-900);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.program-code {
+  display: block;
+  color: var(--lp-green-900);
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.program-name {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--lp-green-600);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.program-summary {
+  margin: 0.7rem 0 1rem;
+  color: #555;
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.program-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: auto;
+  color: var(--lp-green-900);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.program-more .school-icon {
+  width: auto;
+  height: auto;
+  background: none;
+}
+
+.program-more .school-icon svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.program-card:hover .program-more .school-icon svg {
+  transform: translateX(4px);
+}
+
+.program-popout {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: calc(100% - 8px);
+  width: min(420px, calc(100vw - 48px));
+  transform: translateX(-50%) translateY(12px);
+  background: #fff;
+  border: 1px solid rgba(45, 80, 22, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
+  padding: 1rem 1.1rem 1.15rem;
+  z-index: 6;
+}
+
+.program-card:hover .program-popout,
+.program-card:focus-within .program-popout,
+.program-card.is-open .program-popout {
+  display: block;
+}
+
+.program-popout p {
+  margin: 0 0 0.85rem;
+  line-height: 1.45;
+}
+
+.program-popout h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+  color: var(--lp-green-900);
+}
+
+.program-popout ul {
+  margin: 0 0 0.85rem;
+  padding-left: 1.1rem;
+}
+
+.program-popout .btn {
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .program-grid > li:nth-child(3n + 1):nth-last-child(2) {
+    grid-column: 2 / span 2;
+  }
+
+  .program-grid > li:nth-child(3n + 1):last-child {
+    grid-column: 3 / span 2;
+  }
+}
+
+@media (max-width: 1023px) and (min-width: 640px) {
+  .program-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .program-grid > li:nth-child(2n + 1):last-child {
+    grid-column: 2 / span 2;
+  }
+}
+
+@media (max-width: 639px) {
+  .program-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .program-grid > li {
+    grid-column: auto;
+  }
+
+  .program-popout {
+    position: static;
+    width: auto;
+    transform: none;
+    margin: 0 0.85rem 0.95rem;
+    box-shadow: none;
+  }
+}

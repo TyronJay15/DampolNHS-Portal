@@ -1,0 +1,107 @@
+.contact-panel,
+.contact-follow {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.6rem 1.5rem;
+}
+
+.contact-panel {
+  border-left: 5px solid var(--lp-green-600);
+}
+
+.contact-panel h2,
+.contact-follow h2 {
+  margin: 0 0 1.1rem;
+  color: var(--lp-green-900);
+}
+
+.contact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1.1rem;
+}
+
+.contact-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+.contact-list .school-icon {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  border-radius: 50%;
+  background: var(--lp-green-600);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.contact-list .school-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.contact-list h3 {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+  color: var(--lp-green-900);
+}
+
+.contact-list p,
+.contact-follow p {
+  margin: 0;
+  color: #555;
+  line-height: 1.45;
+}
+
+.contact-follow {
+  margin-top: 1.2rem;
+  text-align: center;
+}
+
+.contact-follow p {
+  margin-bottom: 1.1rem;
+}
+
+.contact-follow-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: center;
+}
+
+.contact-facebook,
+.contact-deped {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.2rem;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 700;
+  color: #fff;
+}
+
+.contact-facebook {
+  background: #1877f2;
+}
+
+.contact-deped {
+  background: var(--lp-green-600);
+}
+
+.contact-facebook .school-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: inherit;
+}
+
+.contact-facebook .school-icon svg {
+  width: 100%;
+  height: 100%;
+}

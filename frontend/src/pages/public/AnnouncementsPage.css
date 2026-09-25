@@ -1,0 +1,97 @@
+.announcement-empty {
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: 2.4rem 1.4rem;
+  text-align: center;
+  background: #fff;
+  border: 1px solid #e3e8e4;
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.07);
+}
+
+.announcement-empty .school-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 0.9rem;
+  border-radius: 50%;
+  background: #eef4f0;
+  color: var(--lp-green-600);
+  display: grid;
+  place-items: center;
+}
+
+.announcement-empty h2 {
+  margin: 0 0 0.5rem;
+  color: var(--lp-green-900);
+}
+
+.announcement-empty p {
+  margin: 0 0 1.1rem;
+  color: #555;
+  line-height: 1.5;
+}
+
+.announcement-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.3rem;
+}
+
+.announcement-grid > li {
+  display: flex;
+}
+
+.announcement-card {
+  overflow: hidden;
+  padding: 0;
+  width: 100%;
+  border-top: 4px solid var(--lp-green-600);
+}
+
+.announcement-photo {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  background: #e7efe8;
+}
+
+.announcement-copy {
+  padding: 1.1rem 1.2rem 1.25rem;
+}
+
+.announcement-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.8rem;
+  margin: 0 0 0.5rem;
+  color: #5b6b61;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.announcement-category {
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  background: #eef4f0;
+  color: var(--lp-green-900);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.announcement-copy h2 {
+  margin: 0 0 0.45rem;
+  color: var(--lp-green-900);
+  font-size: 1.2rem;
+}
+
+.announcement-copy p {
+  margin: 0 0 0.85rem;
+  color: #555;
+  line-height: 1.5;
+  white-space: pre-line;
+}

@@ -1,0 +1,166 @@
+.about-grid,
+.about-achievements,
+.about-features {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.about-grid {
+  grid-template-columns: repeat(4, 1fr);
+  margin-bottom: 1.4rem;
+}
+
+.about-card {
+  padding: 1.4rem 1.2rem;
+  text-align: center;
+  border-top: 5px solid var(--lp-green-600);
+}
+
+.about-card .school-icon,
+.about-features .school-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 0.9rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4a7c59, #5a8c69);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.about-card .school-icon svg,
+.about-features .school-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.about-block {
+  padding: 1.6rem 1.5rem;
+  margin-bottom: 1.4rem;
+  border-left: 5px solid var(--lp-green-600);
+}
+
+.about-card h2,
+.about-block h2,
+.about-features h3 {
+  margin: 0 0 0.7rem;
+  color: var(--lp-green-900);
+}
+
+.about-card h2 {
+  font-size: 1.05rem;
+}
+
+.about-card p,
+.about-block p,
+.about-features p {
+  margin: 0;
+  line-height: 1.5;
+  color: #555;
+}
+
+.about-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  border-left: 2px solid var(--lp-green-600);
+}
+
+.about-timeline li {
+  position: relative;
+  padding: 0 0 1.2rem 1.2rem;
+}
+
+.about-timeline li:last-child {
+  padding-bottom: 0;
+}
+
+.about-timeline li::before {
+  content: '';
+  position: absolute;
+  left: -1.35rem;
+  top: 0.35rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--lp-green-600);
+}
+
+.about-timeline span {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--lp-green-600);
+  font-weight: 700;
+}
+
+.about-achievements {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  grid-template-columns: 1fr 1fr;
+}
+
+.about-achievements li,
+.about-features li {
+  text-align: center;
+  padding: 1.2rem 1rem;
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+}
+
+.about-achievements li {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  text-align: left;
+  padding: 1rem;
+  border-radius: 10px;
+}
+
+.about-achievements li:hover,
+.about-features li:hover {
+  border-color: var(--lp-green-600);
+}
+
+.about-achievements .school-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  background: var(--lp-green-600);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.about-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.about-features li {
+  text-align: center;
+  padding: 1.2rem 1rem;
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+}
+
+@media (max-width: 900px) {
+  .about-grid,
+  .about-features,
+  .about-achievements {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .about-grid,
+  .about-features,
+  .about-achievements {
+    grid-template-columns: 1fr;
+  }
+}

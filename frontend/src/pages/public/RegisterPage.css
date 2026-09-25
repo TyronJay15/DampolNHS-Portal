@@ -1,0 +1,39 @@
+.register-page .auth-card {
+  width: min(720px, 100%);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.register-grid-3,
+.register-grid-2 {
+  display: grid;
+  gap: 0 0.75rem;
+}
+
+.register-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.register-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.register-consent {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  color: #fff;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.register-consent input {
+  margin-top: 0.2rem;
+}
+
+@media (max-width: 860px) {
+  .register-grid-3,
+  .register-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
