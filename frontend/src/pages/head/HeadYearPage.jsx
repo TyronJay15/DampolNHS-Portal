@@ -191,7 +191,7 @@ export default function HeadYearPage() {
           {years.length === 0 ? <p className="studio-empty">No school year yet.</p> : null}
           <div className="studio-cards">
             {years.map((year) => (
-              <article className="card studio-card" key={year.id}>
+              <article className="studio-item" key={year.id}>
                 <p className="studio-kicker">{year.is_current ? 'Current' : 'Ready'}</p>
                 <h2>
                   <DeskMark name="year" size={16} />

@@ -4,14 +4,23 @@ import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
 import YearChip from '../../components/YearChip';
 import { useAuth } from '../../context/AuthContext';
-import { approveGrades, fetchGradeQueues, fetchSchoolYears, returnGrades } from '../../services/adminService';
+import {
+  approveAllGrades,
+  approveGrades,
+  approveTeacherGrades,
+  fetchGradeQueues,
+  fetchSchoolYears,
+  returnGrades,
+} from '../../services/adminService';
 import { fetchTerms } from '../../services/teacherService';
 
 export default function HeadApprovePage() {
   const { user } = useAuth();
   const [terms, setTerms] = useState([]);
   const [termId, setTermId] = useState('');
-  const [groups, setGroups] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [openTeachers, setOpenTeachers] = useState({});
+  const [waiting, setWaiting] = useState(0);
   const [busyKey, setBusyKey] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -38,7 +47,20 @@ export default function HeadApprovePage() {
     let cancelled = false;
     fetchGradeQueues(termId)
       .then((data) => {
-        if (!cancelled) setGroups(data.groups || []);
+        if (!cancelled) {
+          const list = data.teachers || [];
+          setTeachers(list);
+          setWaiting(data.waiting || 0);
+          setOpenTeachers((current) => {
+            if (Object.keys(current).length) return current;
+            const next = {};
+            list.forEach((teacher) => {
+              const key = String(teacher.teacher_id || teacher.teacher);
+              next[key] = teacher.submitted > 0 || teacher.missing > 0 || list.length <= 3;
+            });
+            return next;
+          });
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -48,24 +70,71 @@ export default function HeadApprovePage() {
     };
   }, [termId]);
 
-  async function runAction(group, action) {
-    const key = `${action}-${group.section_id}-${group.subject_id}`;
+  async function refreshQueues() {
+    const data = await fetchGradeQueues(termId);
+    setTeachers(data.teachers || []);
+    setWaiting(data.waiting || 0);
+  }
+
+  function toggleTeacher(key) {
+    setOpenTeachers((current) => ({ ...current, [key]: !current[key] }));
+  }
+
+  async function runSubject(sectionId, subjectId) {
+    const key = `subject-${sectionId}-${subjectId}`;
     setBusyKey(key);
     setMessage('');
     setError('');
     try {
-      const payload = { term: Number(termId), section: group.section_id, subject: group.subject_id };
-      const result = action === 'approve' ? await approveGrades(payload) : await returnGrades(payload);
-      const data = await fetchGradeQueues(termId);
-      setGroups(data.groups || []);
-      if (action === 'approve') {
-        setMessage(`Approved ${result.approved} grade(s).`);
-      } else {
-        setMessage(
-          `Returned ${result.returned} hidden grade(s) to draft.` +
-            (result.still_shown ? ` ${result.still_shown} shown card(s) left untouched.` : ''),
-        );
-      }
+      const result = await approveGrades({ term: Number(termId), section: sectionId, subject: subjectId });
+      await refreshQueues();
+      setMessage(`Approved ${result.approved} grade(s). Teachers are notified.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyKey('');
+    }
+  }
+
+  async function runTeacher(teacherId) {
+    setBusyKey(`teacher-${teacherId}`);
+    setMessage('');
+    setError('');
+    try {
+      const result = await approveTeacherGrades({ term: Number(termId), teacher: teacherId });
+      await refreshQueues();
+      setMessage(`Approved ${result.approved} grade(s) for this teacher.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyKey('');
+    }
+  }
+
+  async function runAll() {
+    setBusyKey('all');
+    setMessage('');
+    setError('');
+    try {
+      const result = await approveAllGrades(Number(termId));
+      await refreshQueues();
+      setMessage(`Approved ${result.approved} submitted grade(s).`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyKey('');
+    }
+  }
+
+  async function runReturn(group) {
+    const key = `return-${group.section_id}-${group.subject_id}`;
+    setBusyKey(key);
+    setMessage('');
+    setError('');
+    try {
+      const result = await returnGrades({ term: Number(termId), section: group.section_id, subject: group.subject_id });
+      await refreshQueues();
+      setMessage(`Returned ${result.returned} grade(s) to draft.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -75,16 +144,13 @@ export default function HeadApprovePage() {
 
   if (loading) return <Loading label="Loading submitted classes…" />;
 
-  const waiting = groups.filter((row) => row.submitted > 0).length;
-
   return (
-    <div className="desk studio">
+    <div className="desk studio studio-spaced">
       <PageHead kicker="Review" title="Approve grades" icon="approve">
-        <p>Approve submitted section tables. Advisers can show a card only after every assigned subject is approved.</p>
+        <p>Every assigned subject is listed, including classes not yet encoded. Approve only acts on submitted scores.</p>
         <div className="studio-hero-meta">
           <YearChip user={user} />
-          <span className="studio-chip">{waiting} waiting</span>
-          <span className="studio-chip">{groups.length} classes</span>
+          <span className="studio-chip">{waiting} submitted waiting</span>
         </div>
       </PageHead>
       {message ? <p className="alert alert-info">{message}</p> : null}
@@ -92,50 +158,117 @@ export default function HeadApprovePage() {
 
       <div className="studio-tabs">
         {terms.map((term) => (
-          <button
-            key={term.id}
-            type="button"
-            className={String(term.id) === termId ? 'is-active' : ''}
-            onClick={() => setTermId(String(term.id))}
-          >
+          <button key={term.id} type="button" className={String(term.id) === termId ? 'is-active' : ''} onClick={() => setTermId(String(term.id))}>
             {term.label}
           </button>
         ))}
       </div>
 
-      {groups.length === 0 ? <p className="card studio-panel studio-empty">No encoded grades for this term yet.</p> : null}
-      <div className="studio-cards">
-        {groups.map((group) => (
-          <article className="card studio-card" key={`${group.section_id}-${group.subject_id}`}>
-            <p className="studio-kicker">{group.section}</p>
-            <h2>
-              <DeskMark name="approve" size={16} />
-              {group.subject}
-            </h2>
-            <p className="studio-empty">
-              Draft {group.draft} · Submitted {group.submitted} · Approved {group.approved} · Shown {group.released}
-            </p>
-            <div className="studio-actions">
-              <button
-                className="btn"
-                type="button"
-                disabled={!group.submitted || busyKey.startsWith('approve')}
-                onClick={() => runAction(group, 'approve')}
-              >
-                {busyKey === `approve-${group.section_id}-${group.subject_id}` ? 'Approving…' : 'Approve submitted'}
-              </button>
-              <button
-                className="btn btn-secondary"
-                type="button"
-                disabled={(!group.submitted && !group.approved) || group.released || busyKey.startsWith('return')}
-                onClick={() => runAction(group, 'return')}
-              >
-                {busyKey === `return-${group.section_id}-${group.subject_id}` ? 'Returning…' : 'Return to draft'}
-              </button>
-            </div>
-          </article>
-        ))}
+      <div className="studio-actions">
+        <button className="btn" type="button" disabled={!waiting || busyKey === 'all'} onClick={runAll}>
+          {busyKey === 'all' ? 'Approving all…' : 'Approve all submitted'}
+        </button>
       </div>
+
+      {teachers.length === 0 ? (
+        <p className="card studio-panel studio-empty">No assigned classes for this term yet.</p>
+      ) : (
+        <div className="studio-accordion-list">
+          {teachers.map((teacher) => {
+            const key = String(teacher.teacher_id || teacher.teacher);
+            const open = Boolean(openTeachers[key]);
+            return (
+              <article className={`card studio-panel studio-accordion-card${open ? ' is-open' : ''}`} key={key}>
+                <button type="button" className="studio-accordion-head" onClick={() => toggleTeacher(key)}>
+                  <div>
+                    <p className="studio-kicker">Teacher</p>
+                    <h2>
+                      <DeskMark name="assign" size={16} />
+                      {teacher.teacher}
+                    </h2>
+                    <p className="studio-empty">
+                      {teacher.submitted} submitted waiting
+                      {teacher.missing ? ` · ${teacher.missing} not encoded` : ''}
+                    </p>
+                  </div>
+                  <div className="studio-accordion-tools">
+                    <button
+                      className="btn"
+                      type="button"
+                      disabled={!teacher.submitted || busyKey === `teacher-${teacher.teacher_id}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        runTeacher(teacher.teacher_id);
+                      }}
+                    >
+                      Approve all
+                    </button>
+                    <span className="studio-accordion-caret">{open ? '▾' : '▸'}</span>
+                  </div>
+                </button>
+                {open ? (
+                  <div className="studio-accordion-body">
+                    {teacher.sections.map((section) => (
+                      <div className="studio-section-block" key={`${key}-${section.section_id}`}>
+                        <h3>{section.section}</h3>
+                        <div className="studio-table-wrap">
+                          <table className="studio-table">
+                            <thead>
+                              <tr>
+                                <th>Subject</th>
+                                <th>Status</th>
+                                <th>Encoded</th>
+                                <th>Submitted</th>
+                                <th>Approved</th>
+                                <th />
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {section.subjects.map((group) => (
+                                <tr key={`${group.section_id}-${group.subject_id}`}>
+                                  <td>{group.subject}</td>
+                                  <td>
+                                    <span
+                                      className={`studio-status ${
+                                        group.workflow === 'submitted'
+                                          ? 'is-submitted'
+                                          : group.workflow === 'approved' || group.progress === 'encoded'
+                                            ? 'is-encoded'
+                                            : group.progress === 'in_progress'
+                                              ? 'is-progress'
+                                              : group.progress === 'not_encoded'
+                                                ? 'is-wait'
+                                                : ''
+                                      }`}
+                                    >
+                                      {group.workflow_label || group.progress_label || 'Not encoded'}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    {group.encoded}/{group.roster}
+                                  </td>
+                                  <td>{group.submitted}</td>
+                                  <td>{group.approved}</td>
+                                  <td>
+                                    <div className="studio-actions">
+                                      <button className="btn" type="button" disabled={!group.submitted} onClick={() => runSubject(group.section_id, group.subject_id)}>Approve</button>
+                                      <button className="btn btn-secondary" type="button" disabled={!group.submitted && !group.approved} onClick={() => runReturn(group)}>Return</button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -92,10 +92,14 @@ class RegistrationApproveView(APIView):
             target_id=user.id,
             details={'registration_id': registration.id, 'email': user.email},
         )
+        from apps.audit.catalog import ACCOUNTS
+
         notify(
             [user],
             title='Account approved',
             body='You can sign in now. The Head Teacher will place you in a section.',
+            level='success',
+            category=ACCOUNTS,
         )
         email_sent = True
         try:
@@ -154,4 +158,61 @@ class RegistrationRejectView(APIView):
         registration.refresh_from_db()
         payload = dict(RegistrationReviewSerializer(registration).data)
         payload['email_sent'] = email_sent
+        return Response(payload)
+
+
+class AdminAccountArchiveView(APIView):
+    """Admin-only archive desk for student and staff accounts."""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        kind = (request.query_params.get('kind') or 'students').strip().lower()
+        if kind == 'staff':
+            rows = (
+                User.objects.filter(
+                    role__in=(User.Role.TEACHER, User.Role.HEAD_TEACHER, User.Role.ADMIN),
+                    account_status__in=(User.AccountStatus.ARCHIVED, User.AccountStatus.SUSPENDED),
+                )
+                .order_by('-approval_updated_at', 'last_name', 'first_name')
+            )
+            return Response(
+                [
+                    {
+                        'id': row.id,
+                        'name': row.get_full_name() or row.email,
+                        'email': row.email,
+                        'role': row.role,
+                        'account_status': row.account_status,
+                        'archived_at': row.approval_updated_at,
+                        'kind': 'staff',
+                    }
+                    for row in rows
+                ]
+            )
+
+        archived_regs = (
+            Registration.objects.select_related('user', 'user__student_profile', 'program', 'school_year')
+            .filter(user__account_status__in=(User.AccountStatus.ARCHIVED, User.AccountStatus.SUSPENDED))
+            .exclude(user__account_status=User.AccountStatus.REMOVED)
+            .order_by('-user__approval_updated_at')
+        )
+        rejected_regs = (
+            Registration.objects.select_related('user', 'user__student_profile', 'program', 'school_year')
+            .filter(status=Registration.Status.REJECTED)
+            .exclude(user__account_status__in=HIDDEN)
+            .order_by('-reviewed_at')
+        )
+        seen = set()
+        payload = []
+        for row in list(archived_regs) + list(rejected_regs):
+            if row.user_id in seen:
+                continue
+            seen.add(row.user_id)
+            data = RegistrationReviewSerializer(row).data
+            data['archive_kind'] = (
+                'rejected' if row.status == Registration.Status.REJECTED else 'archived'
+            )
+            data['archived_at'] = row.user.approval_updated_at or row.reviewed_at
+            payload.append(data)
         return Response(payload)

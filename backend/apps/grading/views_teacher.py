@@ -10,9 +10,11 @@ from apps.accounts.permissions import IsTeacher
 from apps.audit import services as audit
 from apps.grading.history import SUBJECT_TEACHER, write_history
 from apps.grading.models import CorrectionRequest, Grade, GradeHistory
+from apps.grading.progress import pack_counts
 from apps.grading.scores import parse_score
 from apps.grading.transitions import transition_grades
-from apps.notifications.services import head_teachers, notify
+from apps.audit.catalog import GRADES
+from apps.notifications.services import advisers_for_section, head_teachers, notify
 from apps.people.assignment_access import subject_assignment_for
 from apps.people.models import StudentSection
 from apps.school.deadlines import encode_closed_response, encode_is_open
@@ -53,6 +55,17 @@ class TeacherClassGradesView(APIView):
                 status=CorrectionRequest.Status.PENDING,
             ).values_list('grade_id', flat=True)
         )
+        students = [_row_payload(item.student, grades.get(item.student_id), pending) for item in roster]
+        draft = submitted = approved = released = 0
+        for row in students:
+            if row['status'] == Grade.Status.DRAFT:
+                draft += 1
+            elif row['status'] == Grade.Status.SUBMITTED:
+                submitted += 1
+            elif row['status'] == Grade.Status.APPROVED:
+                approved += 1
+            elif row['status'] == Grade.Status.RELEASED:
+                released += 1
         return Response(
             {
                 'assignment': {
@@ -70,10 +83,8 @@ class TeacherClassGradesView(APIView):
                     'encode_closes_at': term.encode_closes_at,
                     'encode_open': encode_is_open(term),
                 },
-                'students': [
-                    _row_payload(item.student, grades.get(item.student_id), pending)
-                    for item in roster
-                ],
+                'summary': pack_counts(len(students), draft=draft, submitted=submitted, approved=approved, released=released),
+                'students': students,
             }
         )
 
@@ -149,14 +160,6 @@ class TeacherEncodeGradeView(APIView):
                     reason='Teacher encoded grade',
                     duty=SUBJECT_TEACHER,
                 )
-        audit.record(
-            user=request.user,
-            action='grade_encoded',
-            summary=f'Encoded {student.user.get_full_name()} · {assignment.subject.name}',
-            target_type='Grade',
-            target_id=grade.id,
-            details={'score': str(score), 'term': term.id},
-        )
         return Response(_row_payload(student, grade))
 
 
@@ -195,9 +198,27 @@ class TeacherSubmitClassView(APIView):
         if moved:
             notify(
                 head_teachers(),
-                title=f'{term.label} grades submitted',
-                body=f'{request.user.get_full_name()} submitted {assignment.subject.name} for {section_label(assignment.section)}.',
+                title=f'{term.label} · {assignment.subject.name} submitted',
+                body=f'{request.user.get_full_name()} submitted grades for {section_label(assignment.section)}.',
+                category=GRADES,
+                action_path='/head/approve',
             )
+            if Grade.objects.filter(
+                section=assignment.section,
+                term=term,
+                status=Grade.Status.RELEASED,
+            ).exists():
+                notify(
+                    advisers_for_section(assignment.section),
+                    title=f'{term.label} · submitted for a shown card',
+                    body=(
+                        f'{request.user.get_full_name()} submitted {assignment.subject.name} for '
+                        f'{section_label(assignment.section)}. Waiting for Head Teacher approval before you can re-show.'
+                    ),
+                    level='info',
+                    category=GRADES,
+                    action_path='/teacher/advisory',
+                )
         return Response({'submitted': moved})
 
 

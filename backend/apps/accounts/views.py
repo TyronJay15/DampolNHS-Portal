@@ -10,7 +10,9 @@ from apps.accounts.serializers import (
     ChangePasswordSerializer,
     ForgotPasswordOtpSerializer,
     ForgotPasswordSerializer,
+    ForgotPasswordVerifySerializer,
     LoginSerializer,
+    PasswordCodeVerifySerializer,
     PasswordOtpSerializer,
     PublicChangePasswordSerializer,
     PublicPasswordOtpSerializer,
@@ -108,6 +110,15 @@ class PasswordOtpView(APIView):
         return Response({'detail': 'A code was sent to your email.'})
 
 
+class PasswordCodeVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = PasswordCodeVerifySerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        return Response({'detail': 'Code verified.', 'verified': True})
+
+
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -144,6 +155,16 @@ class ForgotPasswordOtpView(APIView):
                 target_id=user.id,
             )
         return Response({'detail': 'If that account exists, a code was sent.'})
+
+
+class ForgotPasswordVerifyView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = ForgotPasswordVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response({'detail': 'Code verified.', 'verified': True})
 
 
 class ForgotPasswordView(APIView):

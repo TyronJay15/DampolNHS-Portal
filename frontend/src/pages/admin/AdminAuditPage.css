@@ -1,6 +1,6 @@
 .audit-filters {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
   gap: 8px;
   margin-bottom: 14px;
 }
@@ -49,6 +49,12 @@
 .audit-card p {
   margin: 0.15rem 0 0;
   line-height: 1.5;
+}
+
+.audit-detail-facts {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--dash-line);
 }
 
 @media (max-width: 900px) {

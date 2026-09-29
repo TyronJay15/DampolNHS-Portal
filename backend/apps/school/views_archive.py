@@ -6,7 +6,6 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsHeadTeacher
 from apps.audit import services as audit
-from apps.grading.models import Grade
 from apps.people.models import TeacherAssignment
 from apps.school.labels import section_label
 from apps.school.models import SchoolYear, Section
@@ -17,12 +16,6 @@ def _year_busy(year):
     return year.sections.exists()
 
 
-def _section_busy(section):
-    if section.student_assignments.exists() or section.teacher_assignments.exists():
-        return True
-    return Grade.objects.filter(section=section).exists()
-
-
 class SchoolYearArchiveView(APIView):
     permission_classes = [IsAuthenticated, IsHeadTeacher]
 
@@ -31,6 +24,9 @@ class SchoolYearArchiveView(APIView):
         if year.is_current:
             return Response({'detail': 'Make another year current before archiving this one.'}, status=400)
         now = timezone.now()
+        from apps.ml.forecast import snapshot_year
+
+        snapshot_year(year)
         year.archived_at = now
         year.is_current = False
         year.save(update_fields=['archived_at', 'is_current'])
@@ -56,9 +52,43 @@ class SchoolYearRestoreView(APIView):
         year = get_object_or_404(SchoolYear, pk=pk)
         if year.archived_at is None:
             return Response({'detail': 'That year is already live.'}, status=400)
+        year_archived_at = year.archived_at
         year.archived_at = None
         year.save(update_fields=['archived_at'])
-        year.sections.exclude(archived_at=None).update(archived_at=None, is_active=True)
+        from apps.school.section_progress import recompute_status
+
+        for section in year.sections.filter(archived_at=year_archived_at):
+            section.archived_at = None
+            section.is_active = True
+            section.save(update_fields=['archived_at', 'is_active'])
+            recompute_status(section)
+            ended = TeacherAssignment.objects.filter(
+                section=section,
+                school_year=year,
+                status=TeacherAssignment.Status.ENDED,
+                ended_at=year_archived_at,
+            )
+            for row in ended:
+                if row.assignment_type == TeacherAssignment.Type.ADVISER:
+                    if TeacherAssignment.objects.filter(
+                        section=section,
+                        school_year=year,
+                        assignment_type=TeacherAssignment.Type.ADVISER,
+                        status=TeacherAssignment.Status.ACTIVE,
+                    ).exists():
+                        continue
+                elif row.subject_id:
+                    if TeacherAssignment.objects.filter(
+                        section=section,
+                        school_year=year,
+                        assignment_type=TeacherAssignment.Type.SUBJECT_TEACHER,
+                        subject_id=row.subject_id,
+                        status=TeacherAssignment.Status.ACTIVE,
+                    ).exists():
+                        continue
+                row.status = TeacherAssignment.Status.ACTIVE
+                row.ended_at = None
+                row.save(update_fields=['status', 'ended_at'])
         audit.record(
             user=request.user,
             action='school_year_restored',
@@ -100,7 +130,8 @@ class SectionArchiveView(APIView):
         now = timezone.now()
         section.archived_at = now
         section.is_active = False
-        section.save(update_fields=['archived_at', 'is_active'])
+        section.status = Section.Status.ARCHIVED
+        section.save(update_fields=['archived_at', 'is_active', 'status'])
         TeacherAssignment.objects.filter(section=section, status=TeacherAssignment.Status.ACTIVE).update(
             status=TeacherAssignment.Status.ENDED,
             ended_at=now,
@@ -124,9 +155,41 @@ class SectionRestoreView(APIView):
             return Response({'detail': 'That section is already live.'}, status=400)
         if section.school_year.archived_at:
             return Response({'detail': 'Restore the school year first.'}, status=400)
+        archived_at = section.archived_at
         section.archived_at = None
         section.is_active = True
-        section.save(update_fields=['archived_at', 'is_active'])
+        from apps.school.section_progress import recompute_status
+
+        recompute_status(section)
+        ended = TeacherAssignment.objects.filter(
+            section=section,
+            school_year=section.school_year,
+            status=TeacherAssignment.Status.ENDED,
+            ended_at=archived_at,
+        )
+        for row in ended:
+            if row.assignment_type == TeacherAssignment.Type.ADVISER:
+                taken = TeacherAssignment.objects.filter(
+                    section=section,
+                    school_year=section.school_year,
+                    assignment_type=TeacherAssignment.Type.ADVISER,
+                    status=TeacherAssignment.Status.ACTIVE,
+                ).exists()
+                if taken:
+                    continue
+            elif row.subject_id:
+                taken = TeacherAssignment.objects.filter(
+                    section=section,
+                    school_year=section.school_year,
+                    assignment_type=TeacherAssignment.Type.SUBJECT_TEACHER,
+                    subject_id=row.subject_id,
+                    status=TeacherAssignment.Status.ACTIVE,
+                ).exists()
+                if taken:
+                    continue
+            row.status = TeacherAssignment.Status.ACTIVE
+            row.ended_at = None
+            row.save(update_fields=['status', 'ended_at'])
         audit.record(
             user=request.user,
             action='section_restored',
@@ -166,8 +229,17 @@ class ArchiveDeskView(APIView):
         kind = (request.query_params.get('kind') or 'sections').strip()
         year_id = request.query_params.get('school_year')
         if kind == 'years':
+            from apps.school.purge import year_delete_summary
+
             rows = SchoolYear.objects.filter(archived_at__isnull=False)
-            return Response(SchoolYearSerializer(rows, many=True).data)
+            payload = []
+            for row in rows:
+                data = SchoolYearSerializer(row).data
+                summary = year_delete_summary(row)
+                data['delete_summary'] = summary
+                data['grades_protected'] = summary['grades'] > 0
+                payload.append(data)
+            return Response(payload)
         if kind == 'duties':
             rows = (
                 TeacherAssignment.objects.filter(status=TeacherAssignment.Status.ENDED)
@@ -194,4 +266,13 @@ class ArchiveDeskView(APIView):
         rows = Section.objects.filter(archived_at__isnull=False).select_related('program', 'school_year')
         if year_id:
             rows = rows.filter(school_year_id=year_id)
-        return Response(SectionSerializer(rows, many=True).data)
+        from apps.school.purge import section_delete_summary
+
+        payload = []
+        for row in rows:
+            data = SectionSerializer(row).data
+            summary = section_delete_summary(row)
+            data['delete_summary'] = summary
+            data['grades_protected'] = summary['grades'] > 0
+            payload.append(data)
+        return Response(payload)

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
@@ -7,7 +8,8 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '../../services/studentService';
-import '../student/StudentStudio.css';
+import { NOTIFICATION_FILTERS, categoryLabel, filterNotifications } from '../../utils/auditTrail';
+import '../../styles/studio.css';
 
 function formatWhen(value) {
   if (!value) return '—';
@@ -16,9 +18,15 @@ function formatWhen(value) {
   return date.toLocaleString();
 }
 
+function categoryCount(rows, value) {
+  if (value === 'all') return rows.length;
+  return rows.filter((row) => row.category === value).length;
+}
+
 export default function NotificationsPage() {
   const [rows, setRows] = useState([]);
-  const [filter, setFilter] = useState('all');
+  const [category, setCategory] = useState('all');
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -58,69 +66,99 @@ export default function NotificationsPage() {
     }
   }
 
+  const unreadCount = rows.filter((row) => !row.is_read).length;
+  const visible = useMemo(
+    () => filterNotifications(rows, category, unreadOnly),
+    [category, unreadOnly, rows],
+  );
+  const activeLabel = NOTIFICATION_FILTERS.find((tab) => tab.value === category)?.label || 'All';
+
   if (loading) return <Loading label="Loading notifications…" />;
 
-  const unreadCount = rows.filter((row) => !row.is_read).length;
-  const visible = filter === 'unread' ? rows.filter((row) => !row.is_read) : rows;
-
   return (
-    <div className="desk student-studio">
+    <div className="desk studio">
       <PageHead kicker="Inbox" title="Notifications" icon="bell">
-        <p>School notices for your account. Event reminders, grade workflow, and account changes.</p>
+        <p>
+          {unreadOnly
+            ? `Unread ${activeLabel.toLowerCase()} notices.`
+            : `${activeLabel} notices for this account.`}
+        </p>
+        <div className="studio-hero-meta">
+          <span className="studio-chip">{unreadCount} unread</span>
+          <span className="studio-chip">{rows.length} total</span>
+        </div>
       </PageHead>
       {error ? <p className="alert alert-error">{error}</p> : null}
 
-      <div className="student-toolbar">
-        <div className="student-filters">
+      <div className="studio-tabs is-page">
+        {NOTIFICATION_FILTERS.map((tab) => (
           <button
+            key={tab.value}
             type="button"
-            className={`student-filter${filter === 'all' ? ' is-active' : ''}`}
-            onClick={() => setFilter('all')}
+            className={category === tab.value ? 'is-active' : ''}
+            onClick={() => setCategory(tab.value)}
           >
-            All <em>{rows.length}</em>
+            {tab.label}
+            <em>{categoryCount(rows, tab.value)}</em>
           </button>
-          <button
-            type="button"
-            className={`student-filter${filter === 'unread' ? ' is-active' : ''}`}
-            onClick={() => setFilter('unread')}
-          >
-            Unread <em>{unreadCount}</em>
-          </button>
-        </div>
+        ))}
+      </div>
+
+      <div className="studio-actions">
+        <button
+          type="button"
+          className={`btn btn-secondary${unreadOnly ? ' is-on' : ''}`}
+          onClick={() => setUnreadOnly((current) => !current)}
+        >
+          {unreadOnly ? 'Showing unread' : 'Unread only'}
+        </button>
         {unreadCount ? (
-          <button type="button" className="btn btn-secondary" onClick={markAll} disabled={busy}>
+          <button className="btn" type="button" onClick={markAll} disabled={busy}>
             Mark all as read
           </button>
         ) : null}
       </div>
 
-      {visible.length === 0 ? (
-        <p className="card student-panel student-empty student-empty-card">
-          {rows.length === 0 ? 'No notifications yet.' : 'No unread notifications.'}
-        </p>
-      ) : (
-        <ul className="student-note-list">
-          {visible.map((row) => (
-            <li key={row.id}>
-              <button
-                type="button"
-                className={`card student-note${row.is_read ? '' : ' is-unread'}`}
-                onClick={() => markOne(row)}
+      <section className="card studio-panel">
+        <h2>
+          <LineMark name="bell" />
+          {activeLabel}
+        </h2>
+        {visible.length === 0 ? (
+          <p className="studio-empty">
+            {rows.length === 0 ? 'No notifications yet.' : 'No notifications match that filter.'}
+          </p>
+        ) : (
+          <div className="studio-inbox">
+            {visible.map((row) => (
+              <article
+                key={row.id}
+                className={`studio-inbox-row${row.is_read ? '' : ' is-unread'}${row.level ? ` is-${row.level}` : ''}`}
               >
-                <p className="student-note-when">
-                  {formatWhen(row.created_at)}
-                  {row.is_read ? null : <em>New</em>}
-                </p>
-                <h2>
-                  <LineMark name="bell" />
-                  {row.title}
-                </h2>
-                <p>{row.body}</p>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                <button type="button" className="studio-inbox-copy" onClick={() => markOne(row)}>
+                  <p className="studio-inbox-meta">
+                    <span className="studio-chip">{categoryLabel(row.category)}</span>
+                    <span>{formatWhen(row.created_at)}</span>
+                    {row.is_read ? null : <em>New</em>}
+                  </p>
+                  <h3>
+                    <LineMark name="bell" size={14} />
+                    {row.title}
+                  </h3>
+                  <p>{row.body}</p>
+                </button>
+                {row.action_path ? (
+                  <div className="studio-actions">
+                    <Link className="btn btn-secondary" to={row.action_path}>
+                      Open
+                    </Link>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

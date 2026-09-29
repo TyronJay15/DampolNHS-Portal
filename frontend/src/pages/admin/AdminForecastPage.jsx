@@ -28,8 +28,8 @@ export default function AdminForecastPage() {
     <div className="forecast-page desk">
       <PageHead kicker="Records" title="Grade 11 forecast" icon="forecast">
         <p>
-          Approved Grade 11 clusters for {stats.year || 'the current year'} map to Grade 12 strands
-          {stats.nextYear ? ` for ${stats.nextYear}` : ''}. Bars use live registration counts, not estimates.
+          New SHS applications by cluster for {stats.year || 'the current year'}. Linear Regression
+          trains after three intakes. The old Grade 12 map stays as a transition note.
         </p>
       </PageHead>
       {error ? <p className="alert alert-error">{error}</p> : null}
@@ -52,16 +52,22 @@ export default function AdminForecastPage() {
         <article className="admin-stat">
           <span className="desk-stat-top">
             <DeskMark name="forecast" size={16} />
-            Largest cluster
+            Most applied
           </span>
-          <strong>{stats.largest ? `${stats.largest.code} · ${stats.largest.count}` : '—'}</strong>
+          <strong>
+            {stats.mostApplied
+              ? `${stats.mostApplied.code} · ${stats.mostApplied.applied}`
+              : stats.largest
+                ? `${stats.largest.code} · ${stats.largest.applied ?? stats.largest.count}`
+                : '—'}
+          </strong>
         </article>
         <article className="admin-stat">
           <span className="desk-stat-top">
             <DeskMark name="forecast" size={16} />
-            Smallest Grade 12 map
+            Model
           </span>
-          <strong>{stats.smallest ? `${stats.smallest.code} · ${stats.smallest.count}` : '—'}</strong>
+          <strong>{stats.ready ? 'Linear Regression' : 'Counts'}</strong>
         </article>
       </div>
 
@@ -71,7 +77,12 @@ export default function AdminForecastPage() {
             <LineMark name="forecast" />
             This year · Grade 11 clusters
           </h2>
-          <ForecastBars rows={stats.clusters} total={stats.total} empty="Approve Grade 11 students to see cluster shares." />
+          <ForecastBars
+            rows={stats.clusters.map((row) => ({ ...row, count: row.applied ?? row.count }))}
+            total={stats.clusters.reduce((sum, row) => sum + Number(row.applied ?? row.count ?? 0), 0)}
+            empty="Register Grade 11 students to see which new clusters attract applicants."
+          />
+          {stats.readyReason ? <p className="desk-empty">{stats.readyReason}</p> : null}
         </section>
         <section className="card forecast-page-card">
           <h2 className="desk-title">
@@ -87,8 +98,10 @@ export default function AdminForecastPage() {
           <thead>
             <tr>
               <th>Grade 11 cluster</th>
-              <th>Students</th>
-              <th>Grade 12 strand</th>
+              <th>Applied</th>
+              <th>Approved</th>
+              <th>Next intake</th>
+              <th>Grade 12 note</th>
             </tr>
           </thead>
           <tbody>
@@ -98,7 +111,9 @@ export default function AdminForecastPage() {
                   <td>
                     {row.code} — {row.name}
                   </td>
+                  <td>{row.applied ?? row.count}</td>
                   <td>{row.count}</td>
+                  <td>{row.projected == null ? '—' : row.projected}</td>
                   <td>
                     {row.grade12_code} — {row.grade12_name}
                   </td>
@@ -106,7 +121,7 @@ export default function AdminForecastPage() {
               ))
             ) : (
               <tr>
-                <td colSpan={3}>No Grade 11 cluster counts yet.</td>
+                <td colSpan={5}>No Grade 11 cluster counts yet.</td>
               </tr>
             )}
           </tbody>

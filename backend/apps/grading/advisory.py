@@ -60,12 +60,26 @@ def _student_state(subject_ids, grades):
             approved += 1
         elif grade.status == Grade.Status.RELEASED:
             released += 1
-    ready = bool(subject_ids) and missing == 0 and draft == 0 and submitted == 0
-    shown = bool(subject_ids) and released == len(subject_ids)
+    assigned = len(subject_ids)
+    posted = approved + released
+    complete = bool(assigned) and missing == 0 and draft == 0 and submitted == 0
+    shown_complete = bool(assigned) and released == assigned
     return {
-        'ready': ready,
-        'shown': shown,
+        'assigned': assigned,
+        'posted': posted,
+        'missing': missing,
+        'draft': draft,
+        'submitted': submitted,
+        'approved': approved,
+        'released': released,
+        'complete': complete,
+        'ready': approved > 0,
+        'shown': shown_complete,
+        'partial': released > 0 and not shown_complete,
+        'update_ready': released > 0 and approved > 0,
         'has_released': released > 0,
+        'can_show': approved > 0,
+        'can_hide': released > 0,
     }
 
 
@@ -116,8 +130,14 @@ def advisory_snapshot(section, term):
                 'guardian_contact': row.student.guardian_contact,
                 'ready': state['ready'],
                 'shown': state['shown'],
-                'can_show': state['ready'] and not state['shown'],
-                'can_hide': state['has_released'],
+                'complete': state['complete'],
+                'partial': state['partial'],
+                'update_ready': state['update_ready'],
+                'posted': state['posted'],
+                'assigned': state['assigned'],
+                'released': state['released'],
+                'can_show': state['can_show'],
+                'can_hide': state['can_hide'],
                 'recommendation': recommend_payload(grades_by_student.get(row.student_id, [])),
             }
         )

@@ -137,14 +137,16 @@ export default function AdminStaffPage() {
     setResult(null);
     setSaving(true);
     try {
-      await reactivateAccount(row.id);
+      const saved = await reactivateAccount(row.id);
       setResult({
-        title: 'Staff must set a password',
+        title: saved.activation_sent ? 'Staff must set a password' : 'Staff reactivated',
         facts: [
           { label: 'Name', value: row.name },
           { label: 'Email', value: row.email },
         ],
-        next: 'Copy the activation code from the Django terminal, then open /activate and set a new password.',
+        next: saved.activation_sent
+          ? 'Copy the activation code from the Django terminal, then open /activate and set a new password.'
+          : 'They can sign in again with their existing password.',
       });
       await load();
     } catch (err) {
@@ -324,7 +326,7 @@ export default function AdminStaffPage() {
                     {ARCHIVED.has(row.account_status) ? (
                       <>
                         <button className="acct-btn acct-btn-ok" type="button" disabled={saving} onClick={() => handleReactivate(row)}>
-                          Restore
+                          Reactivate
                         </button>
                         <button className="acct-btn acct-btn-no" type="button" disabled={saving} onClick={() => setRemoving(row)}>
                           Delete

@@ -91,10 +91,14 @@ class TermViewSet(ModelViewSet):
         )
         if term.encode_closes_at and term.encode_closes_at != previous_close:
             when = timezone.localtime(term.encode_closes_at).strftime('%b %d, %Y')
+            from apps.audit.catalog import SCHOOL
+
             notify(
                 teachers_for_year(term.school_year),
                 title=f'{term.label} encode window',
                 body=f'Encode {term.label} grades by {when}. Submit the class when the table is ready.',
+                category=SCHOOL,
+                action_path='/teacher/classes',
             )
 
 
@@ -156,33 +160,63 @@ class SectionViewSet(ModelViewSet):
 
     def get_queryset(self):
         rows = Section.objects.select_related('school_year', 'program')
+        school_year = self.request.query_params.get('school_year')
+        status = self.request.query_params.get('status')
+        grade_level = self.request.query_params.get('grade_level')
+        program = self.request.query_params.get('program')
         if self.request.query_params.get('archived'):
-            return rows.filter(archived_at__isnull=False)
-        return rows.filter(archived_at__isnull=True, school_year__archived_at__isnull=True)
+            rows = rows.filter(archived_at__isnull=False)
+        else:
+            rows = rows.filter(archived_at__isnull=True, school_year__archived_at__isnull=True)
+        if school_year:
+            rows = rows.filter(school_year_id=school_year)
+        if status:
+            rows = rows.filter(status=status)
+        if grade_level:
+            rows = rows.filter(grade_level=grade_level)
+        if program:
+            if str(program).isdigit():
+                rows = rows.filter(program_id=program)
+            else:
+                rows = rows.filter(program__code=str(program).upper())
+        return rows
+
+    def perform_create(self, serializer):
+        section = serializer.save(status=Section.Status.DRAFT)
+        audit.record(
+            user=self.request.user,
+            action='section_created',
+            summary=f'Created {section.name} for {section.school_year.label}',
+            target_type='Section',
+            target_id=section.id,
+            details={'grade_level': section.grade_level, 'program': section.program.code if section.program_id else ''},
+        )
 
     def perform_update(self, serializer):
-        instance = serializer.instance
-        if instance.student_assignments.filter(is_active=True).exists():
-            serializer.save(
-                name=serializer.validated_data.get('name', instance.name),
-                grade_level=instance.grade_level,
-                program=instance.program,
-                school_year=instance.school_year,
-            )
-            return
-        serializer.save()
+        section = serializer.save()
+        if section.status != Section.Status.ACTIVE and not section.archived_at:
+            from apps.school.section_progress import recompute_status
+
+            recompute_status(section)
 
     def destroy(self, request, *args, **kwargs):
         section = self.get_object()
-        if (
-            section.archived_at
-            or section.student_assignments.exists()
-            or section.teacher_assignments.exists()
-        ):
-            return Response({'detail': 'Archive a section that has students or duties.'}, status=400)
+        if section.student_assignments.exists() or section.teacher_assignments.exists():
+            return Response({'detail': 'Remove or archive a section that has students or duties.'}, status=400)
         from apps.grading.models import Grade
 
         if Grade.objects.filter(section=section).exists():
             return Response({'detail': 'Archive a section that has grades.'}, status=400)
+        if not section.archived_at and section.status == Section.Status.ACTIVE:
+            return Response({'detail': 'Archive this section before deleting it.'}, status=400)
+        label = section.name
+        section_id = section.id
         section.delete()
+        audit.record(
+            user=request.user,
+            action='section_deleted',
+            summary=f'Deleted section {label}',
+            target_type='Section',
+            target_id=section_id,
+        )
         return Response(status=204)

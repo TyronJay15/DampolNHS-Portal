@@ -116,7 +116,8 @@ class StudentNotificationTests(TestCase):
         inbox = self.student_client.get('/api/notifications/')
         self.assertEqual(inbox.status_code, 200)
         self.assertEqual(inbox.data['unread'], 1)
-        self.assertEqual(inbox.data['notifications'][0]['title'], 'Term 1 report card is available')
+        self.assertEqual(inbox.data['notifications'][0]['title'], 'Report card available · Term 1')
+        self.assertEqual(inbox.data['notifications'][0]['category'], 'grades')
         self.assertEqual(Notification.objects.filter(user=self.student_user).count(), 1)
 
         hide = self.adviser_client.post(
@@ -127,10 +128,10 @@ class StudentNotificationTests(TestCase):
         self.assertEqual(hide.status_code, 200)
         inbox = self.student_client.get('/api/notifications/')
         self.assertEqual(inbox.data['unread'], 2)
-        self.assertEqual(inbox.data['notifications'][0]['title'], 'Term 1 report card was hidden')
+        self.assertEqual(inbox.data['notifications'][0]['title'], 'Report card hidden · Term 1')
 
         teacher_titles = [row['title'] for row in self.teacher_client.get('/api/notifications/').data['notifications']]
-        self.assertNotIn('Term 1 report card is available', teacher_titles)
+        self.assertNotIn('Report card available · Term 1', teacher_titles)
         self.assertNotIn('Term 1 report card was hidden', teacher_titles)
 
     def test_student_can_mark_notifications_read(self):

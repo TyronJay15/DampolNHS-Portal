@@ -5,14 +5,8 @@ import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
 import YearChip from '../../components/YearChip';
 import { useAuth } from '../../context/AuthContext';
-import { cardStatusIcon } from '../../utils/gradeStatus';
+import { cardStatusClass, cardStatusIcon, cardStatusLabel } from '../../utils/gradeStatus';
 import { fetchAdvisory, fetchTeacherAssignments, fetchTerms } from '../../services/teacherService';
-
-function cardLabel(row) {
-  if (row.shown) return 'Shown';
-  if (!row.ready) return 'Waiting for approval';
-  return 'Ready to show';
-}
 
 export default function TeacherAdvisoryRecordsPage() {
   const { assignmentId } = useParams();
@@ -145,9 +139,9 @@ export default function TeacherAdvisoryRecordsPage() {
                     {row.guardian_contact ? ` · ${row.guardian_contact}` : ''}
                   </td>
                   <td>
-                    <span className={`studio-status ${row.shown ? 'is-shown' : row.ready ? 'is-ready' : ''}`}>
+                    <span className={`studio-status ${cardStatusClass(row)}`}>
                       <LineMark name={cardStatusIcon(row)} size={14} />
-                      {cardLabel(row)}
+                      {cardStatusLabel(row)}
                     </span>
                   </td>
                   <td>{row.recommendation?.courses?.[0]?.name || '—'}</td>

@@ -9,9 +9,7 @@ import { fetchAssignments, fetchPlacements, fetchSchoolYears, fetchSections } fr
 
 const SHORTCUTS = [
   { to: '/head/year', label: 'School year', icon: 'year' },
-  { to: '/head/sections', label: 'Sections', icon: 'sections' },
-  { to: '/head/place', label: 'Place students', icon: 'place' },
-  { to: '/head/assign', label: 'Assign teachers', icon: 'assign' },
+  { to: '/head/sections', label: 'Section management', icon: 'sections' },
   { to: '/head/approve', label: 'Approve grades', icon: 'approve' },
   { to: '/head/corrections', label: 'Corrections', icon: 'corrections' },
   { to: '/head/archive', label: 'Archive', icon: 'archive' },
@@ -44,7 +42,7 @@ export default function HeadOverview() {
       <WelcomeBanner>
         <p className="dash-hero-kicker">School operations</p>
         <h1>Head Teacher</h1>
-        <p>Open the year, build sections, place students, assign teachers, then approve grades. Advisers show or lock cards.</p>
+        <p>Open the year, complete section setup in Section Management, then approve grades. Advisers show or lock cards.</p>
         <div className="studio-hero-meta">
           <span className="studio-chip">{year?.label || 'No school year'}</span>
           <span className="studio-chip">{year?.is_current ? 'Current year' : 'Set a current year'}</span>

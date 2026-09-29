@@ -5,7 +5,7 @@ import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
 import YearChip from '../../components/YearChip';
 import { useAuth } from '../../context/AuthContext';
-import { gradeStatusIcon } from '../../utils/gradeStatus';
+import { gradeStatusIcon, progressChipClass } from '../../utils/gradeStatus';
 import {
   encodeGrade,
   fetchClassGrades,
@@ -36,10 +36,13 @@ export default function TeacherClassPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [encodeOpen, setEncodeOpen] = useState(true);
-  const [correctingId, setCorrectingId] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [correctionRow, setCorrectionRow] = useState(null);
+  const [correctionScore, setCorrectionScore] = useState('');
   const [correctReason, setCorrectReason] = useState('');
   const [query, setQuery] = useState('');
+  const [encodeOpen, setEncodeOpen] = useState(true);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +79,7 @@ export default function TeacherClassPage() {
         if (cancelled) return;
         setMeta(data.assignment);
         setEncodeOpen(data.term?.encode_open !== false);
+        setSummary(data.summary || null);
         setStudents(data.students || []);
         const next = {};
         (data.students || []).forEach((row) => {
@@ -109,6 +113,8 @@ export default function TeacherClassPage() {
         score: scores[student.student_id],
       });
       setStudents((rows) => rows.map((row) => (row.student_id === saved.student_id ? saved : row)));
+      const data = await fetchClassGrades(assignmentId, termId);
+      setSummary(data.summary || null);
       setMessage(`Saved ${saved.name}.`);
     } catch (err) {
       setError(err.message);
@@ -117,7 +123,20 @@ export default function TeacherClassPage() {
     }
   }
 
-  async function sendCorrection(student) {
+  function openCorrection(student) {
+    setCorrectionRow(student);
+    setCorrectionScore(scores[student.student_id] ?? student.score ?? '');
+    setCorrectReason('');
+  }
+
+  function closeCorrection() {
+    setCorrectionRow(null);
+    setCorrectReason('');
+  }
+
+  async function sendCorrection() {
+    if (!correctionRow) return;
+    const student = correctionRow;
     setBusyId(student.student_id);
     setMessage('');
     setError('');
@@ -125,13 +144,12 @@ export default function TeacherClassPage() {
       await requestCorrection({
         assignment: Number(assignmentId),
         grade: student.grade_id,
-        proposed_score: scores[student.student_id],
+        proposed_score: correctionScore,
         reason: correctReason,
       });
       const data = await fetchClassGrades(assignmentId, termId);
       setStudents(data.students || []);
-      setCorrectingId(null);
-      setCorrectReason('');
+      closeCorrection();
       setMessage(`Correction requested for ${student.name}.`);
     } catch (err) {
       setError(err.message);
@@ -148,6 +166,7 @@ export default function TeacherClassPage() {
       const result = await submitClassGrades(Number(assignmentId), Number(termId));
       const data = await fetchClassGrades(assignmentId, termId);
       setStudents(data.students || []);
+      setSummary(data.summary || null);
       setMessage(`Submitted ${result.submitted} draft grade(s).`);
     } catch (err) {
       setError(err.message);
@@ -163,9 +182,18 @@ export default function TeacherClassPage() {
   return (
     <div className="desk studio">
       <PageHead kicker={heading} title={meta ? `${meta.subject} · ${heading}` : 'Encode grades'} icon="classes">
-        <p>{meta?.school_year || 'Save drafts, then submit the class when the encode window is open.'}</p>
+        <p>
+          {meta?.school_year || 'Save drafts, then submit the class when the encode window is open.'}
+          {summary ? ` ${summary.encoded} of ${summary.roster} encoded.` : ''}
+        </p>
         <div className="studio-hero-meta">
           <YearChip user={user} />
+          {summary ? (
+            <>
+              <span className={`studio-chip ${progressChipClass(summary.progress)}`}>{summary.progress_label}</span>
+              {summary.workflow_label ? <span className="studio-chip is-approved">{summary.workflow_label}</span> : null}
+            </>
+          ) : null}
         </div>
       </PageHead>
       <div className="studio-actions">
@@ -190,6 +218,22 @@ export default function TeacherClassPage() {
 
       {encodeOpen ? null : <p className="alert alert-error">The encode window for this term is closed.</p>}
 
+      <details className="studio-help card" open={showHelp} onToggle={(event) => setShowHelp(event.target.open)}>
+        <summary>How to submit grades &amp; request a correction</summary>
+        <div className="studio-help-body">
+          <p>
+            <strong>Submitting grades:</strong> type each student's grade in the Grade column, then click{' '}
+            <strong>Save</strong> on that row. Once every student you want to send is saved, click{' '}
+            <strong>Submit class grades</strong> above the table to send the drafts for approval.
+          </p>
+          <p>
+            <strong>Requesting a correction:</strong> for a grade that has already been submitted, approved, or
+            released, click <strong>Request correction</strong> on that row. A pop-up will open where you enter the
+            corrected score and your reason — short or long, it's up to you — then click <strong>Send request</strong>.
+          </p>
+        </div>
+      </details>
+
       <label className="studio-search">
         <span className="desk-line">
           <LineMark name="search" size={14} />
@@ -212,6 +256,11 @@ export default function TeacherClassPage() {
               {submitting ? 'Submitting…' : 'Submit class grades'}
             </button>
           </div>
+          {summary?.missing ? (
+            <p className="studio-empty">
+              {summary.missing} student{summary.missing === 1 ? ' has' : 's have'} no score. Submit will send only encoded drafts.
+            </p>
+          ) : null}
           {visible.length === 0 ? <p className="studio-empty">No students match that search.</p> : null}
           <table className="studio-table">
             <thead>
@@ -239,7 +288,7 @@ export default function TeacherClassPage() {
                         className="studio-score"
                         inputMode="decimal"
                         value={scores[row.student_id] ?? ''}
-                        disabled={!(row.editable && encodeOpen) && correctingId !== row.student_id}
+                        disabled={!(row.editable && encodeOpen)}
                         onChange={(event) =>
                           setScores((current) => ({ ...current, [row.student_id]: event.target.value }))
                         }
@@ -259,20 +308,8 @@ export default function TeacherClassPage() {
                         </button>
                       ) : row.correction_pending ? (
                         'Correction pending'
-                      ) : row.can_correct && correctingId === row.student_id ? (
-                        <span className="studio-actions">
-                          <input
-                            className="studio-score"
-                            placeholder="Reason"
-                            value={correctReason}
-                            onChange={(event) => setCorrectReason(event.target.value)}
-                          />
-                          <button className="btn" type="button" disabled={busyId === row.student_id} onClick={() => sendCorrection(row)}>
-                            Send
-                          </button>
-                        </span>
                       ) : row.can_correct ? (
-                        <button className="btn btn-secondary" type="button" onClick={() => setCorrectingId(row.student_id)}>
+                        <button className="btn btn-secondary" type="button" onClick={() => openCorrection(row)}>
                           Request correction
                         </button>
                       ) : row.editable ? (
@@ -287,6 +324,50 @@ export default function TeacherClassPage() {
             </table>
         </section>
       )}
+
+      {correctionRow ? (
+        <div className="studio-modal-backdrop" onClick={closeCorrection}>
+          <div className="card studio-panel studio-modal" onClick={(event) => event.stopPropagation()}>
+            <h2>Request correction · {correctionRow.name}</h2>
+            <p className="studio-table-sub">Current score: {correctionRow.score ?? '—'}</p>
+            <label className="form-field">
+              <span>Corrected score</span>
+              <input
+                inputMode="decimal"
+                value={correctionScore}
+                onChange={(event) => setCorrectionScore(event.target.value)}
+              />
+            </label>
+            <label className="form-field">
+              <span>Reason</span>
+              <textarea
+                rows={4}
+                value={correctReason}
+                onChange={(event) => setCorrectReason(event.target.value)}
+                placeholder="Explain why this grade needs correction (a short or long reason is fine)"
+              />
+            </label>
+            <div className="studio-actions">
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={closeCorrection}
+                disabled={busyId === correctionRow.student_id}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn"
+                type="button"
+                onClick={sendCorrection}
+                disabled={busyId === correctionRow.student_id || !correctReason.trim()}
+              >
+                {busyId === correctionRow.student_id ? 'Sending…' : 'Send request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

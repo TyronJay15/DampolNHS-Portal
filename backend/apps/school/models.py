@@ -135,6 +135,13 @@ class ProgramSubject(models.Model):
 
 
 class Section(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        IN_PROGRESS = 'in_progress', 'In progress'
+        READY = 'ready', 'Ready'
+        ACTIVE = 'active', 'Active'
+        ARCHIVED = 'archived', 'Archived'
+
     school_year = models.ForeignKey(SchoolYear, on_delete=models.CASCADE, related_name='sections')
     name = models.CharField(max_length=64)
     grade_level = models.CharField(max_length=32, db_index=True)
@@ -144,6 +151,13 @@ class Section(models.Model):
         null=True,
         blank=True,
         related_name='sections',
+    )
+    capacity = models.PositiveSmallIntegerField(default=40)
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.DRAFT,
+        db_index=True,
     )
     is_active = models.BooleanField(default=True, db_index=True)
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)

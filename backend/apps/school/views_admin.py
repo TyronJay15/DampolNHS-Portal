@@ -29,7 +29,7 @@ class AdminProgramListView(APIView):
         program = serializer.save()
         audit.record(
             user=request.user,
-            action='cms_save',
+            action='program_created',
             summary=f'Created program {program.code}',
             target_type='Program',
             target_id=program.id,
@@ -47,7 +47,7 @@ class AdminProgramDetailView(APIView):
         serializer.save()
         audit.record(
             user=request.user,
-            action='cms_save',
+            action='program_updated',
             summary=f'Updated program {program.code}',
             target_type='Program',
             target_id=program.id,

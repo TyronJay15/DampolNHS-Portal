@@ -337,10 +337,9 @@
   color: var(--dash-muted);
 }
 
-.student-grade-foot {
-  margin: 0.7rem 0 0;
-  font-size: 0.82rem;
+.student-grade-pending {
   color: var(--dash-muted);
+  font-size: 0.82rem;
 }
 
 .student-rec {
@@ -473,9 +472,24 @@
   margin: 0 0 0.4rem;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 0.6rem;
   font-size: 0.8rem;
   color: var(--dash-muted);
+}
+
+.student-note-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: var(--dash-field);
+  color: var(--dash-muted);
+  font-style: normal;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 @media (max-width: 1100px) {

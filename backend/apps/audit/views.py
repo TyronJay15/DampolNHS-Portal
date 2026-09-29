@@ -16,10 +16,13 @@ class AuditLogListView(APIView):
                 {
                     'id': row.id,
                     'action': row.action,
+                    'family': row.family,
                     'summary': row.summary,
                     'actor': row.actor_label,
                     'role': row.actor_role,
                     'target_type': row.target_type,
+                    'target_id': row.target_id,
+                    'details': row.details,
                     'created_at': row.created_at,
                 }
                 for row in rows

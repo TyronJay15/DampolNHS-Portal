@@ -227,10 +227,3 @@ PROGRAM_SUBJECTS = _links()
 
 def names_for_program(code):
     return [SUBJECT_NAMES[subject] for program, subject, _kind, _term in PROGRAM_SUBJECTS if program == code]
-
-
-def program_has_subject(program_code, subject_code):
-    return any(
-        program == program_code and subject == subject_code
-        for program, subject, _kind, _term in PROGRAM_SUBJECTS
-    )

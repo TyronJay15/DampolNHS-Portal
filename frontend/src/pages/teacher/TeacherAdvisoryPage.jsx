@@ -5,7 +5,7 @@ import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
 import YearChip from '../../components/YearChip';
 import { useAuth } from '../../context/AuthContext';
-import { cardStatusIcon } from '../../utils/gradeStatus';
+import { cardStatusClass, cardStatusIcon, cardStatusLabel } from '../../utils/gradeStatus';
 import {
   fetchAdvisory,
   fetchTeacherAssignments,
@@ -14,12 +14,6 @@ import {
   showAdvisoryGrades,
   showReadyCards,
 } from '../../services/teacherService';
-
-function cardLabel(row) {
-  if (row.shown) return 'Shown';
-  if (!row.ready) return 'Waiting for approval';
-  return 'Ready to show';
-}
 
 export default function TeacherAdvisoryPage() {
   const { assignmentId } = useParams();
@@ -32,6 +26,7 @@ export default function TeacherAdvisoryPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [confirmShow, setConfirmShow] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,14 +76,20 @@ export default function TeacherAdvisoryPage() {
     return payload;
   }
 
-  async function showReady() {
+  async function showReady(force = false) {
+    const incomplete = (data?.students || []).filter((row) => row.can_show && !row.complete);
+    if (!force && incomplete.length) {
+      setConfirmShow({ bulk: true, count: incomplete.length });
+      return;
+    }
     setBusy('show-ready');
     setMessage('');
     setError('');
+    setConfirmShow(null);
     try {
       const result = await showReadyCards(Number(assignmentId), Number(termId));
       await reload();
-      setMessage(`Showed ${result.shown} ready card(s). ${result.skipped} skipped.`);
+      setMessage(`Showed ${result.shown} card(s). ${result.skipped} had nothing new to show.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -96,10 +97,15 @@ export default function TeacherAdvisoryPage() {
     }
   }
 
-  async function run(action, row) {
+  async function run(action, row, force = false) {
+    if (action === 'show' && !force && row.assigned && row.posted < row.assigned && !row.update_ready) {
+      setConfirmShow(row);
+      return;
+    }
     setBusy(`${action}-${row.student_id}`);
     setMessage('');
     setError('');
+    setConfirmShow(null);
     try {
       const result =
         action === 'show'
@@ -136,7 +142,7 @@ export default function TeacherAdvisoryPage() {
       >
         <p>
           {data
-            ? `${data.roster_count} student(s). Show when every assigned subject is approved. Lock hides the card again.`
+            ? `${data.roster_count} student(s). You can show a partial card; missing subjects stay off the student view until they are approved and re-shown.`
             : 'Show or lock student cards for this section.'}
         </p>
         <div className="studio-hero-meta">
@@ -259,9 +265,9 @@ export default function TeacherAdvisoryPage() {
                       {row.guardian_contact ? ` · ${row.guardian_contact}` : ''}
                     </td>
                     <td>
-                      <span className={`studio-status ${row.shown ? 'is-shown' : row.ready ? 'is-ready' : ''}`}>
+                      <span className={`studio-status ${cardStatusClass(row)}`}>
                         <LineMark name={cardStatusIcon(row)} size={14} />
-                        {cardLabel(row)}
+                        {cardStatusLabel(row)}
                       </span>
                     </td>
                     <td>{row.recommendation?.courses?.[0]?.name || '—'}</td>
@@ -273,7 +279,7 @@ export default function TeacherAdvisoryPage() {
                           disabled={!row.can_show || Boolean(busy)}
                           onClick={() => run('show', row)}
                         >
-                          {busy === `show-${row.student_id}` ? 'Showing…' : 'Show'}
+                          {busy === `show-${row.student_id}` ? 'Showing…' : row.update_ready ? 'Re-show' : 'Show'}
                         </button>
                         <button
                           className="btn btn-secondary"
@@ -292,6 +298,44 @@ export default function TeacherAdvisoryPage() {
           </div>
         )}
       </section>
+
+      {confirmShow?.bulk ? (
+        <div className="studio-modal-backdrop">
+          <div className="card studio-panel studio-modal">
+            <h2>Show incomplete cards?</h2>
+            <p>
+              {confirmShow.count} student{confirmShow.count === 1 ? ' has' : 's have'} approved scores while other
+              subjects are still missing. They will see a partial card until those subjects are approved and re-shown.
+            </p>
+            <div className="studio-actions">
+              <button className="btn btn-secondary" type="button" onClick={() => setConfirmShow(null)}>
+                Cancel
+              </button>
+              <button className="btn" type="button" onClick={() => showReady(true)}>
+                Show ready cards
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : confirmShow ? (
+        <div className="studio-modal-backdrop">
+          <div className="card studio-panel studio-modal">
+            <h2>Show a partial card?</h2>
+            <p>
+              Show {confirmShow.posted} of {confirmShow.assigned} subjects for <strong>{confirmShow.name}</strong>? The
+              student will see a partial card. Missing subjects stay as not yet posted.
+            </p>
+            <div className="studio-actions">
+              <button className="btn btn-secondary" type="button" onClick={() => setConfirmShow(null)}>
+                Cancel
+              </button>
+              <button className="btn" type="button" onClick={() => run('show', confirmShow, true)}>
+                Show partial card
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

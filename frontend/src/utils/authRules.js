@@ -17,7 +17,7 @@ export function flattenErrors(errors) {
   return out;
 }
 
-export function lrnDigits(value) {
+function lrnDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
 

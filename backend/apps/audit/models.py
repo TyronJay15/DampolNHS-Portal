@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 
+from apps.audit.catalog import ACCOUNTS, FAMILIES
+
 
 class AuditLogQuerySet(models.QuerySet):
     def delete(self):
@@ -21,6 +23,7 @@ class AuditLog(models.Model):
     actor_label = models.CharField(max_length=150, blank=True)
     actor_role = models.CharField(max_length=16, blank=True, db_index=True)
     action = models.CharField(max_length=64, db_index=True)
+    family = models.CharField(max_length=16, choices=[(row, row) for row in FAMILIES], default=ACCOUNTS, db_index=True)
     target_type = models.CharField(max_length=64, blank=True)
     target_id = models.CharField(max_length=64, blank=True)
     summary = models.CharField(max_length=255)

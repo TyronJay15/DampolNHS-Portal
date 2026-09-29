@@ -10,7 +10,6 @@ urlpatterns = [
     path('api/health/', HealthView.as_view(), name='health'),
     path('api/auth/', include('apps.accounts.urls')),
     path('api/register/', include('apps.people.register_urls')),
-    path('api/school/', include('apps.school.urls')),
     path('api/programs/', include('apps.school.program_urls')),
     path('api/students/', include('apps.people.student_urls')),
     path('api/teachers/', include('apps.people.teacher_urls')),
@@ -25,6 +24,7 @@ urlpatterns = [
     path('api/audit-logs/', include('apps.audit.urls')),
     path('api/chatbot/', include('apps.chatbot.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
+    path('api/ml/', include('apps.ml.urls')),
 ]
 
 if settings.DEBUG:

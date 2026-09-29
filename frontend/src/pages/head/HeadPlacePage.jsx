@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import AdvancedToolBanner from '../../components/AdvancedToolBanner/AdvancedToolBanner';
 import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
@@ -7,28 +9,20 @@ import { sectionLabel } from '../../utils/sectionLabel';
 
 function matches(row, query) {
   if (!query) return true;
-  const hay = [row.name, row.lrn, row.program_code, row.program_name, row.section].join(' ').toLowerCase();
+  const hay = [row.name, row.lrn, row.program_code, row.section].join(' ').toLowerCase();
   return hay.includes(query);
 }
 
-function matchingSections(row, sections, transfer = false) {
-  return sections.filter((section) => {
-    if (row.grade_level && section.grade_level && row.grade_level !== section.grade_level) return false;
-    if (!transfer && row.program_code && section.program_code && row.program_code !== section.program_code) {
-      return false;
-    }
-    return true;
-  });
-}
-
 export default function HeadPlacePage() {
-  const [view, setView] = useState('section');
   const [students, setStudents] = useState([]);
   const [sections, setSections] = useState([]);
   const [sectionId, setSectionId] = useState('');
-  const [query, setQuery] = useState('');
-  const [picks, setPicks] = useState({});
+  const [sectionQuery, setSectionQuery] = useState('');
+  const [studentQuery, setStudentQuery] = useState('');
+  const [studentTab, setStudentTab] = useState('available');
   const [selected, setSelected] = useState({});
+  const [transferTarget, setTransferTarget] = useState(null);
+  const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -48,37 +42,44 @@ export default function HeadPlacePage() {
   }, []);
 
   const section = sections.find((row) => String(row.id) === String(sectionId));
-  const unplaced = students.filter((row) => !row.placed).length;
+  const filteredSections = useMemo(() => {
+    const needle = sectionQuery.trim().toLowerCase();
+    return sections.filter((row) => !needle || sectionLabel(row).toLowerCase().includes(needle));
+  }, [sections, sectionQuery]);
 
-  const candidates = useMemo(() => {
-    if (!section) return [];
+  const roster = useMemo(
+    () => students.filter((row) => row.section_id === Number(sectionId) && matches(row, studentQuery.trim().toLowerCase())),
+    [students, sectionId, studentQuery],
+  );
+
+  const pool = useMemo(() => {
+    const needle = studentQuery.trim().toLowerCase();
     return students.filter((row) => {
-      if (row.placed) return false;
+      if (studentTab === 'available' && row.placed) return false;
+      if (studentTab === 'in_section' && row.section_id !== Number(sectionId)) return false;
+      if (!section) return false;
       if (row.grade_level && section.grade_level && row.grade_level !== section.grade_level) return false;
-      if (row.program_code && section.program_code && row.program_code !== section.program_code) return false;
-      return matches(row, query.trim().toLowerCase());
+      if (!row.placed && row.program_code && section.program_code && row.program_code !== section.program_code) return false;
+      return matches(row, needle);
     });
-  }, [students, section, query]);
+  }, [students, studentTab, sectionId, section, studentQuery]);
 
-  const movers = useMemo(() => {
-    return students.filter((row) => matches(row, query.trim().toLowerCase()));
-  }, [students, query]);
+  const chosen = pool.filter((row) => selected[row.student_id]);
 
-  const chosen = candidates.filter((row) => selected[row.student_id]);
-
-  async function placeBulk() {
+  async function placeBulk(force = false) {
     if (!section || chosen.length === 0) return;
     setBusy('bulk');
     setError('');
-    setMessage('');
     try {
-      const saved = await savePlacementsBulk({
+      const result = await savePlacementsBulk({
         section: Number(sectionId),
         students: chosen.map((row) => row.student_id),
+        override_capacity: force,
+        reason,
       });
       setSelected({});
-      setMessage(`Placed ${saved.placed} student(s) in ${saved.section}.`);
       await load();
+      setMessage(`Placed ${result.placed} student(s) in ${sectionLabel(section)}. Changes appear in Section Workspace.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -86,23 +87,21 @@ export default function HeadPlacePage() {
     }
   }
 
-  async function moveOne(row) {
-    const nextId = picks[row.student_id] || matchingSections(row, sections)[0]?.id;
-    if (!nextId) {
-      setError('Create a matching section first.');
-      return;
-    }
+  async function transferOne(row, force = false) {
     setBusy(`move-${row.student_id}`);
     setError('');
-    setMessage('');
     try {
-      const saved = await savePlacement({
+      await savePlacement({
         student: row.student_id,
-        section: Number(nextId),
+        section: Number(sectionId),
         transfer: Boolean(row.placed),
+        override_capacity: force,
+        reason,
       });
-      setMessage(`${row.name} ${row.placed ? 'transferred' : 'placed'} to ${saved.section}.`);
+      setTransferTarget(null);
+      setReason('');
       await load();
+      setMessage(`Updated ${row.name} in ${sectionLabel(section)}.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -113,130 +112,123 @@ export default function HeadPlacePage() {
   if (loading) return <Loading label="Loading placements…" />;
 
   return (
-    <div className="desk studio">
-      <PageHead kicker="Roster" title="Place students" icon="place">
-        <p>Fill a section from the matching unplaced list, or transfer a placed student to another section or program.</p>
-        <div className="studio-hero-meta">
-          <span className="studio-chip">{unplaced} unplaced</span>
-          <span className="studio-chip">{students.length} active</span>
-        </div>
+    <div className="desk studio studio-spaced">
+      <PageHead kicker="Advanced" title="Place students" icon="place">
+        <p>Pick a section, then assign or transfer students. Every change syncs with Section Management and Workspace.</p>
       </PageHead>
+      <AdvancedToolBanner />
       {message ? <p className="alert alert-info">{message}</p> : null}
       {error ? <p className="alert alert-error">{error}</p> : null}
 
-      <div className="studio-filters">
-        <button type="button" className={`studio-filter${view === 'section' ? ' is-active' : ''}`} onClick={() => setView('section')}>
-          By section
-        </button>
-        <button type="button" className={`studio-filter${view === 'move' ? ' is-active' : ''}`} onClick={() => setView('move')}>
-          Move one
-        </button>
-      </div>
+      <div className="studio-split-panels">
+        <section className="card studio-panel">
+          <label className="studio-search studio-search-wide">
+            <span>Search sections</span>
+            <input value={sectionQuery} onChange={(e) => setSectionQuery(e.target.value)} placeholder="Section name" />
+          </label>
+          <div className="studio-pick-list studio-pick-list-scroll">
+            {filteredSections.map((row) => (
+              <button
+                key={row.id}
+                type="button"
+                className={`studio-pick${String(row.id) === String(sectionId) ? ' is-active' : ''}`}
+                onClick={() => setSectionId(String(row.id))}
+              >
+                <strong>{sectionLabel(row)}</strong>
+                <em>{row.student_count || 0}{row.capacity ? ` / ${row.capacity}` : ''}</em>
+              </button>
+            ))}
+          </div>
+          {section ? (
+            <Link className="btn btn-secondary" to={`/head/sections/${section.id}/setup?step=students`}>
+              Open in Section Workspace
+            </Link>
+          ) : null}
+        </section>
 
-      <label className="studio-search">
-        <span className="desk-line">
-          <LineMark name="search" size={14} />
-          Search
-        </span>
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, LRN, or program" />
-      </label>
-
-      {view === 'section' ? (
-        <div className="studio-grid is-wide">
-          <section className="card studio-panel">
-            <h2>
-              <LineMark name="sections" />
-              Sections
-            </h2>
-            <div className="studio-pick-list">
-              {sections.map((row) => (
-                <button
-                  key={row.id}
-                  type="button"
-                  className={`studio-pick${String(row.id) === String(sectionId) ? ' is-active' : ''}`}
-                  onClick={() => setSectionId(String(row.id))}
-                >
-                  <strong className="desk-line">
-                    <LineMark name="sections" size={14} />
-                    {sectionLabel(row)}
-                  </strong>
-                  <em>{row.student_count || 0} placed</em>
-                </button>
-              ))}
+        <section className="card studio-panel">
+          <div className="studio-toolbar">
+            <div>
+              <h2>{section ? sectionLabel(section) : 'Select a section'}</h2>
+              <p className="studio-empty">{roster.length} currently placed</p>
             </div>
-          </section>
-          <section className="card studio-panel">
-            <div className="studio-toolbar">
-              <div>
-                <h2 className="desk-line">
-                  <LineMark name="sections" />
-                  {section ? sectionLabel(section) : 'Select a section'}
-                </h2>
-                <p className="studio-empty">{candidates.length} matching unplaced</p>
-              </div>
-              <button className="btn" type="button" disabled={busy === 'bulk' || chosen.length === 0} onClick={placeBulk}>
-                {busy === 'bulk' ? 'Placing…' : `Place selected (${chosen.length})`}
+            <div className="studio-filters">
+              <button type="button" className={`studio-filter${studentTab === 'available' ? ' is-active' : ''}`} onClick={() => setStudentTab('available')}>Available</button>
+              <button type="button" className={`studio-filter${studentTab === 'in_section' ? ' is-active' : ''}`} onClick={() => setStudentTab('in_section')}>In section</button>
+            </div>
+          </div>
+          <label className="studio-search studio-search-wide">
+            <span>Search students</span>
+            <input value={studentQuery} onChange={(e) => setStudentQuery(e.target.value)} placeholder="Name or LRN" />
+          </label>
+          {studentTab === 'available' ? (
+            <div className="studio-actions">
+              <button className="btn" type="button" disabled={busy === 'bulk' || chosen.length === 0} onClick={() => placeBulk(false)}>
+                {busy === 'bulk' ? 'Placing…' : `Assign selected (${chosen.length})`}
               </button>
             </div>
-            {candidates.length === 0 ? <p className="studio-empty">No matching unplaced students.</p> : null}
-            {candidates.map((row) => (
-              <label className="studio-check" key={row.student_id}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(selected[row.student_id])}
-                  onChange={(event) =>
-                    setSelected((current) => ({ ...current, [row.student_id]: event.target.checked }))
-                  }
-                />
-                <span>
-                  <strong className="desk-line">
-                    <LineMark name="user" size={14} />
-                    {row.name}
-                  </strong>
-                  <em>
-                    {row.lrn} · {row.program_code}
-                  </em>
-                </span>
-              </label>
-            ))}
-          </section>
-        </div>
-      ) : (
-        <section className="card studio-panel">
-          {movers.length === 0 ? <p className="studio-empty">No students match that search.</p> : null}
-          {movers.map((row) => {
-            const options = matchingSections(row, sections, Boolean(row.placed));
-            return (
-              <article className="card studio-row is-place" key={row.student_id}>
-                <div>
-                  <h2>
-                    <LineMark name="user" />
-                    {row.name}
-                  </h2>
-                  <p>
-                    {row.lrn} · {row.section || 'Not placed'}
-                  </p>
-                </div>
-                <div className="studio-picks">
-                  {options.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={`studio-chip-btn${String(picks[row.student_id] || options[0]?.id) === String(item.id) ? ' is-active' : ''}`}
-                      onClick={() => setPicks((current) => ({ ...current, [row.student_id]: item.id }))}
-                    >
-                      {sectionLabel(item)}
-                    </button>
-                  ))}
-                </div>
-                <button className="btn" type="button" disabled={busy === `move-${row.student_id}` || options.length === 0} onClick={() => moveOne(row)}>
-                  {busy === `move-${row.student_id}` ? 'Saving…' : row.placed ? 'Transfer' : 'Place'}
-                </button>
-              </article>
-            );
-          })}
+          ) : null}
+          <div className="studio-table-wrap">
+            <table className="studio-table">
+              <thead>
+                <tr>
+                  {studentTab === 'available' ? <th /> : null}
+                  <th>Student</th>
+                  <th>LRN</th>
+                  <th>Current section</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {pool.map((row) => (
+                  <tr key={row.student_id}>
+                    {studentTab === 'available' ? (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selected[row.student_id])}
+                          onChange={(e) => setSelected((c) => ({ ...c, [row.student_id]: e.target.checked }))}
+                        />
+                      </td>
+                    ) : null}
+                    <td>{row.name}</td>
+                    <td>{row.lrn}</td>
+                    <td>{row.section || '—'}</td>
+                    <td>
+                      {row.placed && row.section_id !== Number(sectionId) ? (
+                        <button className="btn btn-secondary" type="button" onClick={() => setTransferTarget(row)}>Transfer here</button>
+                      ) : null}
+                      {!row.placed && studentTab === 'available' ? (
+                        <button className="btn btn-secondary" type="button" onClick={() => transferOne(row)}>Assign</button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
-      )}
+      </div>
+
+      {transferTarget ? (
+        <div className="studio-modal-backdrop">
+          <div className="card studio-panel studio-modal">
+            <h2>Confirm transfer</h2>
+            <p>
+              Move <strong>{transferTarget.name}</strong> from <strong>{transferTarget.section || 'unplaced'}</strong> to{' '}
+              <strong>{section ? sectionLabel(section) : ''}</strong>?
+            </p>
+            <label className="form-field is-wide">
+              <span>Reason (optional)</span>
+              <input value={reason} onChange={(e) => setReason(e.target.value)} />
+            </label>
+            <div className="studio-actions">
+              <button className="btn btn-secondary" type="button" onClick={() => setTransferTarget(null)}>Cancel</button>
+              <button className="btn" type="button" onClick={() => transferOne(transferTarget)} disabled={Boolean(busy)}>Confirm transfer</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

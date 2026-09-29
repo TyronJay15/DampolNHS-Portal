@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import AdvancedToolBanner from '../../components/AdvancedToolBanner/AdvancedToolBanner';
 import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
@@ -96,8 +97,8 @@ export default function HeadAssignPage() {
       });
       setMessage(
         form.type === 'adviser'
-          ? `${saved.teacher} is adviser of ${saved.section}.`
-          : `${saved.teacher} teaches ${saved.subject} in ${saved.section}.`,
+          ? `${saved.teacher} is adviser of ${saved.section}. Visible in Section Workspace.`
+          : `${saved.teacher} teaches ${saved.subject} in ${saved.section}. Visible in Section Workspace.`,
       );
       setForm((current) => ({ ...current, subject: '' }));
       await load();
@@ -127,13 +128,14 @@ export default function HeadAssignPage() {
   const duties = view === 'section' ? sectionDuties : teacherDuties;
 
   return (
-    <div className="desk studio">
+    <div className="desk studio studio-spaced">
       <PageHead kicker="Duties" title="Assign teachers" icon="assign">
         <p>Work by section or by teacher. Ending a duty parks it in Archive so it can be restored later.</p>
         <div className="studio-hero-meta">
           <span className="studio-chip">{assignments.length} live duties</span>
         </div>
       </PageHead>
+      <AdvancedToolBanner />
       {message ? <p className="alert alert-info">{message}</p> : null}
       {error ? <p className="alert alert-error">{error}</p> : null}
 
@@ -146,13 +148,13 @@ export default function HeadAssignPage() {
         </button>
       </div>
 
-      <div className="studio-grid is-wide">
+      <div className="studio-split-panels">
         <section className="card studio-panel">
           <h2>
             <LineMark name={view === 'section' ? 'sections' : 'staff'} />
             {view === 'section' ? 'Sections' : 'Teachers'}
           </h2>
-          <div className="studio-pick-list">
+          <div className="studio-pick-list studio-pick-list-scroll">
             {view === 'section'
               ? sections.map((row) => (
                   <button
@@ -197,6 +199,36 @@ export default function HeadAssignPage() {
                 : 'Select a teacher'}
           </h2>
           {view === 'section' && adviser ? <p className="studio-empty">Adviser · {adviser.teacher}</p> : null}
+
+          {view === 'section' && section ? (
+            <div className="studio-table-wrap">
+              <table className="studio-table">
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>Teacher</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {subjects.map((subj) => {
+                    const duty = sectionDuties.find((row) => String(row.subject_id) === String(subj.id));
+                    return (
+                      <tr key={subj.id}>
+                        <td>{subj.name}</td>
+                        <td>{duty ? duty.teacher : '—'}</td>
+                        <td>
+                          {duty ? (
+                            <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => endDuty(duty)}>End</button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
 
           <form className="studio-form" onSubmit={handleCreate}>
             {view === 'section' ? (
@@ -261,23 +293,36 @@ export default function HeadAssignPage() {
             </div>
           </form>
 
-          {duties.length === 0 ? <p className="studio-empty">No live duties here yet.</p> : null}
-          {duties.map((row) => (
-            <article className="card studio-row is-stack" key={row.id}>
-              <div>
-                <h2>
-                  <LineMark name="staff" />
-                  {row.teacher}
-                </h2>
-                <p>
-                  {row.type === 'adviser' ? 'Adviser' : row.subject} · {row.section}
-                </p>
+          {view === 'teacher' ? (
+            duties.length === 0 ? (
+              <p className="studio-empty">No live duties here yet.</p>
+            ) : (
+              <div className="studio-table-wrap">
+                <table className="studio-table">
+                  <thead>
+                    <tr>
+                      <th>Duty</th>
+                      <th>Section</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {duties.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.type === 'adviser' ? 'Adviser' : row.subject}</td>
+                        <td>{row.section}</td>
+                        <td>
+                          <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => endDuty(row)}>
+                            {busy === `del-${row.id}` ? 'Ending…' : 'End duty'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => endDuty(row)}>
-                {busy === `del-${row.id}` ? 'Ending…' : 'End duty'}
-              </button>
-            </article>
-          ))}
+            )
+          ) : null}
         </section>
       </div>
     </div>

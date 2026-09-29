@@ -5,6 +5,7 @@ from apps.grading.advisory import assigned_subject_ids
 from apps.grading.history import ADVISER
 from apps.grading.models import Grade, PtpaAttendance
 from apps.grading.transitions import transition_grades
+from apps.audit.catalog import GRADES
 from apps.notifications.services import notify
 from apps.people.models import StudentSection
 
@@ -28,10 +29,6 @@ def roster_entry(section, student_id):
     )
 
 
-def ptpa_attended(student, term):
-    return PtpaAttendance.objects.filter(student=student, term=term, attended=True).exists()
-
-
 def student_term_grades(section, term, student, statuses=None):
     rows = Grade.objects.filter(
         term=term,
@@ -45,6 +42,7 @@ def student_term_grades(section, term, student, statuses=None):
 
 
 def student_is_ready(section, term, student):
+    """True when every assigned subject is approved or already shown."""
     subject_ids = assigned_subject_ids(section)
     if not subject_ids:
         return False
@@ -55,35 +53,58 @@ def student_is_ready(section, term, student):
     return all(grades[subject_id].status in allowed for subject_id in subject_ids)
 
 
-def _notify_student(student, title, body):
-    notify([student.user], title=title, body=body)
+def student_can_show(section, term, student):
+    return bool(student_term_grades(section, term, student, statuses=[Grade.Status.APPROVED]))
+
+
+def _notify_student(student, title, body, *, level='success'):
+    notify(
+        [student.user],
+        title=title,
+        body=body,
+        level=level,
+        category=GRADES,
+        action_path='/student/grades',
+    )
 
 
 def show_student_card(*, section, term, student, user):
-    if not student_is_ready(section, term, student):
-        raise ReleaseError('Every assigned subject for this student must be approved first.')
-    grades = student_term_grades(section, term, student, statuses=[Grade.Status.APPROVED])
+    pending = student_term_grades(section, term, student, statuses=[Grade.Status.APPROVED])
+    if not pending:
+        raise ReleaseError('No approved grades to show yet.')
+    complete = student_is_ready(section, term, student)
     moved = transition_grades(
-        grades=grades,
+        grades=pending,
         to_status=Grade.Status.RELEASED,
         user=user,
-        reason='Adviser showed report card',
+        reason='Adviser showed report card' if complete else 'Adviser showed partial report card',
         duty=ADVISER,
     )
+    assigned = len(assigned_subject_ids(section))
+    released = Grade.objects.filter(
+        term=term,
+        section=section,
+        student=student,
+        status=Grade.Status.RELEASED,
+        subject_id__in=assigned_subject_ids(section),
+    ).count()
     audit.record(
         user=user,
         action='grades_shown',
         summary=f'Showed {student.user.get_full_name()} report card for {term.label}',
         target_type='StudentProfile',
         target_id=student.id,
-        details={'term': term.id, 'section': section.id, 'shown': moved},
+        details={'term': term.id, 'section': section.id, 'shown': moved, 'partial': not complete},
     )
     if moved:
-        _notify_student(
-            student,
-            f'{term.label} report card is available',
-            f'Your adviser showed your {term.label} grades for {section.name}.',
-        )
+        if complete:
+            body = f'Your adviser showed your {term.label} grades for {section.name}.'
+        else:
+            body = (
+                f'Your adviser showed a partial {term.label} card for {section.name} '
+                f'({released} of {assigned} subjects). More subjects may still be posted.'
+            )
+        _notify_student(student, f'Report card available · {term.label}', body)
     return moved
 
 
@@ -108,8 +129,9 @@ def hide_student_card(*, section, term, student, user, reason='Adviser hid repor
     )
     _notify_student(
         student,
-        f'{term.label} report card was hidden',
+        f'Report card hidden · {term.label}',
         f'Your adviser hid your {term.label} grades for {section.name}.',
+        level='warning',
     )
     return moved
 
@@ -178,9 +200,6 @@ def show_ready_cards(*, section, term, user):
     shown = 0
     skipped = 0
     for student in _students_on_roster(section, None):
-        if not student_is_ready(section, term, student):
-            skipped += 1
-            continue
         pending = student_term_grades(section, term, student, statuses=[Grade.Status.APPROVED])
         if not pending:
             skipped += 1

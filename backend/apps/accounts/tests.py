@@ -139,6 +139,20 @@ class AuthApiTests(APITestCase):
         self.assertEqual(otp.status_code, 200, otp.data)
         self.assertTrue(mail.outbox)
         code = extract_code(mail.outbox[-1].body)
+        rejected = self.client.post(
+            '/api/auth/change-password/verify/',
+            {'current_password': 'student-pass', 'code': '000000'},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {token}',
+        )
+        self.assertEqual(rejected.status_code, 400)
+        verified = self.client.post(
+            '/api/auth/change-password/verify/',
+            {'current_password': 'student-pass', 'code': code},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {token}',
+        )
+        self.assertEqual(verified.status_code, 200, verified.data)
         missing = self.client.post(
             '/api/auth/change-password/',
             {
@@ -207,6 +221,18 @@ class AuthApiTests(APITestCase):
         )
         self.assertEqual(unknown.status_code, 200)
         code = extract_code(mail.outbox[-1].body)
+        rejected = self.client.post(
+            '/api/auth/forgot-password/verify/',
+            {'identifier': 'teacher@school.test', 'code': '000000'},
+            format='json',
+        )
+        self.assertEqual(rejected.status_code, 400)
+        verified = self.client.post(
+            '/api/auth/forgot-password/verify/',
+            {'identifier': 'teacher@school.test', 'code': code},
+            format='json',
+        )
+        self.assertEqual(verified.status_code, 200, verified.data)
         changed = self.client.post(
             '/api/auth/forgot-password/',
             {

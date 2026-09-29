@@ -45,6 +45,12 @@ FAQS = [
         'How do I contact the school?',
         'Use the Contact page. Official DepEd and school Facebook links are listed there.',
     ),
+    (
+        'events',
+        'event, events, calendar, activity, upcoming',
+        'Where do I see upcoming events?',
+        'Upcoming events appear on the dashboards after you sign in. Public news stays on the Announcements page.',
+    ),
 ]
 
 

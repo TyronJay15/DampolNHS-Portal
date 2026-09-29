@@ -8,6 +8,7 @@ import {
   reactivateAccount,
   rejectRegistration,
   removeAccount,
+  restoreRejectedToPending,
 } from '../../services/adminService';
 import AccountListToolbar from './AccountListToolbar';
 import AccountResultCard from './AccountResultCard';
@@ -198,16 +199,41 @@ export default function AdminAccountsPage() {
     setResult(null);
     setError('');
     try {
-      await reactivateAccount(row.user_id);
+      const saved = await reactivateAccount(row.user_id);
       setResult({
-        title: 'Student must set a password',
+        title: saved.activation_sent ? 'Student must set a password' : 'Student reactivated',
         facts: [
           { label: 'Name', value: `${row.first_name} ${row.last_name}` },
           { label: 'Email', value: row.email },
         ],
-        next: 'They must open /activate and set a new password before signing in.',
+        next: saved.activation_sent
+          ? 'They must open /activate and set a new password before signing in.'
+          : 'They can sign in again with their existing password.',
       });
       await load(status);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleRestorePending(row) {
+    setBusyId(row.id);
+    setResult(null);
+    setError('');
+    try {
+      await restoreRejectedToPending(row.user_id);
+      setResult({
+        title: 'Restored to pending',
+        facts: [
+          { label: 'Name', value: `${row.first_name} ${row.last_name}` },
+          { label: 'LRN', value: row.lrn },
+        ],
+        next: 'The registration is back in Pending. You can approve or reject again.',
+      });
+      await load('pending');
+      setStatus('pending');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -448,6 +474,16 @@ export default function AdminAccountsPage() {
                   Archive
                 </button>
               ) : null}
+              {row.status === 'rejected' ? (
+                <button
+                  className="acct-btn"
+                  type="button"
+                  disabled={busyId === row.id}
+                  onClick={() => handleRestorePending(row)}
+                >
+                  Restore to pending
+                </button>
+              ) : null}
               {row.account_status === 'archived' || row.account_status === 'suspended' ? (
                 <>
                   <button
@@ -456,7 +492,7 @@ export default function AdminAccountsPage() {
                     disabled={busyId === row.id}
                     onClick={() => handleReactivate(row)}
                   >
-                    Restore
+                    Reactivate
                   </button>
                   <button
                     className="acct-btn acct-btn-no"
@@ -468,7 +504,7 @@ export default function AdminAccountsPage() {
                   </button>
                 </>
               ) : null}
-              {row.account_status === 'pending_activation' ? (
+              {row.account_status === 'pending_activation' && row.status !== 'rejected' ? (
                 <button
                   className="acct-btn"
                   type="button"

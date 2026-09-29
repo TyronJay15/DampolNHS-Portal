@@ -8,6 +8,7 @@ import {
   actionFamily,
   actionLabel,
   chipKind,
+  detailLines,
   familyIcon,
   groupAuditRows,
   roleLabel,
@@ -37,7 +38,7 @@ export default function AdminAuditPage() {
   return (
     <div className="desk audit-page">
       <PageHead kicker="Records" title="Audit log" icon="audit">
-        <p>Account, staff, grade, and website actions. These records cannot be edited or deleted.</p>
+        <p>School, assignment, placement, grade, account, and announcement actions. These records cannot be edited or deleted.</p>
       </PageHead>
       {error ? <p className="alert alert-error">{error}</p> : null}
 
@@ -73,28 +74,42 @@ export default function AdminAuditPage() {
           <section className="audit-day" key={group.day}>
             <h2>{group.day}</h2>
             <div className="audit-list">
-              {group.rows.map((row) => (
-                <article className="card audit-card" key={row.id}>
-                  <header className="audit-card-head">
-                    <em className={`acct-chip desk-line ${chipKind(actionFamily(row.action))}`}>
-                      <LineMark name={familyIcon(actionFamily(row.action))} size={14} />
-                      {actionLabel(row.action)}
-                    </em>
-                    <span>{timeLabel(row.created_at)}</span>
-                  </header>
-                  <dl className="acct-facts">
-                    <div>
-                      <dt>Who</dt>
-                      <dd>{row.actor || '—'}</dd>
-                    </div>
-                    <div>
-                      <dt>Role</dt>
-                      <dd>{roleLabel(row.role)}</dd>
-                    </div>
-                  </dl>
-                  <p>{row.summary}</p>
-                </article>
-              ))}
+              {group.rows.map((row) => {
+                const family = actionFamily(row);
+                const facts = detailLines(row.details);
+                return (
+                  <article className="card audit-card" key={row.id}>
+                    <header className="audit-card-head">
+                      <em className={`acct-chip desk-line ${chipKind(family)}`}>
+                        <LineMark name={familyIcon(family)} size={14} />
+                        {actionLabel(row.action)}
+                      </em>
+                      <span>{timeLabel(row.created_at)}</span>
+                    </header>
+                    <dl className="acct-facts">
+                      <div>
+                        <dt>Who</dt>
+                        <dd>{row.actor || '—'}</dd>
+                      </div>
+                      <div>
+                        <dt>Role</dt>
+                        <dd>{roleLabel(row.role)}</dd>
+                      </div>
+                    </dl>
+                    <p>{row.summary}</p>
+                    {facts.length ? (
+                      <dl className="acct-facts audit-detail-facts">
+                        {facts.map((fact) => (
+                          <div key={`${row.id}-${fact.label}`}>
+                            <dt>{fact.label}</dt>
+                            <dd>{fact.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : null}
+                  </article>
+                );
+              })}
             </div>
           </section>
         ))

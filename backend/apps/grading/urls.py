@@ -17,7 +17,13 @@ from .views_teacher import (
     TeacherGradeTimelineView,
     TeacherSubmitClassView,
 )
-from .views_workflow import ApproveGradesView, GradeQueueView, ReturnGradesView
+from .views_workflow import (
+    ApproveAllGradesView,
+    ApproveGradesView,
+    ApproveTeacherGradesView,
+    GradeQueueView,
+    ReturnGradesView,
+)
 
 urlpatterns = [
     path('me/', StudentGradesView.as_view(), name='student-grades'),
@@ -33,6 +39,8 @@ urlpatterns = [
     path('show-ready/', ShowReadyView.as_view(), name='grade-show-ready'),
     path('queues/', GradeQueueView.as_view(), name='grade-queues'),
     path('approve/', ApproveGradesView.as_view(), name='grade-approve'),
+    path('approve/teacher/', ApproveTeacherGradesView.as_view(), name='grade-approve-teacher'),
+    path('approve/all/', ApproveAllGradesView.as_view(), name='grade-approve-all'),
     path('return/', ReturnGradesView.as_view(), name='grade-return'),
     path('history/', GradeHistoryListView.as_view(), name='grade-history'),
     path('report/', GradeReportView.as_view(), name='grade-report'),

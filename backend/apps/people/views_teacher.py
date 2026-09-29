@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsTeacher
+from apps.grading.progress import assignment_progress
 from apps.people.models import TeacherAssignment
 from apps.school.labels import section_label
 
@@ -11,7 +12,7 @@ class TeacherAssignmentListView(APIView):
     permission_classes = [IsAuthenticated, IsTeacher]
 
     def get(self, request):
-        rows = (
+        rows = list(
             TeacherAssignment.objects.filter(
                 teacher=request.user,
                 status=TeacherAssignment.Status.ACTIVE,
@@ -19,6 +20,7 @@ class TeacherAssignmentListView(APIView):
             .select_related('subject', 'section', 'section__program', 'school_year')
             .order_by('assignment_type', 'section__name', 'subject__name')
         )
+        progress = assignment_progress(rows)
         return Response(
             [
                 {
@@ -37,6 +39,7 @@ class TeacherAssignmentListView(APIView):
                     and bool(row.section_id and row.subject_id),
                     'can_advise': row.assignment_type == TeacherAssignment.Type.ADVISER
                     and bool(row.section_id),
+                    'progress': progress.get(row.id),
                 }
                 for row in rows
             ]

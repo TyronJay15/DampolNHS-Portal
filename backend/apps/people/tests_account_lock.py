@@ -76,7 +76,7 @@ class AccountLockTests(APITestCase):
         self.assertEqual(student.approval_status, User.ApprovalStatus.REJECTED)
         self.assertEqual(registration.status, Registration.Status.REJECTED)
 
-    def test_reactivate_clears_password_and_sends_code(self):
+    def test_reactivate_with_password_restores_active(self):
         teacher = User.objects.create_user(
             email='teacher@school.test',
             password='Teacherpass1',
@@ -88,8 +88,28 @@ class AccountLockTests(APITestCase):
         response = self.client.post(f'/api/admin/accounts/{teacher.id}/reactivate/', {}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         teacher.refresh_from_db()
+        self.assertEqual(teacher.account_status, User.AccountStatus.ACTIVE)
+        self.assertTrue(teacher.has_usable_password())
+        self.assertFalse(response.data['activation_sent'])
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_reactivate_without_password_sends_code(self):
+        teacher = User.objects.create_user(
+            email='teacher2@school.test',
+            password=None,
+            first_name='Liza',
+            last_name='Cruz',
+            role=User.Role.TEACHER,
+            account_status=User.AccountStatus.ARCHIVED,
+        )
+        teacher.set_unusable_password()
+        teacher.save(update_fields=['password'])
+        response = self.client.post(f'/api/admin/accounts/{teacher.id}/reactivate/', {}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        teacher.refresh_from_db()
         self.assertEqual(teacher.account_status, User.AccountStatus.PENDING_ACTIVATION)
         self.assertFalse(teacher.has_usable_password())
+        self.assertTrue(response.data['activation_sent'])
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('activation', mail.outbox[0].subject.lower())
 

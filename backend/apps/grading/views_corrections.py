@@ -9,12 +9,14 @@ from apps.audit import services as audit
 from apps.grading.history import HEAD_TEACHER, write_history
 from apps.grading.models import CorrectionRequest, Grade
 from apps.grading.scores import parse_score
+from apps.audit.catalog import GRADES
 from apps.notifications.services import head_teachers, notify
 from apps.people.assignment_access import subject_assignment_for
 from apps.school.labels import section_label
 
 
 def _payload(row):
+    grade = row.grade
     return {
         'id': row.id,
         'grade_id': row.grade_id,
@@ -27,6 +29,13 @@ def _payload(row):
         'proposed_score': str(row.proposed_score),
         'reason': row.reason,
         'status': row.status,
+        'grade_status': grade.status,
+        'approve_blocked': grade.status == Grade.Status.RELEASED,
+        'approve_block_reason': (
+            'Hide this student’s report card before approving this correction.'
+            if grade.status == Grade.Status.RELEASED
+            else ''
+        ),
         'requested_by': row.requested_by.get_full_name() if row.requested_by_id else '',
         'reviewed_by': row.reviewed_by.get_full_name() if row.reviewed_by_id else '',
         'review_note': row.review_note,
@@ -57,6 +66,8 @@ class CorrectionListCreateView(APIView):
             rows = rows.filter(status__in=[CorrectionRequest.Status.APPROVED, CorrectionRequest.Status.REJECTED])
         elif status:
             rows = rows.filter(status=status)
+        elif request.user.role == 'head_teacher':
+            rows = rows.filter(status=CorrectionRequest.Status.PENDING)
         return Response([_payload(row) for row in rows[:100]])
 
     def post(self, request):
@@ -102,6 +113,8 @@ class CorrectionListCreateView(APIView):
             head_teachers(),
             title='Correction requested',
             body=f'{request.user.get_full_name()} asked to change {grade.student.user.get_full_name()} · {grade.subject.name}.',
+            category=GRADES,
+            action_path='/head/corrections',
         )
         return Response(_payload(row), status=201)
 
@@ -160,5 +173,8 @@ class CorrectionReviewView(APIView):
             [row.requested_by],
             title=f'Correction {decision}',
             body=f'{request.user.get_full_name()} {decision} the correction for {row.grade.student.user.get_full_name()} · {row.grade.subject.name}.',
+            level='warning' if decision == CorrectionRequest.Status.REJECTED else 'success',
+            category=GRADES,
+            action_path='/teacher/classes',
         )
         return Response(_payload(row))

@@ -91,8 +91,11 @@ def _notify_event(row, was_published):
     if row.kind != Announcement.Kind.EVENT or not row.is_published or was_published:
         return
     when = row.event_date.strftime('%b %d, %Y') if row.event_date else 'soon'
+    from apps.audit.catalog import ANNOUNCEMENTS
+
     notify(
         active_users(),
         title=f'Upcoming event: {row.title}',
         body=f'{row.title} is on {when}{f" · {row.location}" if row.location else ""}.',
+        category=ANNOUNCEMENTS,
     )

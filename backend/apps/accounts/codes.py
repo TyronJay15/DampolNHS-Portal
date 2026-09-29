@@ -32,6 +32,17 @@ def issue_code(user, purpose, minutes=24 * 60):
     return raw
 
 
+def check_code(user, purpose, raw):
+    row = (
+        EmailCode.objects.filter(user=user, purpose=purpose, used_at__isnull=True)
+        .order_by('-created_at')
+        .first()
+    )
+    if row is None or row.expires_at < timezone.now() or not check_password(str(raw or ''), row.code_hash):
+        return False
+    return True
+
+
 def consume_code(user, purpose, raw):
     row = (
         EmailCode.objects.filter(user=user, purpose=purpose, used_at__isnull=True)

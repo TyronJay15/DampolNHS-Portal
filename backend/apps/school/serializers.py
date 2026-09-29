@@ -233,6 +233,8 @@ class SectionSerializer(serializers.ModelSerializer):
     student_count = serializers.SerializerMethodField()
     can_delete = serializers.SerializerMethodField()
     archived = serializers.SerializerMethodField()
+    progress_percent = serializers.SerializerMethodField()
+    identity_locked = serializers.SerializerMethodField()
 
     class Meta:
         model = Section
@@ -241,6 +243,8 @@ class SectionSerializer(serializers.ModelSerializer):
             'name',
             'display_label',
             'grade_level',
+            'capacity',
+            'status',
             'is_active',
             'school_year',
             'school_year_label',
@@ -248,6 +252,8 @@ class SectionSerializer(serializers.ModelSerializer):
             'program_code',
             'program_name',
             'student_count',
+            'progress_percent',
+            'identity_locked',
             'can_delete',
             'archived_at',
             'archived',
@@ -263,7 +269,7 @@ class SectionSerializer(serializers.ModelSerializer):
         return obj.student_assignments.filter(is_active=True).count()
 
     def get_can_delete(self, obj):
-        if obj.archived_at or obj.student_assignments.exists() or obj.teacher_assignments.exists():
+        if obj.student_assignments.exists() or obj.teacher_assignments.exists():
             return False
         from apps.grading.models import Grade
 
@@ -271,6 +277,23 @@ class SectionSerializer(serializers.ModelSerializer):
 
     def get_archived(self, obj):
         return bool(obj.archived_at)
+
+    def get_progress_percent(self, obj):
+        from apps.school.section_progress import section_progress
+
+        return section_progress(obj)['progress_percent']
+
+    def get_identity_locked(self, obj):
+        from apps.school.models import Section
+
+        return obj.status == Section.Status.ACTIVE or bool(obj.archived_at)
+
+    def validate_capacity(self, value):
+        if value is not None and value < 1:
+            raise serializers.ValidationError('Capacity must be at least 1.')
+        if value is not None and value > 999:
+            raise serializers.ValidationError('Capacity is too large.')
+        return value
 
     def validate(self, attrs):
         program = attrs.get('program', getattr(self.instance, 'program', None))
@@ -280,4 +303,18 @@ class SectionSerializer(serializers.ModelSerializer):
         required = grade_for(program.code)
         if required and grade_level and required != grade_level:
             raise serializers.ValidationError({'program': f'{program.code} is a {required} program.'})
+        instance = self.instance
+        if instance and (instance.status == Section.Status.ACTIVE or instance.archived_at):
+            for field in ('school_year', 'grade_level', 'program', 'name'):
+                if field not in attrs:
+                    continue
+                if attrs[field] != getattr(instance, field):
+                    raise serializers.ValidationError(
+                        {
+                            'detail': (
+                                'Section identity is locked while active. '
+                                'Archive and create a new section instead.'
+                            )
+                        }
+                    )
         return attrs

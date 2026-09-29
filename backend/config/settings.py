@@ -13,6 +13,7 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-only')
 DEBUG = os.environ.get('DEBUG', 'true').lower() in ('true', '1', 'yes')
 RECAPTCHA_SECRET_KEY = '' if 'test' in sys.argv else os.environ.get('RECAPTCHA_SECRET_KEY', '')
+GEMINI_API_KEY = '' if 'test' in sys.argv else os.environ.get('GEMINI_API_KEY', '').strip()
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -40,6 +41,7 @@ INSTALLED_APPS = [
     'apps.audit',
     'apps.chatbot',
     'apps.notifications',
+    'apps.ml',
 ]
 
 MIDDLEWARE = [

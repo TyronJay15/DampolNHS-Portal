@@ -1,6 +1,15 @@
 from apps.grading.knn import rank_courses
 from apps.grading.skills import overall_average, skill_rows, skill_vector
 
+
+def _trained_courses(vector, program_code):
+    try:
+        from apps.ml.knn_model import rank_trained
+
+        return rank_trained(vector, program_code)
+    except Exception:
+        return []
+
 METHOD = 'knn'
 MIN_SKILLS = 3
 ADVISORY = 'Advisory. Based on subjects shown so far. Not an admission decision.'
@@ -18,7 +27,7 @@ def _payload(*, ready, overall, skills, courses, summary):
     }
 
 
-def recommend_payload(grades):
+def recommend_payload(grades, program_code=None):
     rows = [row for row in grades if row is not None]
     overall = overall_average(rows)
     vector = skill_vector(rows)
@@ -31,7 +40,7 @@ def recommend_payload(grades):
             courses=[],
             summary='Not enough shown grades yet for a college recommendation.',
         )
-    courses = rank_courses(vector)
+    courses = _trained_courses(vector, program_code) or rank_courses(vector)
     if not courses:
         return _payload(
             ready=False,

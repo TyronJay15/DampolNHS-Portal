@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCms } from '../../hooks/useCms';
 import { useTheme } from '../../hooks/useTheme';
@@ -9,7 +9,16 @@ import ThemeToggle from '../ThemeToggle/ThemeToggle';
 import './DashboardShell.css';
 import '../../styles/desk.css';
 
-export default function DashboardShell({ title, subtitle = 'Dampol 1st National High School', initials, links, accountTo, children }) {
+export default function DashboardShell({
+  title,
+  subtitle = 'Dampol 1st National High School',
+  initials,
+  links,
+  accountTo,
+  notificationTo,
+  notificationCount = 0,
+  children,
+}) {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
   const cms = useCms();
@@ -53,6 +62,7 @@ export default function DashboardShell({ title, subtitle = 'Dampol 1st National 
                 </span>
               ) : null}
               <span>{link.label}</span>
+              {link.badge ? <span className="dash-badge">{link.badge}</span> : null}
             </NavLink>
           ))}
         </nav>
@@ -86,6 +96,12 @@ export default function DashboardShell({ title, subtitle = 'Dampol 1st National 
             <small>{subtitle}</small>
           </div>
           <div className="dash-top-tools">
+            {notificationTo ? (
+              <Link className="dash-bell" to={notificationTo} aria-label="Notifications">
+                <Icon name="bell" size={18} />
+                {notificationCount ? <span className="dash-badge is-top">{notificationCount}</span> : null}
+              </Link>
+            ) : null}
             <ThemeToggle theme={theme} onToggle={toggle} />
             <div className="dash-userchip">
               <span>{brand}</span>

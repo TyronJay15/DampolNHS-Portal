@@ -144,6 +144,28 @@ def student_grade_card(profile: StudentProfile):
         .order_by('term__number', 'subject__name')
     )
     subjects = _append_released_subjects(_subjects(section, program), released)
+    averages = _averages(released, subjects, terms)
+    posted = len(released)
+    term_coverage = []
+    for term in terms:
+        offered = [row for row in subjects if term.number in _offered_terms(row, terms)]
+        posted_term = sum(1 for grade in released if grade.term_id == term.id)
+        term_coverage.append(
+            {
+                'term_id': term.id,
+                'term': term.label,
+                'posted': posted_term,
+                'possible': len(offered),
+                'complete': bool(offered) and posted_term >= len(offered),
+            }
+        )
+    incomplete = [row for row in term_coverage if row['possible'] and row['posted'] < row['possible']]
+    note = ''
+    if posted and incomplete:
+        first = incomplete[0]
+        note = f'Partial card — {first["posted"]} of {first["possible"]} subjects posted for {first["term"]}.'
+        if len(incomplete) > 1:
+            note = 'Partial card — some subjects are not yet posted.'
 
     return {
         'school_year': year.label if year else '',
@@ -160,6 +182,9 @@ def student_grade_card(profile: StudentProfile):
             }
             for grade in released
         ],
-        **_averages(released, subjects, terms),
-        'recommendation': recommend_payload(released) if released else None,
+        **averages,
+        'partial': bool(incomplete and posted),
+        'coverage_note': note,
+        'term_coverage': term_coverage,
+        'recommendation': recommend_payload(released, program.code if program else None) if released else None,
     }

@@ -10,6 +10,7 @@ from apps.accounts.codes import issue_code
 from apps.accounts.mail import account_deactivated_email, activation_email
 from apps.accounts.models import User
 from apps.audit import services as audit
+from apps.audit.catalog import ACCOUNTS
 from apps.notifications.services import notify
 from apps.people.models import Registration
 
@@ -51,6 +52,8 @@ def archive_account(actor, user, reason=''):
         [user],
         title='Account archived',
         body='Your school portal account was archived. Contact the school office if you need help.',
+        level='warning',
+        category=ACCOUNTS,
     )
     with transaction.atomic():
         user.account_status = User.AccountStatus.ARCHIVED
@@ -96,25 +99,58 @@ def deactivate_account(actor, user, reason=''):
 def reactivate_account(actor, user):
     if user.account_status == User.AccountStatus.REMOVED:
         raise AccountActionError({'detail': 'A removed account cannot be restored.'})
+    if user.account_status == User.AccountStatus.ACTIVE:
+        raise AccountActionError({'detail': 'This account is already active.'})
     if user.account_status not in (
         User.AccountStatus.SUSPENDED,
         User.AccountStatus.ARCHIVED,
         User.AccountStatus.PENDING_ACTIVATION,
     ):
-        raise AccountActionError({'detail': 'This account is not waiting for a new password.'})
+        raise AccountActionError({'detail': 'This account cannot be reactivated.'})
+
+    now = timezone.now()
+    has_password = user.has_usable_password()
+    if has_password:
+        user.account_status = User.AccountStatus.ACTIVE
+        user.approval_note = ''
+        user.approval_updated_at = now
+        user.save(update_fields=['account_status', 'approval_note', 'approval_updated_at'])
+        notify(
+            [user],
+            title='Account restored',
+            body='Your school portal account is active again. Sign in with your existing password.',
+            force=True,
+            level='success',
+            category=ACCOUNTS,
+        )
+        audit.record(
+            user=actor,
+            action='account_reactivated',
+            summary=f'Reactivated {user.role} account {user.email}',
+            target_type='User',
+            target_id=user.id,
+            details={'email': user.email, 'activation_sent': False},
+        )
+        return {
+            'email': user.email,
+            'account_status': user.account_status,
+            'activation_sent': False,
+        }
 
     notify(
         [user],
         title='Account restored',
         body='Your account was restored. Set a new password with the activation code to sign in.',
         force=True,
+        level='success',
+        category=ACCOUNTS,
     )
     code = issue_code(user, 'activate')
     activation_email(user, code)
     user.set_unusable_password()
     user.account_status = User.AccountStatus.PENDING_ACTIVATION
     user.approval_note = ''
-    user.approval_updated_at = timezone.now()
+    user.approval_updated_at = now
     user.save(update_fields=['password', 'account_status', 'approval_note', 'approval_updated_at'])
     audit.record(
         user=actor,
@@ -122,9 +158,57 @@ def reactivate_account(actor, user):
         summary=f'Restored {user.role} account {user.email}',
         target_type='User',
         target_id=user.id,
-        details={'email': user.email},
+        details={'email': user.email, 'activation_sent': True},
     )
-    return {'email': user.email}
+    return {
+        'email': user.email,
+        'account_status': user.account_status,
+        'activation_sent': True,
+    }
+
+
+def restore_rejected_to_pending(actor, user):
+    if user.role != User.Role.STUDENT:
+        raise AccountActionError({'detail': 'Only student registrations can be restored to pending.'})
+    now = timezone.now()
+    with transaction.atomic():
+        registration = (
+            Registration.objects.select_for_update()
+            .filter(user=user, status=Registration.Status.REJECTED)
+            .first()
+        )
+        if registration is None:
+            raise AccountActionError({'detail': 'This student is not in rejected status.'})
+        registration.status = Registration.Status.PENDING
+        registration.rejection_reason = ''
+        registration.reviewed_at = None
+        registration.reviewed_by = None
+        registration.save(update_fields=['status', 'rejection_reason', 'reviewed_at', 'reviewed_by'])
+        user.approval_status = User.ApprovalStatus.PENDING
+        user.approval_note = ''
+        user.approval_updated_at = now
+        user.save(update_fields=['approval_status', 'approval_note', 'approval_updated_at'])
+
+    notify(
+        [user],
+        title='Registration reopened',
+        body='Your enrollment application is back under review. The school office will contact you if needed.',
+        force=True,
+        category=ACCOUNTS,
+    )
+    audit.record(
+        user=actor,
+        action='registration_restored_pending',
+        summary=f'Restored rejected student {user.email} to pending review',
+        target_type='User',
+        target_id=user.id,
+        details={'email': user.email, 'registration_id': registration.id},
+    )
+    return {
+        'email': user.email,
+        'registration_id': registration.id,
+        'status': registration.status,
+    }
 
 
 def anonymize_account(actor, user):

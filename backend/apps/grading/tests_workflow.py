@@ -5,6 +5,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import StudentProfile, User
 from apps.grading.models import Grade
+from apps.notifications.models import Notification
 from apps.people.models import StudentSection, TeacherAssignment
 from apps.school.models import Program, SchoolYear, Section, Subject, Term
 
@@ -196,7 +197,7 @@ class GradeWorkflowTests(TestCase):
         self.grade.refresh_from_db()
         self.assertEqual(self.grade.status, Grade.Status.DRAFT)
 
-    def test_cannot_show_until_every_assigned_subject_is_approved(self):
+    def test_can_show_partial_when_another_subject_is_missing(self):
         TeacherAssignment.objects.create(
             teacher=self.teacher,
             assignment_type=TeacherAssignment.Type.SUBJECT_TEACHER,
@@ -205,8 +206,19 @@ class GradeWorkflowTests(TestCase):
             section=self.section,
         )
         self._submit_and_approve()
-        blocked = self._show()
-        self.assertEqual(blocked.status_code, 400)
+        shown = self._show()
+        self.assertEqual(shown.status_code, 200, shown.data)
+        self.assertEqual(shown.data['shown'], 1)
+        self.grade.refresh_from_db()
+        self.assertEqual(self.grade.status, Grade.Status.RELEASED)
+        student_client = APIClient()
+        student_client.force_authenticate(user=self.student_user)
+        card = student_client.get('/api/grades/me/')
+        self.assertEqual(card.status_code, 200, card.data)
+        self.assertTrue(card.data['partial'])
+        self.assertIn('Partial card', card.data['coverage_note'])
+        self.assertEqual(len(card.data['grades']), 1)
+        self.assertTrue(any(row['name'] == 'Media and Information Literacy' for row in card.data['subjects']))
 
     def test_cannot_return_while_shown(self):
         self._submit_and_approve()
@@ -318,3 +330,96 @@ class GradeWorkflowTests(TestCase):
         self.assertEqual(section['display_label'], '12 - STEM STEM-A')
         self.assertEqual(section['students'][0]['name'], 'Ana Reyes')
         self.assertEqual(section['adviser'], 'Rina Santos')
+
+    def test_queue_lists_unencoded_assignment(self):
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            assignment_type=TeacherAssignment.Type.SUBJECT_TEACHER,
+            school_year=self.year,
+            subject=self.other_subject,
+            section=self.section,
+        )
+        response = self.head_client.get(f'/api/grades/queues/?term={self.term.id}')
+        self.assertEqual(response.status_code, 200, response.data)
+        subjects = [
+            item['subject']
+            for teacher in response.data['teachers']
+            for section in teacher['sections']
+            for item in section['subjects']
+        ]
+        self.assertIn('Media and Information Literacy', subjects)
+        mil = next(
+            item
+            for teacher in response.data['teachers']
+            for section in teacher['sections']
+            for item in section['subjects']
+            if item['subject_id'] == self.other_subject.id
+        )
+        self.assertEqual(mil['progress'], 'not_encoded')
+        self.assertEqual(mil['missing'], 1)
+
+    def test_submit_notifies_adviser_when_card_is_shown(self):
+        self._submit_and_approve()
+        self.assertEqual(self._show().status_code, 200)
+        mil = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            assignment_type=TeacherAssignment.Type.SUBJECT_TEACHER,
+            school_year=self.year,
+            subject=self.other_subject,
+            section=self.section,
+        )
+        Grade.objects.create(
+            student=self.student,
+            subject=self.other_subject,
+            term=self.term,
+            school_year=self.year,
+            section=self.section,
+            score=Decimal('88.00'),
+            status=Grade.Status.DRAFT,
+            teacher=self.teacher,
+        )
+        Notification.objects.filter(user=self.adviser).delete()
+        submitted = self.teacher_client.post(
+            '/api/grades/submit/',
+            {'assignment': mil.id, 'term': self.term.id},
+            format='json',
+        )
+        self.assertEqual(submitted.status_code, 200, submitted.data)
+        titles = list(Notification.objects.filter(user=self.adviser).values_list('title', flat=True))
+        self.assertTrue(any('shown card' in title.lower() for title in titles), titles)
+
+    def test_approve_notifies_adviser_to_reshow(self):
+        self._submit_and_approve()
+        self.assertEqual(self._show().status_code, 200)
+        mil = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            assignment_type=TeacherAssignment.Type.SUBJECT_TEACHER,
+            school_year=self.year,
+            subject=self.other_subject,
+            section=self.section,
+        )
+        Grade.objects.create(
+            student=self.student,
+            subject=self.other_subject,
+            term=self.term,
+            school_year=self.year,
+            section=self.section,
+            score=Decimal('88.00'),
+            status=Grade.Status.DRAFT,
+            teacher=self.teacher,
+        )
+        submitted = self.teacher_client.post(
+            '/api/grades/submit/',
+            {'assignment': mil.id, 'term': self.term.id},
+            format='json',
+        )
+        self.assertEqual(submitted.status_code, 200, submitted.data)
+        Notification.objects.filter(user=self.adviser).delete()
+        approved = self.head_client.post(
+            '/api/grades/approve/',
+            {'term': self.term.id, 'section': self.section.id, 'subject': self.other_subject.id},
+            format='json',
+        )
+        self.assertEqual(approved.status_code, 200, approved.data)
+        titles = list(Notification.objects.filter(user=self.adviser).values_list('title', flat=True))
+        self.assertTrue(any('re-show' in title.lower() for title in titles), titles)

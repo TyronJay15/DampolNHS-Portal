@@ -51,6 +51,8 @@ export default function StudentGradesPage() {
     overall_average: null,
     school_year: '',
     recommendation: null,
+    partial: false,
+    coverage_note: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -67,6 +69,8 @@ export default function StudentGradesPage() {
           overall_average: data.overall_average || null,
           school_year: data.school_year || '',
           recommendation: data.recommendation || null,
+          partial: Boolean(data.partial),
+          coverage_note: data.coverage_note || '',
         }),
       )
       .catch((err) => setError(err.message))
@@ -92,12 +96,12 @@ export default function StudentGradesPage() {
   return (
     <div className="desk student-studio">
       <PageHead kicker={card.school_year || 'Report card'} title="Grades" icon="grades">
-        <p>Only scores your adviser has shown are filled in. The college match on the right is reserved even when empty.</p>
+        <p>Only scores your adviser has shown are filled in. Subjects that are not posted yet stay marked as not yet posted.</p>
         <div className="student-hero-meta">
           <YearChip user={user} className="student-chip" />
         </div>
       </PageHead>
-      {error ? <p className="alert alert-error">{error}</p> : null}
+      {card.partial && card.coverage_note ? <p className="alert alert-info">{card.coverage_note}</p> : null}
 
       <div className="student-stats is-grades">
         <article className="card student-stat">
@@ -170,7 +174,9 @@ export default function StudentGradesPage() {
                         </td>
                         {card.terms.map((term) => (
                           <td key={term.id} className="student-grade-score">
-                            {scores[`${subject.id}:${term.number}`] || '—'}
+                            <span className={scores[`${subject.id}:${term.number}`] ? '' : 'student-grade-pending'}>
+                              {scores[`${subject.id}:${term.number}`] || 'Not yet posted'}
+                            </span>
                           </td>
                         ))}
                         <td className="student-grade-score student-grade-avg">

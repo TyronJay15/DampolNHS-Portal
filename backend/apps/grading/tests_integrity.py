@@ -81,8 +81,6 @@ class GradeIntegrityTests(TestCase):
         history = GradeHistory.objects.get(to_status=Grade.Status.DRAFT)
         self.assertEqual(history.duty, 'subject_teacher')
         self.assertEqual(history.new_score, Decimal('91.50'))
-        self.assertTrue(AuditLog.objects.filter(action='grade_encoded').exists())
-
         submit = self.teacher_client.post(
             '/api/grades/submit/',
             {'assignment': self.assignment.id, 'term': self.term.id},

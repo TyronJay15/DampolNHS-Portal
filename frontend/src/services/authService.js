@@ -37,6 +37,14 @@ export function requestPasswordOtp({ current_password }) {
   });
 }
 
+export function verifyPasswordOtp({ current_password, code }) {
+  return apiRequest('/auth/change-password/verify/', {
+    method: 'POST',
+    auth: true,
+    body: { current_password, code },
+  });
+}
+
 export function changePassword({ current_password, new_password, confirm_password, code }) {
   return apiRequest('/auth/change-password/', {
     method: 'POST',
@@ -45,24 +53,17 @@ export function changePassword({ current_password, new_password, confirm_passwor
   });
 }
 
-export function requestPasswordOtpPublic({ identifier, current_password }) {
-  return apiRequest('/auth/change-password-public/otp/', {
-    method: 'POST',
-    body: { identifier, current_password },
-  });
-}
-
-export function changePasswordPublic(payload) {
-  return apiRequest('/auth/change-password-public/', {
-    method: 'POST',
-    body: payload,
-  });
-}
-
 export function requestForgotPasswordOtp({ identifier, recaptcha_token }) {
   return apiRequest('/auth/forgot-password/otp/', {
     method: 'POST',
     body: { identifier, recaptcha_token },
+  });
+}
+
+export function verifyForgotPasswordOtp({ identifier, code, recaptcha_token }) {
+  return apiRequest('/auth/forgot-password/verify/', {
+    method: 'POST',
+    body: { identifier, code, recaptcha_token },
   });
 }
 

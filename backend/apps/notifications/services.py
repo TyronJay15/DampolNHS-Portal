@@ -1,9 +1,9 @@
 from apps.accounts.models import User
 from apps.notifications.models import Notification
-from apps.people.models import StudentSection, TeacherAssignment
+from apps.people.models import TeacherAssignment
 
 
-def notify(users, title, body, force=False):
+def notify(users, title, body, force=False, level='info', action_path='', category=''):
     seen = set()
     rows = []
     for user in users:
@@ -15,7 +15,18 @@ def notify(users, title, body, force=False):
             if getattr(user, 'approval_status', None) != User.ApprovalStatus.APPROVED:
                 continue
         seen.add(user.id)
-        rows.append(Notification(user=user, title=title, body=body))
+        from apps.audit.catalog import infer_notification_category
+
+        rows.append(
+            Notification(
+                user=user,
+                title=title,
+                body=body,
+                category=category or infer_notification_category(title, body),
+                level=level,
+                action_path=action_path or '',
+            )
+        )
     if not rows:
         return 0
     Notification.objects.bulk_create(rows)
@@ -30,31 +41,6 @@ def active_users(*roles):
     if roles:
         qs = qs.filter(role__in=roles)
     return list(qs)
-
-
-def users_for_section(section):
-    return [
-        row.student.user
-        for row in StudentSection.objects.filter(
-            section=section,
-            school_year=section.school_year,
-            is_active=True,
-            student__user__account_status=User.AccountStatus.ACTIVE,
-            student__user__approval_status=User.ApprovalStatus.APPROVED,
-        ).select_related('student__user')
-    ]
-
-
-def users_for_year(school_year):
-    return [
-        row.student.user
-        for row in StudentSection.objects.filter(
-            school_year=school_year,
-            is_active=True,
-            student__user__account_status=User.AccountStatus.ACTIVE,
-            student__user__approval_status=User.ApprovalStatus.APPROVED,
-        ).select_related('student__user')
-    ]
 
 
 def teachers_for_year(school_year):

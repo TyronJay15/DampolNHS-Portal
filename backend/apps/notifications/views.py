@@ -11,6 +11,9 @@ def _payload(row):
         'id': row.id,
         'title': row.title,
         'body': row.body,
+        'level': row.level,
+        'category': row.category,
+        'action_path': row.action_path,
         'is_read': row.is_read,
         'created_at': row.created_at,
     }

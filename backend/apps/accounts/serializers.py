@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.exceptions import APIException
 
-from apps.accounts.codes import consume_code, issue_code
+from apps.accounts.codes import check_code, consume_code, issue_code
 from apps.accounts.identity import find_portal_user
 from apps.accounts.mail import password_otp_email
 from apps.accounts.models import User
@@ -152,6 +152,19 @@ class PasswordOtpSerializer(serializers.Serializer):
         return attrs
 
 
+class PasswordCodeVerifySerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    code = serializers.CharField()
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        if not user.check_password(attrs['current_password']):
+            raise serializers.ValidationError({'current_password': 'Current password is incorrect.'})
+        if not check_code(user, 'password', attrs['code']):
+            raise serializers.ValidationError({'code': 'That code is invalid or has expired.'})
+        return attrs
+
+
 class ChangePasswordSerializer(serializers.Serializer):
     current_password = serializers.CharField(write_only=True)
     code = serializers.CharField()
@@ -182,6 +195,19 @@ class ForgotPasswordOtpSerializer(serializers.Serializer):
         verify_recaptcha(attrs.pop('recaptcha_token', ''))
         user = find_portal_user(attrs['identifier'])
         attrs['user'] = user if user and user.email and user.has_usable_password() else None
+        return attrs
+
+
+class ForgotPasswordVerifySerializer(serializers.Serializer):
+    identifier = serializers.CharField()
+    code = serializers.CharField()
+    recaptcha_token = serializers.CharField(required=False, allow_blank=True, write_only=True)
+
+    def validate(self, attrs):
+        verify_recaptcha(attrs.pop('recaptcha_token', ''))
+        user = find_portal_user(attrs['identifier'])
+        if user is None or not user.has_usable_password() or not check_code(user, 'password', attrs['code']):
+            raise serializers.ValidationError({'code': 'That code is invalid or has expired.'})
         return attrs
 
 
