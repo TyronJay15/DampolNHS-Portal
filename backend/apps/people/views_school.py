@@ -18,6 +18,10 @@ from apps.school.offerings import program_offers_subject
 from apps.school.section_progress import recompute_status
 
 
+TRANSFER_TITLE = 'Roster change · transfer'
+PLACEMENT_TITLE = 'Roster change · placement'
+
+
 def _current_year():
     return SchoolYear.objects.filter(is_current=True, archived_at__isnull=True).first()
 
@@ -36,7 +40,7 @@ def _notify_placement(student, old_section, section, transfer):
     if transfer and old_section:
         notify(
             advisers_for_section(old_section) + advisers_for_section(section),
-            title='Roster change · transfer',
+            title=TRANSFER_TITLE,
             body=f'{name} moved from {section_label(old_section)} to {label}.',
             category=PLACEMENT,
             action_path='/teacher/advisory',
@@ -44,7 +48,7 @@ def _notify_placement(student, old_section, section, transfer):
         return
     notify(
         advisers_for_section(section),
-        title='Roster change · placement',
+        title=PLACEMENT_TITLE,
         body=f'{name} was placed in {label}.',
         category=PLACEMENT,
         action_path='/teacher/advisory',
@@ -87,10 +91,9 @@ def _place_student(student, section, year, user, transfer=False, override_capaci
     old_section = current.section if current else None
     if old_section and old_section.id == section.id:
         return None
-    if not old_section:
-        cap_error = _capacity_error(section, override=override_capacity)
-        if cap_error:
-            return cap_error
+    cap_error = _capacity_error(section, override=override_capacity)
+    if cap_error:
+        return cap_error
     StudentSection.objects.filter(student=student, school_year=year, is_active=True).update(
         is_active=False,
         ended_at=timezone.now(),
@@ -101,6 +104,7 @@ def _place_student(student, section, year, user, transfer=False, override_capaci
         school_year=year,
         assigned_by=user,
     )
+    old_program = _follow_section_program(registration, section, year)
     name = student.user.get_full_name() or student.lrn
     label = section_label(section)
     if transfer or old_section:
@@ -114,13 +118,16 @@ def _place_student(student, section, year, user, transfer=False, override_capaci
                 'student': name,
                 'from': section_label(old_section) if old_section else '',
                 'to': label,
+                'program_from': old_program.code if old_program else '',
+                'program_to': section.program.code if old_program else '',
                 'reason': reason,
             },
         )
+        program_note = f' Program changed from {old_program.code} to {section.program.code}.' if old_program else ''
         notify(
             head_teachers(),
-            title='Roster change · transfer',
-            body=f'{name} was transferred to {label}.',
+            title=TRANSFER_TITLE,
+            body=f'{name} was transferred to {label}.{program_note}',
             level='info',
             category=PLACEMENT,
             action_path=f'/head/sections/{section.id}/setup?step=students',
@@ -139,6 +146,25 @@ def _place_student(student, section, year, user, transfer=False, override_capaci
     if old_section and old_section.id != section.id:
         recompute_status(old_section)
     return None
+
+
+def _follow_section_program(registration, section, year):
+    """A transfer into another program's section moves this year's registration with it.
+
+    Registrations from earlier years stay as they were, so enrollment history is kept.
+    Returns the previous program when it changed, else None.
+    """
+    if (
+        registration is None
+        or not section.program_id
+        or registration.program_id == section.program_id
+        or registration.school_year_id != year.id
+    ):
+        return None
+    old_program = registration.program
+    registration.program = section.program
+    registration.save(update_fields=['program'])
+    return old_program
 
 
 def _approved_registration(user):

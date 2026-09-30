@@ -1,11 +1,17 @@
+from io import StringIO
+
+from django.core.exceptions import ValidationError
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from apps.accounts.models import StudentProfile, User
 from apps.cms.models import SiteContent
 from apps.notifications.models import Notification
-from apps.people.models import Registration, TeacherAssignment
-from apps.school.models import Program, ProgramSubject, SchoolYear, Section, Subject, Term
+from apps.people.models import Registration, StudentSection, TeacherAssignment
+from apps.people.views_school import TRANSFER_TITLE
+from apps.school.models import Program, ProgramSubject, SchoolYear, Section, SkillDomain, Subject, Term
 
 
 class AdminSchoolCmsTests(TestCase):
@@ -229,4 +235,61 @@ class AdminSchoolCmsTests(TestCase):
             format='json',
         )
         self.assertEqual(moved.status_code, 200, moved.data)
-        self.assertTrue(Notification.objects.filter(user=self.teacher, title='Student transferred').exists())
+        self.assertTrue(Notification.objects.filter(user=self.teacher, title=TRANSFER_TITLE).exists())
+        registration = Registration.objects.get(user=self.student.user)
+        self.assertEqual(registration.program, other_program)
+        self.assertTrue(
+            StudentSection.objects.filter(student=self.student, section=target, is_active=True).exists()
+        )
+
+    def test_grade_must_match_program_everywhere(self):
+        grade12 = Program.objects.create(code='ABM', name='ABM', grade_level='Grade 12', sort_order=3)
+        with self.assertRaises(ValidationError):
+            Registration.objects.create(
+                user=self.student.user,
+                school_year=self.year,
+                program=grade12,
+                grade_level_enrollment='Grade 11',
+            )
+        with self.assertRaises(ValidationError):
+            Section.objects.create(school_year=self.year, name='ABM-X', grade_level='Grade 11', program=grade12)
+        Subject.objects.update(skill_domain=SkillDomain.objects.get(key='science'))
+        call_command('check_data', stdout=StringIO())
+        Section.objects.bulk_create(
+            [Section(school_year=self.year, name='ABM-Y', grade_level='Grade 11', program=grade12)]
+        )
+        with self.assertRaises(CommandError):
+            call_command('check_data', stdout=StringIO())
+
+    def test_transfer_respects_target_capacity(self):
+        Registration.objects.create(
+            user=self.student.user,
+            school_year=self.year,
+            program=self.program,
+            grade_level_enrollment='Grade 12',
+            status=Registration.Status.APPROVED,
+        )
+        full = Section.objects.create(
+            school_year=self.year,
+            name='STEM-B',
+            grade_level='Grade 12',
+            program=self.program,
+            capacity=1,
+        )
+        other_user = User.objects.create_user(email='ben@example.com', password='Strongpass1', role=User.Role.STUDENT)
+        other = StudentProfile.objects.create(user=other_user, lrn='136000009922')
+        StudentSection.objects.create(student=other, section=full, school_year=self.year)
+        self.client.post('/api/admin/placements/', {'student': self.student.id, 'section': self.section.id}, format='json')
+        blocked = self.client.post(
+            '/api/admin/placements/',
+            {'student': self.student.id, 'section': full.id, 'transfer': True},
+            format='json',
+        )
+        self.assertEqual(blocked.status_code, 400)
+        self.assertIn('capacity', blocked.data['detail'])
+        forced = self.client.post(
+            '/api/admin/placements/',
+            {'student': self.student.id, 'section': full.id, 'transfer': True, 'override_capacity': True},
+            format='json',
+        )
+        self.assertEqual(forced.status_code, 200, forced.data)

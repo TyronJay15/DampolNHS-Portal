@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.ml.gemini import phrase_answer
-from apps.ml.intent import FALLBACK, answers_for, classify_question, ensure_intent, school_pack
+from apps.ml.intent import FALLBACK, answers_for, classify_question, school_pack
 from apps.ml.models import ChatQuestion
 
 
@@ -16,11 +16,8 @@ class ChatbotAskView(APIView):
         if not question:
             return Response({'answer': 'Please type a question.', 'topic': None, 'confidence': 0})
 
-        try:
-            ensure_intent()
-            topic, confidence = classify_question(question)
-        except ValueError:
-            topic, confidence = 'other', 0.0
+        # Prediction only: the intent model is trained by setup_school or train_intent, never here.
+        topic, confidence = classify_question(question)
 
         pack = school_pack(topic)
         answers = answers_for(topic)

@@ -1,6 +1,6 @@
 from apps.accounts.lifecycle import HIDDEN
 from apps.grading.models import Grade
-from apps.grading.recommend import recommend_payload
+from apps.grading.recommend import RecommendationContext, recommend_payload
 from apps.people.models import StudentSection, TeacherAssignment
 
 
@@ -117,6 +117,8 @@ def advisory_snapshot(section, term):
             }
         )
 
+    program_code = section.program.code if section.program_id else None
+    context = RecommendationContext()
     students = []
     for row in roster:
         state = _student_state(subject_ids, term_by_student.get(row.student_id, []))
@@ -138,7 +140,11 @@ def advisory_snapshot(section, term):
                 'released': state['released'],
                 'can_show': state['can_show'],
                 'can_hide': state['can_hide'],
-                'recommendation': recommend_payload(grades_by_student.get(row.student_id, [])),
+                'recommendation': recommend_payload(
+                    grades_by_student.get(row.student_id, []),
+                    program_code,
+                    context,
+                ),
             }
         )
 

@@ -3,14 +3,32 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.people.models import Registration
-from apps.school.models import Program, SchoolYear
+from apps.school.models import Curriculum, Program, SchoolYear
 
 
 class Grade11ForecastTests(TestCase):
     def setUp(self):
         self.year = SchoolYear.objects.create(label='2025-2026', is_current=True)
-        self.stemc = Program.objects.create(code='STEMC', name='STEM Cluster', sort_order=13)
-        self.be = Program.objects.create(code='BE', name='Business Cluster', sort_order=12)
+        sshs = Curriculum.objects.get(code='strengthened-shs')
+        k12 = Curriculum.objects.get(code='k12-shs')
+        strands = {
+            code: Program.objects.create(code=code, name=code, grade_level='Grade 12', curriculum=k12, sort_order=index)
+            for index, code in enumerate(('STEM', 'ABM', 'HUMSS'), start=1)
+        }
+
+        def cluster(code, strand, order):
+            return Program.objects.create(
+                code=code,
+                name=f'{code} Cluster',
+                grade_level='Grade 11',
+                curriculum=sshs,
+                continues_to=strands[strand],
+                sort_order=order,
+            )
+
+        self.stemc = cluster('STEMC', 'STEM', 13)
+        self.be = cluster('BE', 'ABM', 12)
+        cluster('ASH', 'HUMSS', 11)
         self.admin = User.objects.create_user(
             email='admin@dampol1nhs.edu.ph',
             password='changeme123',

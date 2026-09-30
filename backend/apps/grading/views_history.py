@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import IsAdmin
 from apps.grading.advisory import section_subject_assignments
 from apps.grading.models import Grade, GradeHistory
-from apps.grading.recommend import recommend_payload
+from apps.grading.recommend import RecommendationContext, recommend_payload
 from apps.people.models import StudentSection, TeacherAssignment
 from apps.school.labels import section_label
 from apps.school.models import SchoolYear, Section, Term
@@ -80,7 +80,9 @@ class GradeReportView(APIView):
         sections = sections.order_by('grade_level', 'program__code', 'name')
 
         payload = []
+        context = RecommendationContext()
         for section in sections:
+            program_code = section.program.code if section.program_id else None
             subjects = section_subject_assignments(section)
             subject_ids = [row.subject_id for row in subjects]
             roster = list(
@@ -138,7 +140,11 @@ class GradeReportView(APIView):
                         'lrn': row.student.lrn,
                         'shown': shown,
                         'scores': scores,
-                        'recommendation': recommend_payload(year_grades.get(row.student_id, [])),
+                        'recommendation': recommend_payload(
+                            year_grades.get(row.student_id, []),
+                            program_code,
+                            context,
+                        ),
                     }
                 )
             payload.append(

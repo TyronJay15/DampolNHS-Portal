@@ -228,8 +228,16 @@ export function fetchGrade11Forecast() {
   return apiRequest('/admin/forecast/', { auth: true });
 }
 
+export function retrainForecast() {
+  return apiRequest('/admin/forecast/', { method: 'POST', auth: true, body: {} });
+}
+
 export function fetchAssistantStats() {
   return apiRequest('/ml/assistant/', { auth: true });
+}
+
+export function retrainAssistant() {
+  return apiRequest('/ml/assistant/', { method: 'POST', auth: true, body: {} });
 }
 
 export function saveTermDeadline(termId, payload) {

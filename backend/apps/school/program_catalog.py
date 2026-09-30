@@ -1,7 +1,20 @@
 """Canonical Senior High School strand copy for seed and updates.
 
 These five Grade 12 strands and five Grade 11 clusters are the current offering.
+Seed data only: runtime code reads Program, Curriculum and continues_to from the database.
 """
+
+CURRICULA = (
+    {'code': 'k12-shs', 'name': 'K to 12 Senior High School Curriculum', 'sort_order': 1},
+    {'code': 'strengthened-shs', 'name': 'Strengthened Senior High School Curriculum', 'sort_order': 2},
+)
+
+# Transition state when these programs were seeded: Grade 11 clusters follow the
+# Strengthened SHS curriculum, Grade 12 strands still follow the K to 12 curriculum.
+CURRICULUM_BY_GRADE = {
+    'Grade 11': 'strengthened-shs',
+    'Grade 12': 'k12-shs',
+}
 
 PROGRAMS = [
     {
@@ -274,6 +287,7 @@ def grade_for(code):
     return catalog_item(code).get('grade_level') or ''
 
 
+# Seed for Program.continues_to.
 GRADE11_TO_GRADE12 = {
     'ASH': 'HUMSS',
     'BE': 'ABM',

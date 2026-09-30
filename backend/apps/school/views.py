@@ -8,6 +8,7 @@ from apps.accounts.permissions import IsAdminOrHeadTeacher, IsHeadTeacher, IsSta
 from apps.audit import services as audit
 from apps.audit.models import AuditLog
 from apps.notifications.services import notify, teachers_for_year
+from apps.school.curriculum import carry_forward
 from apps.school.models import Program, SchoolYear, Section, Subject, Term
 from apps.school.serializers import (
     ProgramSerializer,
@@ -43,6 +44,7 @@ class SchoolYearViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         year = serializer.save()
+        carry_forward(year)
         for number in (1, 2, 3):
             Term.objects.get_or_create(
                 school_year=year,

@@ -5,8 +5,16 @@ from apps.accounts.models import User
 from apps.chatbot.models import FaqEntry
 from apps.cms import defaults as cms_defaults
 from apps.cms.models import SiteContent
+from apps.ml.intent import train_intent
+from apps.ml.seed import seed_college_programs
+from apps.school.curriculum import carry_forward
 from apps.school.models import SchoolYear, Term
-from apps.school.offerings import seed_programs, sync_subject_catalog
+from apps.school.offerings import (
+    seed_academic_reference,
+    seed_matching_exclusions,
+    seed_programs,
+    sync_subject_catalog,
+)
 
 FAQS = [
     (
@@ -19,7 +27,8 @@ FAQS = [
         'programs',
         'stem, abm, humss, ict, he, cluster, program, strand',
         'What programs are offered?',
-        'Grade 12 strands are STEM, ABM, HUMSS, ICT, and HE. Grade 11 cluster programs are ASH, BE, STEMC, HT, and ICTP. Choose one on the Programs page, then click Register Now.',
+        # The live program list is added by the chatbot from the Program table.
+        'See every program and its subjects on the Programs page, then click Register Now.',
     ),
     (
         'login',
@@ -81,6 +90,10 @@ class Command(BaseCommand):
 
         seed_programs()
         sync_subject_catalog()
+        seed_academic_reference()
+        seed_matching_exclusions()
+        seed_college_programs()
+        carry_forward(year)
 
         admin, created = User.objects.get_or_create(
             email='admin@dampol1nhs.edu.ph',
@@ -118,8 +131,9 @@ class Command(BaseCommand):
             defaults={'payload': cms_defaults.FOOTER},
         )
 
+        # Create missing FAQs only; answers edited by staff are kept.
         for topic, keywords, question, answer in FAQS:
-            FaqEntry.objects.update_or_create(
+            FaqEntry.objects.get_or_create(
                 question=question,
                 defaults={
                     'topic': topic,
@@ -127,5 +141,10 @@ class Command(BaseCommand):
                     'answer': answer,
                 },
             )
+
+        try:
+            train_intent()
+        except ValueError as exc:
+            self.stdout.write(self.style.WARNING(f'Chatbot intent model not trained: {exc}'))
 
         self.stdout.write(self.style.SUCCESS('School foundation data is ready.'))

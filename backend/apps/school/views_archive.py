@@ -16,6 +16,13 @@ def _year_busy(year):
     return year.sections.exists()
 
 
+def _retrain_forecast():
+    """The set of completed years changed, so the enrollment trend is refit (snapshots included)."""
+    from apps.ml.forecast import train_forecast
+
+    train_forecast()
+
+
 class SchoolYearArchiveView(APIView):
     permission_classes = [IsAuthenticated, IsHeadTeacher]
 
@@ -24,9 +31,6 @@ class SchoolYearArchiveView(APIView):
         if year.is_current:
             return Response({'detail': 'Make another year current before archiving this one.'}, status=400)
         now = timezone.now()
-        from apps.ml.forecast import snapshot_year
-
-        snapshot_year(year)
         year.archived_at = now
         year.is_current = False
         year.save(update_fields=['archived_at', 'is_current'])
@@ -42,6 +46,7 @@ class SchoolYearArchiveView(APIView):
             target_type='SchoolYear',
             target_id=year.id,
         )
+        _retrain_forecast()
         return Response(SchoolYearSerializer(year).data)
 
 
@@ -96,6 +101,7 @@ class SchoolYearRestoreView(APIView):
             target_type='SchoolYear',
             target_id=year.id,
         )
+        _retrain_forecast()
         return Response(SchoolYearSerializer(year).data)
 
 

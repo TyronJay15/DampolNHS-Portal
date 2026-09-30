@@ -2,7 +2,8 @@ import re
 
 from rest_framework import serializers
 
-from apps.school.models import Program, ProgramSubject, SchoolYear, Section, Subject, Term
+from apps.school.curriculum import GRADE_LEVELS, curriculum_for, set_year_curricula
+from apps.school.models import Curriculum, Program, ProgramSubject, SchoolYear, Section, SkillDomain, Subject, Term
 from apps.school.offerings import replace_program_subjects, subject_payloads_for_program
 from apps.school.program_catalog import extra_for, grade_for
 
@@ -52,6 +53,17 @@ class ProgramSerializer(serializers.ModelSerializer):
 
 class AdminProgramSerializer(serializers.ModelSerializer):
     subjects = serializers.SerializerMethodField()
+    curriculum = serializers.SlugRelatedField(
+        slug_field='code',
+        queryset=Curriculum.objects.all(),
+        allow_null=True,
+        required=False,
+    )
+    continues_to = serializers.PrimaryKeyRelatedField(
+        queryset=Program.objects.all(),
+        allow_null=True,
+        required=False,
+    )
 
     class Meta:
         model = Program
@@ -64,6 +76,8 @@ class AdminProgramSerializer(serializers.ModelSerializer):
             'track',
             'grade_level',
             'pathways',
+            'curriculum',
+            'continues_to',
             'is_active',
             'sort_order',
             'subjects',
@@ -95,6 +109,12 @@ class AdminProgramSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if self.instance is None and not attrs.get('grade_level'):
             raise serializers.ValidationError({'grade_level': 'Choose Grade 11 or Grade 12.'})
+        target = attrs.get('continues_to')
+        if target is not None:
+            if self.instance is not None and target.pk == self.instance.pk:
+                raise serializers.ValidationError({'continues_to': 'A program cannot continue to itself.'})
+            if target.grade_level != Program.GradeLevel.GRADE_12:
+                raise serializers.ValidationError({'continues_to': 'Choose a Grade 12 program.'})
         if 'subjects' in self.initial_data:
             attrs['subjects'] = self._clean_subjects(self.initial_data.get('subjects'))
         return attrs
@@ -155,11 +175,64 @@ class AdminProgramSerializer(serializers.ModelSerializer):
 class SchoolYearSerializer(serializers.ModelSerializer):
     archived = serializers.SerializerMethodField()
     can_delete = serializers.SerializerMethodField()
+    curricula = serializers.SerializerMethodField()
+    curriculum_options = serializers.SerializerMethodField()
 
     class Meta:
         model = SchoolYear
-        fields = ('id', 'label', 'is_current', 'starts_on', 'ends_on', 'archived_at', 'archived', 'can_delete')
+        fields = (
+            'id',
+            'label',
+            'is_current',
+            'starts_on',
+            'ends_on',
+            'archived_at',
+            'archived',
+            'can_delete',
+            'curricula',
+            'curriculum_options',
+        )
         extra_kwargs = {'archived_at': {'read_only': True}}
+
+    def get_curricula(self, obj):
+        rows = {}
+        for grade_level in GRADE_LEVELS:
+            curriculum = curriculum_for(obj, grade_level)
+            rows[grade_level] = curriculum.code if curriculum else ''
+        return rows
+
+    def get_curriculum_options(self, obj):
+        return list(Curriculum.objects.filter(is_active=True).values('code', 'name'))
+
+    def validate(self, attrs):
+        if 'curricula' in self.initial_data:
+            attrs['curricula'] = self._clean_curricula(self.initial_data.get('curricula'))
+        return attrs
+
+    def _clean_curricula(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError({'curricula': 'Send a curriculum per grade level.'})
+        by_code = {row.code: row for row in Curriculum.objects.filter(is_active=True)}
+        cleaned = {}
+        for grade_level, code in value.items():
+            if grade_level not in GRADE_LEVELS or code not in by_code:
+                raise serializers.ValidationError({'curricula': 'Choose a listed curriculum for Grade 11 or Grade 12.'})
+            cleaned[grade_level] = by_code[code]
+        return cleaned
+
+    def create(self, validated_data):
+        curricula = validated_data.pop('curricula', None)
+        year = super().create(validated_data)
+        if curricula:
+            set_year_curricula(year, curricula)
+        return year
+
+    def update(self, instance, validated_data):
+        curricula = validated_data.pop('curricula', None)
+        year = super().update(instance, validated_data)
+        if curricula:
+            set_year_curricula(year, curricula)
+        return year
 
     def get_archived(self, obj):
         return bool(obj.archived_at)
@@ -220,9 +293,16 @@ class TermSerializer(serializers.ModelSerializer):
 
 
 class SubjectSerializer(serializers.ModelSerializer):
+    skill_domain = serializers.SlugRelatedField(
+        slug_field='key',
+        queryset=SkillDomain.objects.all(),
+        allow_null=True,
+        required=False,
+    )
+
     class Meta:
         model = Subject
-        fields = ('id', 'code', 'name', 'is_active')
+        fields = ('id', 'code', 'name', 'skill_domain', 'is_active')
 
 
 class SectionSerializer(serializers.ModelSerializer):

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdvancedToolBanner from '../../components/AdvancedToolBanner/AdvancedToolBanner';
-import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
 import { fetchPlacements, fetchSections, savePlacement, savePlacementsBulk } from '../../services/adminService';
+import { isCapacityError, programChangeNote } from '../../utils/placement';
 import { sectionLabel } from '../../utils/sectionLabel';
 
 function matches(row, query) {
@@ -22,6 +22,7 @@ export default function HeadPlacePage() {
   const [studentTab, setStudentTab] = useState('available');
   const [selected, setSelected] = useState({});
   const [transferTarget, setTransferTarget] = useState(null);
+  const [capacityRetry, setCapacityRetry] = useState(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -52,12 +53,15 @@ export default function HeadPlacePage() {
     [students, sectionId, studentQuery],
   );
 
+  // available: unplaced, same program · other: placed elsewhere (transfer) · in_section: this roster
   const pool = useMemo(() => {
     const needle = studentQuery.trim().toLowerCase();
     return students.filter((row) => {
-      if (studentTab === 'available' && row.placed) return false;
-      if (studentTab === 'in_section' && row.section_id !== Number(sectionId)) return false;
       if (!section) return false;
+      const here = row.section_id === Number(sectionId);
+      if (studentTab === 'available' && row.placed) return false;
+      if (studentTab === 'other' && (!row.placed || here)) return false;
+      if (studentTab === 'in_section' && !here) return false;
       if (row.grade_level && section.grade_level && row.grade_level !== section.grade_level) return false;
       if (!row.placed && row.program_code && section.program_code && row.program_code !== section.program_code) return false;
       return matches(row, needle);
@@ -65,6 +69,11 @@ export default function HeadPlacePage() {
   }, [students, studentTab, sectionId, section, studentQuery]);
 
   const chosen = pool.filter((row) => selected[row.student_id]);
+
+  function retryOnCapacity(err, retry) {
+    if (isCapacityError(err)) setCapacityRetry(retry);
+    else setError(err.message);
+  }
 
   async function placeBulk(force = false) {
     if (!section || chosen.length === 0) return;
@@ -78,10 +87,12 @@ export default function HeadPlacePage() {
         reason,
       });
       setSelected({});
+      setCapacityRetry(null);
       await load();
-      setMessage(`Placed ${result.placed} student(s) in ${sectionLabel(section)}. Changes appear in Section Workspace.`);
+      const failedNote = result.failed?.length ? ` ${result.failed.length} could not be placed.` : '';
+      setMessage(`Placed ${result.placed} student(s) in ${sectionLabel(section)}.${failedNote}`);
     } catch (err) {
-      setError(err.message);
+      retryOnCapacity(err, { type: 'bulk' });
     } finally {
       setBusy('');
     }
@@ -99,11 +110,13 @@ export default function HeadPlacePage() {
         reason,
       });
       setTransferTarget(null);
+      setCapacityRetry(null);
       setReason('');
       await load();
-      setMessage(`Updated ${row.name} in ${sectionLabel(section)}.`);
+      setMessage(`${row.placed ? 'Transferred' : 'Placed'} ${row.name} in ${sectionLabel(section)}.`);
     } catch (err) {
-      setError(err.message);
+      setTransferTarget(null);
+      retryOnCapacity(err, { type: 'one', row });
     } finally {
       setBusy('');
     }
@@ -154,6 +167,7 @@ export default function HeadPlacePage() {
             </div>
             <div className="studio-filters">
               <button type="button" className={`studio-filter${studentTab === 'available' ? ' is-active' : ''}`} onClick={() => setStudentTab('available')}>Available</button>
+              <button type="button" className={`studio-filter${studentTab === 'other' ? ' is-active' : ''}`} onClick={() => setStudentTab('other')}>Other sections</button>
               <button type="button" className={`studio-filter${studentTab === 'in_section' ? ' is-active' : ''}`} onClick={() => setStudentTab('in_section')}>In section</button>
             </div>
           </div>
@@ -175,11 +189,19 @@ export default function HeadPlacePage() {
                   {studentTab === 'available' ? <th /> : null}
                   <th>Student</th>
                   <th>LRN</th>
+                  <th>Program</th>
                   <th>Current section</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
+                {pool.length === 0 ? (
+                  <tr>
+                    <td colSpan={studentTab === 'available' ? 6 : 5}>
+                      {studentTab === 'other' ? 'No students in other sections of this grade level.' : 'No students here.'}
+                    </td>
+                  </tr>
+                ) : null}
                 {pool.map((row) => (
                   <tr key={row.student_id}>
                     {studentTab === 'available' ? (
@@ -193,13 +215,18 @@ export default function HeadPlacePage() {
                     ) : null}
                     <td>{row.name}</td>
                     <td>{row.lrn}</td>
+                    <td>{row.program_code || '—'}</td>
                     <td>{row.section || '—'}</td>
                     <td>
-                      {row.placed && row.section_id !== Number(sectionId) ? (
-                        <button className="btn btn-secondary" type="button" onClick={() => setTransferTarget(row)}>Transfer here</button>
+                      {studentTab === 'other' ? (
+                        <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => setTransferTarget(row)}>
+                          Transfer here
+                        </button>
                       ) : null}
-                      {!row.placed && studentTab === 'available' ? (
-                        <button className="btn btn-secondary" type="button" onClick={() => transferOne(row)}>Assign</button>
+                      {studentTab === 'available' ? (
+                        <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => transferOne(row)}>
+                          Assign
+                        </button>
                       ) : null}
                     </td>
                   </tr>
@@ -218,6 +245,9 @@ export default function HeadPlacePage() {
               Move <strong>{transferTarget.name}</strong> from <strong>{transferTarget.section || 'unplaced'}</strong> to{' '}
               <strong>{section ? sectionLabel(section) : ''}</strong>?
             </p>
+            {programChangeNote(transferTarget, section) ? (
+              <p className="alert alert-info">{programChangeNote(transferTarget, section)}</p>
+            ) : null}
             <label className="form-field is-wide">
               <span>Reason (optional)</span>
               <input value={reason} onChange={(e) => setReason(e.target.value)} />
@@ -225,6 +255,29 @@ export default function HeadPlacePage() {
             <div className="studio-actions">
               <button className="btn btn-secondary" type="button" onClick={() => setTransferTarget(null)}>Cancel</button>
               <button className="btn" type="button" onClick={() => transferOne(transferTarget)} disabled={Boolean(busy)}>Confirm transfer</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {capacityRetry ? (
+        <div className="studio-modal-backdrop">
+          <div className="card studio-panel studio-modal">
+            <h2>Section is full</h2>
+            <p>
+              <strong>{section ? sectionLabel(section) : ''}</strong> is at capacity ({section?.student_count || 0}
+              {section?.capacity ? ` / ${section.capacity}` : ''}). Place anyway?
+            </p>
+            <div className="studio-actions">
+              <button className="btn btn-secondary" type="button" onClick={() => setCapacityRetry(null)}>Cancel</button>
+              <button
+                className="btn"
+                type="button"
+                disabled={Boolean(busy)}
+                onClick={() => (capacityRetry.type === 'bulk' ? placeBulk(true) : transferOne(capacityRetry.row, true))}
+              >
+                Place anyway
+              </button>
             </div>
           </div>
         </div>

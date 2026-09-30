@@ -148,7 +148,11 @@ export default function AdminDashboard() {
                 ? `${stats.total} approved Grade 11 student${stats.total === 1 ? '' : 's'} ${stats.total === 1 ? 'maps' : 'map'} to ${stats.nextYear || 'next year'}.`
                 : 'No approved Grade 11 registrations yet.'}
             </p>
-            <ForecastBars rows={stats.clusters} total={stats.total} empty="Cluster counts appear after Grade 11 approvals." />
+            <ForecastBars
+              rows={stats.appliedClusters}
+              total={stats.appliedTotal}
+              empty="Cluster counts appear after Grade 11 applications."
+            />
           </section>
 
           <section className="card desk-tile">

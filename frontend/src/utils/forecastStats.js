@@ -6,24 +6,23 @@ export function shareOf(count, total) {
 export function forecastStats(data) {
   const clusters = data?.clusters || [];
   const strands = data?.strands || [];
-  const total = Number(data?.grade11_total) || 0;
-  const largest = clusters.reduce((best, row) => {
-    const score = Number(row.applied ?? row.count) || 0;
-    const bestScore = Number(best?.applied ?? best?.count) || 0;
-    return !best || score > bestScore ? row : best;
-  }, null);
-  const smallest = strands.reduce((best, row) => (!best || row.count < best.count ? row : best), null);
+  // Charts plot applications (pending + approved) so every screen shows the same numbers.
+  const appliedClusters = clusters.map((row) => ({ ...row, count: Number(row.applied ?? row.count) || 0 }));
+  const appliedTotal = appliedClusters.reduce((sum, row) => sum + row.count, 0);
   return {
     clusters,
+    appliedClusters,
+    appliedTotal,
     strands,
-    total,
-    largest,
-    smallest,
+    total: Number(data?.grade11_total) || 0,
+    favored: clusters.find((row) => row.rank === 1 && row.applied) || null,
     year: data?.school_year || '',
     nextYear: data?.projected_year || '',
-    method: data?.method || 'counts',
+    curriculum: data?.curriculum || null,
     ready: Boolean(data?.ready),
     readyReason: data?.ready_reason || '',
-    mostApplied: data?.most_applied || null,
+    model: data?.model || null,
+    plan: data?.plan || { grade12_curriculum: null, warnings: [] },
+    typicalCapacity: Number(data?.typical_capacity) || 40,
   };
 }

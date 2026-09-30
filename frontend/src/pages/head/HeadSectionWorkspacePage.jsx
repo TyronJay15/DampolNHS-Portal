@@ -16,6 +16,7 @@ import {
   savePlacementsBulk,
   saveSection,
 } from '../../services/adminService';
+import { isCapacityError, programChangeNote } from '../../utils/placement';
 import { sectionLabel } from '../../utils/sectionLabel';
 
 const STEPS = [
@@ -72,13 +73,14 @@ export default function HeadSectionWorkspacePage() {
   const identityLocked = detail?.identity_locked;
   const isActive = section?.status === 'active';
 
+  // Unplaced students must match the program; placed students from any program can transfer in.
   const candidates = useMemo(() => {
     if (!section) return [];
     const needle = studentQuery.trim().toLowerCase();
     return students.filter((row) => {
       if (row.section_id === section.id) return false;
       if (row.grade_level && section.grade_level && row.grade_level !== section.grade_level) return false;
-      if (row.program_code && section.program_code && row.program_code !== section.program_code) return false;
+      if (!row.placed && row.program_code && section.program_code && row.program_code !== section.program_code) return false;
       if (!needle) return true;
       return [row.name, row.lrn, row.program_code].join(' ').toLowerCase().includes(needle);
     });
@@ -89,7 +91,7 @@ export default function HeadSectionWorkspacePage() {
     [students, sectionId],
   );
 
-  const chosen = candidates.filter((row) => selected[row.student_id]);
+  const chosen = candidates.filter((row) => !row.placed && selected[row.student_id]);
 
   function goStep(next) {
     setSearchParams({ step: next });
@@ -129,7 +131,7 @@ export default function HeadSectionWorkspacePage() {
       const failedNote = result.failed?.length ? ` ${result.failed.length} could not be placed.` : '';
       setMessage(`Placed ${result.placed} student(s).${failedNote}`);
     } catch (err) {
-      if (err.message.includes('capacity')) {
+      if (isCapacityError(err)) {
         setConfirm({ type: 'capacity', count: chosen.length });
       } else {
         setError(err.message);
@@ -155,7 +157,7 @@ export default function HeadSectionWorkspacePage() {
       await reload();
       setMessage(`Transferred ${row.name}.`);
     } catch (err) {
-      if (err.message.includes('capacity')) {
+      if (isCapacityError(err)) {
         setConfirm({ type: 'capacity', student: row });
       } else {
         setError(err.message);
@@ -371,13 +373,15 @@ export default function HeadSectionWorkspacePage() {
               {candidates.map((row) => (
                 <tr key={row.student_id}>
                   <td>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(selected[row.student_id])}
-                      onChange={(event) =>
-                        setSelected((current) => ({ ...current, [row.student_id]: event.target.checked }))
-                      }
-                    />
+                    {row.placed ? null : (
+                      <input
+                        type="checkbox"
+                        checked={Boolean(selected[row.student_id])}
+                        onChange={(event) =>
+                          setSelected((current) => ({ ...current, [row.student_id]: event.target.checked }))
+                        }
+                      />
+                    )}
                   </td>
                   <td>{row.name}</td>
                   <td>{row.lrn}</td>
@@ -574,6 +578,9 @@ export default function HeadSectionWorkspacePage() {
                 Move <strong>{confirm.student.name}</strong> from <strong>{confirm.student.section}</strong> to{' '}
                 <strong>{sectionLabel(section)}</strong>?
               </p>
+            ) : null}
+            {confirm.type === 'transfer' && programChangeNote(confirm.student, section) ? (
+              <p className="alert alert-info">{programChangeNote(confirm.student, section)}</p>
             ) : null}
             {confirm.type === 'capacity' ? (
               <p>This assignment exceeds section capacity. Confirm to proceed anyway.</p>

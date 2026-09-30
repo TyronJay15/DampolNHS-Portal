@@ -14,7 +14,7 @@ function recCopy(rec) {
   }
   if (rec.ready) {
     return {
-      kicker: 'College match',
+      kicker: rec.evidence === 'limited' ? 'Closest match so far' : 'College match',
       title: rec.courses?.[0]?.name || 'Top match ready',
       body: rec.summary || 'Ranked from the subjects your adviser has shown.',
     };
@@ -26,10 +26,30 @@ function recCopy(rec) {
   };
 }
 
+function joinLabels(labels) {
+  return labels.length === 1 ? labels[0] : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
+}
+
+// How much of a program's skill areas the student's own grades cover. Wording only; the API decides the status.
+function evidenceCopy(evidence) {
+  if (!evidence?.status) return '';
+  const level = evidence.status === 'strong' ? 'Strong' : 'Limited';
+  return `Evidence: ${level}. Based on ${evidence.observed} of ${evidence.total} relevant skill areas.`;
+}
+
+function needsCopy(coverage) {
+  const labels = coverage?.needs || [];
+  if (!labels.length) return '';
+  const count = coverage.not_evaluated || 0;
+  const subject = count ? `${count} other program${count === 1 ? '' : 's'}` : 'More programs';
+  return `${subject} can be checked once you have grades in ${joinLabels(labels)}.`;
+}
+
 export default function RecommendationPanel({ rec, compact = false, className = '' }) {
   const copy = recCopy(rec);
   const courses = rec?.ready && rec.courses?.length ? rec.courses.slice(0, 3) : PLACEHOLDERS;
   const skills = rec?.skills || [];
+  const needs = needsCopy(rec?.coverage);
 
   return (
     <section className={`card student-rec${compact ? ' is-compact' : ''}${rec?.ready ? ' is-ready' : ''}${className ? ` ${className}` : ''}`}>
@@ -59,11 +79,16 @@ export default function RecommendationPanel({ rec, compact = false, className = 
             <div>
               <strong>{course.name}</strong>
               <span>{course.reason}</span>
+              {evidenceCopy(course.evidence) ? <span>{evidenceCopy(course.evidence)}</span> : null}
             </div>
           </li>
         ))}
       </ol>
 
+      {rec && !rec.ready ? (
+        <p className="student-rec-hint">Evidence: Insufficient. More subject grades are needed to evaluate college programs.</p>
+      ) : null}
+      {needs ? <p className="student-rec-hint">{needs}</p> : null}
       <p className="student-rec-note">{rec?.advisory || 'Advisory. Based on subjects shown so far. Not an admission decision.'}</p>
     </section>
   );

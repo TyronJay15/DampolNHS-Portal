@@ -40,6 +40,7 @@ const ACTION_LABELS = {
   section_activated_incomplete: 'Section activated (incomplete)',
   program_created: 'Program created',
   program_updated: 'Program updated',
+  model_trained: 'Model retrained',
   adviser_assigned: 'Adviser assigned',
   subject_teacher_assigned: 'Subject teacher assigned',
   assignment_ended: 'Assignment ended',

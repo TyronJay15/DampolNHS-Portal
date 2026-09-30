@@ -99,6 +99,20 @@ export default function HeadYearPage() {
     }
   }
 
+  async function setCurriculum(year, gradeLevel, code) {
+    setBusy(`curriculum-${year.id}`);
+    setError('');
+    try {
+      const saved = await saveSchoolYear(year.id, { curricula: { [gradeLevel]: code } });
+      setYears((rows) => rows.map((row) => (row.id === saved.id ? saved : row)));
+      setMessage(`${year.label} ${gradeLevel} now follows the ${code} curriculum.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy('');
+    }
+  }
+
   async function archive(year) {
     setBusy(`archive-${year.id}`);
     setError('');
@@ -197,6 +211,25 @@ export default function HeadYearPage() {
                   <DeskMark name="year" size={16} />
                   {year.label}
                 </h2>
+                <div className="studio-toolbar">
+                  {['Grade 11', 'Grade 12'].map((gradeLevel) => (
+                    <label className="form-field" key={gradeLevel}>
+                      <span>{gradeLevel} curriculum</span>
+                      <select
+                        value={year.curricula?.[gradeLevel] || ''}
+                        disabled={Boolean(busy)}
+                        onChange={(event) => setCurriculum(year, gradeLevel, event.target.value)}
+                      >
+                        {year.curricula?.[gradeLevel] ? null : <option value="">Not set</option>}
+                        {(year.curriculum_options || []).map((row) => (
+                          <option key={row.code} value={row.code}>
+                            {row.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
                 <div className="studio-actions">
                   {year.is_current ? null : (
                     <button className="btn" type="button" disabled={Boolean(busy)} onClick={() => makeCurrent(year)}>

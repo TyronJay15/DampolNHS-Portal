@@ -1,6 +1,15 @@
+from django.apps import apps as django_apps
+
 from apps.school.models import Program, ProgramSubject, Subject
-from apps.school.program_catalog import PROGRAMS
-from apps.school.subject_catalog import LEGACY_SUBJECT_CODES, PROGRAM_SUBJECTS, SUBJECTS
+from apps.school.program_catalog import CURRICULA, CURRICULUM_BY_GRADE, GRADE11_TO_GRADE12, PROGRAMS
+from apps.school.subject_catalog import (
+    LEGACY_SUBJECT_CODES,
+    MATCHING_EXCLUDED,
+    PROGRAM_SUBJECTS,
+    SKILL_DOMAINS,
+    SUBJECT_DOMAIN,
+    SUBJECTS,
+)
 
 
 def program_seed_defaults(item):
@@ -65,6 +74,62 @@ def sync_subject_catalog():
     for code, name in SUBJECTS:
         Subject.objects.update_or_create(code=code, defaults={'name': name, 'is_active': True})
     return _seed_empty_program_subjects()
+
+
+def seed_academic_reference(get_model=None):
+    """Seed curricula, skill domains, program curriculum/continuation and subject domains.
+
+    Fills blanks only, so admin edits are kept. Migration school.0010 calls this with
+    historical models, so it must only touch fields that exist at that migration.
+    """
+    get_model = get_model or django_apps.get_model
+    curriculum_model = get_model('school', 'Curriculum')
+    domain_model = get_model('school', 'SkillDomain')
+    program_model = get_model('school', 'Program')
+    subject_model = get_model('school', 'Subject')
+
+    curricula = {}
+    for item in CURRICULA:
+        curricula[item['code']], _created = curriculum_model.objects.get_or_create(
+            code=item['code'],
+            defaults={'name': item['name'], 'sort_order': item['sort_order']},
+        )
+
+    domains = {}
+    for index, (key, label) in enumerate(SKILL_DOMAINS, start=1):
+        domains[key], _created = domain_model.objects.get_or_create(
+            key=key,
+            defaults={'label': label, 'sort_order': index},
+        )
+
+    for grade_level, code in CURRICULUM_BY_GRADE.items():
+        program_model.objects.filter(grade_level=grade_level, curriculum__isnull=True).update(
+            curriculum=curricula[code]
+        )
+
+    by_code = {row.code: row for row in program_model.objects.all()}
+    for cluster, strand in GRADE11_TO_GRADE12.items():
+        program = by_code.get(cluster)
+        target = by_code.get(strand)
+        if program is not None and target is not None and program.continues_to_id is None:
+            program.continues_to = target
+            program.save(update_fields=['continues_to'])
+
+    for code, key in SUBJECT_DOMAIN.items():
+        subject_model.objects.filter(code=code, skill_domain__isnull=True).update(skill_domain=domains[key])
+
+
+def seed_matching_exclusions(get_model=None):
+    """Mark catalog subjects that are deliberately left out of college matching.
+
+    Separate from seed_academic_reference because the field only exists from
+    migration school.0012 on, and older migrations call that function.
+    """
+    get_model = get_model or django_apps.get_model
+    get_model('school', 'Subject').objects.filter(
+        code__in=MATCHING_EXCLUDED,
+        skill_domain__isnull=True,
+    ).update(matching_excluded=True)
 
 
 def replace_program_subjects(program, rows):

@@ -1,7 +1,28 @@
-"""College course profiles in the same skill space as a student.
+"""Seed for ml.CollegeProgram: college course profiles in the student skill space.
 
-Neighbors for KNN are these profiles until alumni records exist.
+These are curated profiles, not learned from student outcomes. Runtime code
+reads CollegeProgram from the database; this file only seeds it.
 """
+
+# Seed for CollegeProgram.shs_programs: SHS programs that lead naturally to each course.
+SHS_PROGRAMS = {
+    'bsce': ('STEMC', 'STEM'),
+    'bscs': ('STEMC', 'STEM', 'ICTP', 'ICT'),
+    'bsit': ('STEMC', 'STEM', 'ICTP', 'ICT'),
+    'bsn': ('STEMC', 'STEM'),
+    'bsbio': ('STEMC', 'STEM'),
+    'bsarch': ('STEMC', 'STEM'),
+    'bsa': ('BE', 'ABM'),
+    'bsba': ('BE', 'ABM'),
+    'bsentrep': ('BE', 'ABM'),
+    'bacom': ('ASH', 'HUMSS'),
+    'bapols': ('ASH', 'HUMSS'),
+    'bspsy': ('ASH', 'HUMSS'),
+    'bsed': ('ASH', 'HUMSS'),
+    'bshrm': ('HT', 'HE'),
+    'bstm': ('HT', 'HE'),
+    'bsindtech': ('HT', 'HE', 'ICTP', 'ICT', 'STEMC', 'STEM'),
+}
 
 COURSES = (
     {
@@ -25,13 +46,13 @@ COURSES = (
     {
         'code': 'bsn',
         'name': 'BS Nursing',
-        'profile': {'math': 75, 'science': 90, 'language': 78, 'service': 75},
+        'profile': {'math': 75, 'science': 90, 'language': 78, 'service': 75, 'research': 80},
         'floors': {'science': 85},
     },
     {
         'code': 'bsbio',
         'name': 'BS Biology',
-        'profile': {'math': 78, 'science': 92, 'language': 70},
+        'profile': {'math': 78, 'science': 92, 'language': 70, 'research': 88},
         'floors': {'science': 85},
     },
     {
@@ -61,25 +82,25 @@ COURSES = (
     {
         'code': 'bacom',
         'name': 'BA Communication',
-        'profile': {'language': 91, 'social': 88, 'arts': 78, 'math': 75, 'science': 70},
+        'profile': {'language': 91, 'social': 88, 'arts': 78, 'math': 75, 'science': 70, 'research': 80},
         'floors': {'language': 80},
     },
     {
         'code': 'bapols',
         'name': 'BA Political Science',
-        'profile': {'social': 91, 'language': 86, 'math': 65, 'science': 60},
+        'profile': {'social': 91, 'language': 86, 'math': 65, 'science': 60, 'research': 82},
         'floors': {'social': 80, 'language': 78},
     },
     {
         'code': 'bspsy',
         'name': 'BS Psychology',
-        'profile': {'social': 85, 'science': 80, 'language': 78, 'math': 65},
+        'profile': {'social': 85, 'science': 80, 'language': 78, 'math': 65, 'research': 84},
         'floors': {'social': 78},
     },
     {
         'code': 'bsed',
         'name': 'Bachelor of Secondary Education',
-        'profile': {'language': 86, 'social': 84, 'math': 70, 'science': 68},
+        'profile': {'language': 86, 'social': 84, 'math': 70, 'science': 68, 'research': 80},
         'floors': {'language': 78},
     },
     {

@@ -3,7 +3,7 @@ import DeskMark from '../../components/DeskMark/DeskMark';
 import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
-import { fetchAssistantStats } from '../../services/adminService';
+import { fetchAssistantStats, retrainAssistant } from '../../services/adminService';
 import './AdminHome.css';
 
 function formatWhen(value) {
@@ -17,6 +17,7 @@ export default function AdminAssistantPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [training, setTraining] = useState(false);
 
   useEffect(() => {
     fetchAssistantStats()
@@ -24,6 +25,18 @@ export default function AdminAssistantPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  async function retrain() {
+    setTraining(true);
+    setError('');
+    try {
+      setData(await retrainAssistant());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setTraining(false);
+    }
+  }
 
   if (loading) return <Loading label="Loading assistant…" />;
 
@@ -41,6 +54,14 @@ export default function AdminAssistantPage() {
         </p>
       </PageHead>
       {error ? <p className="alert alert-error">{error}</p> : null}
+      {intent.stale || !intent.ready ? (
+        <p className="alert alert-info">
+          {intent.ready ? 'FAQs changed after the last training.' : 'The topic classifier is not trained yet.'}{' '}
+          <button className="btn btn-secondary" type="button" disabled={training} onClick={retrain}>
+            {training ? 'Retraining…' : 'Retrain now'}
+          </button>
+        </p>
+      ) : null}
 
       <div className="admin-stats">
         <article className="admin-stat is-ok">

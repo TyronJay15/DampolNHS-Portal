@@ -6,6 +6,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import StudentProfile, User
 from apps.grading.models import Grade
+from apps.ml.knn_model import METHOD
 from apps.people.models import StudentSection
 from apps.school.models import Program, SchoolYear, Section, Subject, Term
 
@@ -86,4 +87,4 @@ class StudentDashboardApiTests(TestCase):
         self.assertEqual(response.data['grades'][0]['term_number'], 1)
         self.assertEqual(response.data['terms'][0]['number'], 1)
         self.assertTrue(any(row['name'] == 'Mathematics' for row in response.data['subjects']))
-        self.assertEqual(response.data['recommendation']['method'], 'knn')
+        self.assertEqual(response.data['recommendation']['method'], METHOD)

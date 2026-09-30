@@ -157,6 +157,11 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'config.exceptions.api_exception_handler',
 }
 
+# College recommendation: share of a college program's skill areas that must be backed by
+# the student's real grades for a match to count as strongly supported. Below it a match is
+# shown as limited evidence. A design parameter, not a measured value; change it here or in .env.
+MIN_RECOMMENDATION_EVIDENCE_COVERAGE = float(os.environ.get('MIN_RECOMMENDATION_EVIDENCE_COVERAGE', '0.6'))
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(
         minutes=int(os.environ.get('JWT_ACCESS_MINUTES', '60'))

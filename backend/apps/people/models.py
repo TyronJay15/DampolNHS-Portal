@@ -52,6 +52,11 @@ class Registration(models.Model):
     def __str__(self):
         return f'{self.user.email} ({self.status})'
 
+    def save(self, *args, **kwargs):
+        if self.program_id:
+            self.program.check_grade(self.grade_level_enrollment, 'grade_level_enrollment')
+        super().save(*args, **kwargs)
+
 
 class TeacherAssignment(models.Model):
     class Type(models.TextChoices):

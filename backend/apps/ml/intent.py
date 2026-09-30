@@ -1,9 +1,13 @@
-from apps.chatbot.models import FaqEntry
-from apps.ml.store import last_artifact, last_run, save_run
-from apps.ml.text import MultinomialNB, TfidfVectorizer, tokenize
+import hashlib
 
-TOPICS = ('registration', 'programs', 'login', 'approval', 'grades', 'contact', 'events')
+from apps.chatbot.models import FaqEntry
+from apps.ml.store import last_artifact, save_run
+from apps.ml.text import MultinomialNB, TfidfVectorizer, tokenize
+from apps.school.curriculum import GRADE_LEVELS, curriculum_for, programs_for
+from apps.school.models import SchoolYear
+
 MIN_CONFIDENCE = 0.42
+# Seed phrasings that widen each FAQ topic. Topics themselves come from FaqEntry rows.
 PARAPHRASES = {
     'registration': (
         'how to sign up',
@@ -68,7 +72,7 @@ def _rows():
     rows = []
     for entry in FaqEntry.objects.filter(is_active=True):
         topic = entry.topic.strip().lower()
-        if topic not in TOPICS:
+        if not topic:
             continue
         rows.append((entry.question, topic))
         for keyword in entry.keyword_list():
@@ -123,11 +127,24 @@ def train_intent():
         n_test=len(test),
         metrics={'accuracy': round(accuracy, 4), 'topics': sorted({topic for _text, topic in rows})},
         artifact={'vectorizer': vectorizer.dump(), 'model': model.dump()},
+        feature_schema={'text': 'tfidf', 'vocabulary': len(vectorizer.idf)},
+        dataset={
+            'rows': len(rows),
+            'faq_entries': FaqEntry.objects.filter(is_active=True).count(),
+            'fingerprint': faq_fingerprint(),
+        },
     )
 
 
-def ensure_intent():
-    return last_run('intent') or train_intent()
+def faq_fingerprint():
+    """Changes whenever an active FAQ's topic, question or keywords change."""
+    rows = FaqEntry.objects.filter(is_active=True).order_by('pk').values_list('pk', 'topic', 'question', 'keywords')
+    return hashlib.sha1(repr(list(rows)).encode()).hexdigest()[:12]
+
+
+def is_stale(run):
+    """True when the FAQs the classifier learns from changed after it was trained."""
+    return run is not None and (run.dataset or {}).get('fingerprint') != faq_fingerprint()
 
 
 def _argmax(vectorizer, model, question):
@@ -153,13 +170,30 @@ def classify_question(question):
     return _label(vectorizer, model, question)
 
 
+def program_summary():
+    """The programs offered this year, read live from the database for the chatbot."""
+    year = SchoolYear.objects.filter(is_current=True).first()
+    parts = []
+    for grade_level in GRADE_LEVELS:
+        programs = list(programs_for(year, grade_level)) if year else []
+        if not programs:
+            continue
+        curriculum = curriculum_for(year, grade_level)
+        label = f'{grade_level} programs' + (f' ({curriculum.name})' if curriculum else '')
+        parts.append(f'{label}: ' + '; '.join(f'{row.code} - {row.name}' for row in programs) + '.')
+    return ' '.join(parts)
+
+
 def answers_for(topic):
     if topic == 'events':
         rows = list(FaqEntry.objects.filter(is_active=True, topic__iexact='events'))
         return [row.answer for row in rows] or [EVENT_ANSWER]
-    return list(
-        FaqEntry.objects.filter(is_active=True, topic__iexact=topic).values_list('answer', flat=True)
-    )
+    rows = list(FaqEntry.objects.filter(is_active=True, topic__iexact=topic).values_list('answer', flat=True))
+    if topic == 'programs':
+        live = program_summary()
+        if live:
+            rows.insert(0, live)
+    return rows
 
 
 def school_pack(topic):

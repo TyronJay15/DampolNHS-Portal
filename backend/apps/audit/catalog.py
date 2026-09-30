@@ -46,6 +46,7 @@ ACTIONS = {
     'section_activated_incomplete': {'family': SCHOOL, 'label': 'Section activated (incomplete)'},
     'program_created': {'family': SCHOOL, 'label': 'Program created'},
     'program_updated': {'family': SCHOOL, 'label': 'Program updated'},
+    'model_trained': {'family': SCHOOL, 'label': 'Model retrained'},
     'adviser_assigned': {'family': ASSIGNMENTS, 'label': 'Adviser assigned'},
     'subject_teacher_assigned': {'family': ASSIGNMENTS, 'label': 'Subject teacher assigned'},
     'assignment_ended': {'family': ASSIGNMENTS, 'label': 'Assignment ended'},

@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdmin
 from apps.audit import services as audit
-from apps.school.models import Program, Subject
+from apps.school.models import Curriculum, Program, SkillDomain, Subject
 from apps.school.serializers import AdminProgramSerializer, SubjectSerializer
 
 
@@ -15,11 +15,13 @@ class AdminProgramListView(APIView):
 
     def get(self, request):
         programs = Program.objects.all().prefetch_related('program_subjects__subject')
-        subjects = Subject.objects.filter(is_active=True)
+        subjects = Subject.objects.filter(is_active=True).select_related('skill_domain')
         return Response(
             {
                 'programs': AdminProgramSerializer(programs, many=True).data,
                 'subjects': SubjectSerializer(subjects, many=True).data,
+                'curricula': list(Curriculum.objects.filter(is_active=True).values('code', 'name')),
+                'skill_domains': list(SkillDomain.objects.filter(is_active=True).values('key', 'label')),
             }
         )
 
@@ -65,5 +67,11 @@ class AdminSubjectCreateView(APIView):
             return Response({'detail': 'Subject code and name are required.'}, status=400)
         if Subject.objects.filter(code=code).exists():
             return Response({'detail': 'A subject with that code already exists.'}, status=400)
-        subject = Subject.objects.create(code=code, name=name, is_active=True)
+        domain = None
+        domain_key = str(request.data.get('skill_domain') or '').strip()
+        if domain_key:
+            domain = SkillDomain.objects.filter(key=domain_key, is_active=True).first()
+            if domain is None:
+                return Response({'detail': 'Unknown skill domain.'}, status=400)
+        subject = Subject.objects.create(code=code, name=name, skill_domain=domain, is_active=True)
         return Response(SubjectSerializer(subject).data, status=201)

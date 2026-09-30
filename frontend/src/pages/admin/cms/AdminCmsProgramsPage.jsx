@@ -25,6 +25,8 @@ function emptyForm() {
     description: '',
     track: '',
     grade_level: 'Grade 11',
+    curriculum: '',
+    continues_to: '',
     pathwaysText: '',
     is_active: true,
     sort_order: 0,
@@ -40,6 +42,8 @@ function formFromProgram(program) {
     description: program.description || '',
     track: program.track || '',
     grade_level: program.grade_level || 'Grade 11',
+    curriculum: program.curriculum || '',
+    continues_to: program.continues_to ? String(program.continues_to) : '',
     pathwaysText: (program.pathways || []).join('\n'),
     is_active: program.is_active !== false,
     sort_order: program.sort_order ?? 0,
@@ -58,6 +62,8 @@ function payloadFromForm(form, includeCode) {
     description: form.description,
     track: form.track.trim(),
     grade_level: form.grade_level,
+    curriculum: form.curriculum || null,
+    continues_to: form.grade_level === 'Grade 11' && form.continues_to ? Number(form.continues_to) : null,
     pathways: form.pathwaysText
       .split('\n')
       .map((line) => line.trim())
@@ -79,10 +85,12 @@ function payloadFromForm(form, includeCode) {
 export default function AdminCmsProgramsPage() {
   const [programs, setPrograms] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [curricula, setCurricula] = useState([]);
+  const [domains, setDomains] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [creating, setCreating] = useState(false);
-  const [newSubject, setNewSubject] = useState({ code: '', name: '' });
+  const [newSubject, setNewSubject] = useState({ code: '', name: '', skill_domain: '' });
   const [addSubjectId, setAddSubjectId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -93,6 +101,8 @@ export default function AdminCmsProgramsPage() {
     const rows = data.programs || [];
     setPrograms(rows);
     setSubjects(data.subjects || []);
+    setCurricula(data.curricula || []);
+    setDomains(data.skill_domains || []);
     return rows.find((row) => String(row.id) === String(keepId)) || rows[0] || null;
   }
 
@@ -111,6 +121,9 @@ export default function AdminCmsProgramsPage() {
     const used = new Set(form.subjects.map((row) => String(row.subject_id)));
     return subjects.filter((row) => !used.has(String(row.id)));
   }, [form.subjects, subjects]);
+
+  const grade12Programs = useMemo(() => programs.filter((row) => row.grade_level === 'Grade 12'), [programs]);
+  const domainLabel = (key) => domains.find((row) => row.key === key)?.label || '';
 
   function selectProgram(program) {
     setCreating(false);
@@ -182,7 +195,7 @@ export default function AdminCmsProgramsPage() {
         ...current,
         subjects: [...current.subjects, { subject_id: String(created.id), kind: 'core', term: '' }],
       }));
-      setNewSubject({ code: '', name: '' });
+      setNewSubject({ code: '', name: '', skill_domain: '' });
       setMessage('Subject added to the catalog.');
     } catch (err) {
       setError(err.message);
@@ -255,6 +268,32 @@ export default function AdminCmsProgramsPage() {
             />
           </label>
         </div>
+        <div className="admin-cms-inline">
+          <label className="form-field">
+            <FieldLabel>Curriculum</FieldLabel>
+            <select value={form.curriculum} onChange={(event) => setForm({ ...form, curriculum: event.target.value })}>
+              <option value="">Not set</option>
+              {curricula.map((row) => (
+                <option key={row.code} value={row.code}>
+                  {row.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {form.grade_level === 'Grade 11' ? (
+            <label className="form-field">
+              <FieldLabel>Leads to (Grade 12)</FieldLabel>
+              <select value={form.continues_to} onChange={(event) => setForm({ ...form, continues_to: event.target.value })}>
+                <option value="">Not set</option>
+                {grade12Programs.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.code} — {row.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
         <div className="cms-grid-2">
         <label className="form-field">
           <FieldLabel>Summary</FieldLabel>
@@ -306,7 +345,13 @@ export default function AdminCmsProgramsPage() {
                   const subject = subjects.find((item) => String(item.id) === String(row.subject_id));
                   return (
                     <tr key={`${row.subject_id}-${index}`}>
-                      <td>{subject ? subject.name : 'Unknown subject'}</td>
+                      <td>
+                        {subject ? subject.name : 'Unknown subject'}
+                        {subject && !subject.skill_domain ? (
+                          <span className="admin-meta"> · No skill domain (not used for college matching)</span>
+                        ) : null}
+                        {subject?.skill_domain ? <span className="admin-meta"> · {domainLabel(subject.skill_domain)}</span> : null}
+                      </td>
                       <td>
                         <select value={row.kind} onChange={(event) => setSubjectRow(index, { kind: event.target.value })}>
                           {KINDS.map(([value, label]) => (
@@ -386,6 +431,20 @@ export default function AdminCmsProgramsPage() {
               onChange={(event) => setNewSubject({ ...newSubject, name: event.target.value })}
               required
             />
+          </label>
+          <label className="form-field">
+            <FieldLabel>Skill domain</FieldLabel>
+            <select
+              value={newSubject.skill_domain}
+              onChange={(event) => setNewSubject({ ...newSubject, skill_domain: event.target.value })}
+            >
+              <option value="">None (not used for college matching)</option>
+              {domains.map((row) => (
+                <option key={row.key} value={row.key}>
+                  {row.label}
+                </option>
+              ))}
+            </select>
           </label>
           <button className="btn btn-secondary" type="submit">
             Add to catalog

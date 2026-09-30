@@ -5,6 +5,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import StudentProfile, User
 from apps.grading.models import Grade
+from apps.ml.knn_model import METHOD
 from apps.notifications.models import Notification
 from apps.people.models import StudentSection, TeacherAssignment
 from apps.school.models import Program, SchoolYear, Section, Subject, Term
@@ -181,7 +182,7 @@ class GradeWorkflowTests(TestCase):
         student_client.force_authenticate(user=self.student_user)
         seen = student_client.get('/api/grades/me/')
         self.assertEqual(len(seen.data['grades']), 1)
-        self.assertEqual(seen.data['recommendation']['method'], 'knn')
+        self.assertEqual(seen.data['recommendation']['method'], METHOD)
 
         hide = self._hide()
         self.assertEqual(hide.data['hidden'], 1)
