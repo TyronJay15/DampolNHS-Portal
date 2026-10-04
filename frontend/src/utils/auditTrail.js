@@ -1,4 +1,4 @@
-export const EVENT_FAMILIES = [
+const EVENT_FAMILIES = [
   { value: 'all', label: 'All' },
   { value: 'accounts', label: 'Accounts' },
   { value: 'school', label: 'School' },
@@ -6,6 +6,7 @@ export const EVENT_FAMILIES = [
   { value: 'placement', label: 'Placement' },
   { value: 'grades', label: 'Grades' },
   { value: 'announcements', label: 'Announcements' },
+  { value: 'access', label: 'Access' },
 ];
 
 export const NOTIFICATION_FILTERS = EVENT_FAMILIES;
@@ -16,12 +17,15 @@ const ACTION_LABELS = {
   password_otp_requested: 'Password code sent',
   password_change: 'Password changed',
   account_approved: 'Student approved',
+  registrations_bulk_approved: 'Students approved together',
+  registration_emails_resent: 'Registration emails resent',
   account_rejected: 'Student rejected',
   account_archived: 'Account archived',
   account_reactivated: 'Account reactivated',
   account_removed: 'Account removed',
   registration_restored_pending: 'Registration reopened',
   student_profile_updated: 'Student profile updated',
+  student_gender_set: 'Student gender updated',
   staff_created: 'Staff created',
   staff_activated: 'Staff activated',
   staff_activation_resent: 'Activation resent',
@@ -31,6 +35,7 @@ const ACTION_LABELS = {
   school_year_deleted: 'School year deleted',
   school_year_hard_deleted: 'School year hard deleted',
   deadline_set: 'Encode window set',
+  term_plan_saved: 'Term plan saved',
   section_created: 'Section created',
   section_deleted: 'Section deleted',
   section_hard_deleted: 'Section hard deleted',
@@ -53,12 +58,19 @@ const ACTION_LABELS = {
   grades_shown: 'Card shown',
   grades_hidden: 'Card hidden',
   grades_shown_ready: 'Ready cards shown',
-  ptpa_marked: 'PTPA marked',
   correction_requested: 'Correction requested',
   correction_approved: 'Correction approved',
   correction_rejected: 'Correction rejected',
   cms_save: 'Website saved',
   announcement_published: 'Event published',
+  access_tag_granted: 'Access tag granted',
+  access_tag_closed: 'Access tag closed',
+  access_request_submitted: 'Request submitted',
+  access_request_withdrawn: 'Request withdrawn',
+  access_request_expired: 'Request expired',
+  access_request_approved: 'Request approved and applied',
+  access_request_declined: 'Request declined',
+  access_request_failed: 'Request could not be applied',
 };
 
 const ROLE_LABELS = {
@@ -75,6 +87,7 @@ const CATEGORY_LABELS = {
   placement: 'Placement',
   grades: 'Grades',
   announcements: 'Announcement',
+  access: 'Access',
 };
 
 export const AUDIT_FILTERS = EVENT_FAMILIES;
@@ -99,6 +112,7 @@ function legacyActionFamily(action) {
     code === 'register' ||
     code === 'login' ||
     code === 'student_profile_updated' ||
+    code === 'student_gender_set' ||
     code.startsWith('password_')
   ) {
     return 'accounts';
@@ -109,7 +123,8 @@ function legacyActionFamily(action) {
   if (code.startsWith('assignment_') || code.endsWith('_assigned')) return 'assignments';
   if (code.startsWith('student_')) return 'placement';
   if (code.startsWith('cms_') || code.startsWith('announcement_')) return 'announcements';
-  if (code.includes('grade') || code.includes('correction') || code.includes('ptpa')) return 'grades';
+  if (code.startsWith('access_')) return 'access';
+  if (code.includes('grade') || code.includes('correction')) return 'grades';
   return 'accounts';
 }
 
@@ -125,6 +140,7 @@ export function familyIcon(family) {
   if (family === 'placement') return 'place';
   if (family === 'announcements') return 'cms';
   if (family === 'accounts') return 'user';
+  if (family === 'access') return 'access';
   return 'audit';
 }
 

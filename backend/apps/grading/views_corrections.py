@@ -1,18 +1,23 @@
-from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.access.permissions import filter_levels, reading_levels
+from apps.access.services import live_tag
 from apps.accounts.permissions import IsHeadTeacher
 from apps.audit import services as audit
-from apps.grading.history import HEAD_TEACHER, write_history
+from apps.grading.corrections import CorrectionBlocked, review_correction
 from apps.grading.models import CorrectionRequest, Grade
 from apps.grading.scores import parse_score
 from apps.audit.catalog import GRADES
 from apps.notifications.services import head_teachers, notify
 from apps.people.assignment_access import subject_assignment_for
+from apps.people.scope import require_grade_in_scope, scope_by_grade
 from apps.school.labels import section_label
+
+
+REVIEW_CORRECTIONS = 'review_corrections'
 
 
 def _payload(row):
@@ -59,8 +64,20 @@ class CorrectionListCreateView(APIView):
             'requested_by',
             'reviewed_by',
         )
+        if request.user.role == 'teacher' and request.query_params.get('review'):
+            # A teacher tagged to review corrections sees other teachers' pending requests in their levels.
+            if live_tag(request.user, REVIEW_CORRECTIONS) is None:
+                return Response({'detail': 'You do not have an active tag to review corrections.'}, status=403)
+            rows = filter_levels(
+                rows.filter(status=CorrectionRequest.Status.PENDING).exclude(requested_by=request.user),
+                reading_levels(request.user, REVIEW_CORRECTIONS),
+                'grade__section__grade_level',
+            )
+            return Response([_payload(row) for row in rows[:100]])
         if request.user.role == 'teacher':
             rows = rows.filter(requested_by=request.user)
+        else:
+            rows = scope_by_grade(request.user, rows, 'grade__section__grade_level')
         status = request.query_params.get('status')
         if status == 'record':
             rows = rows.filter(status__in=[CorrectionRequest.Status.APPROVED, CorrectionRequest.Status.REJECTED])
@@ -133,48 +150,10 @@ class CorrectionReviewView(APIView):
             ),
             pk=pk,
         )
-        if row.status != CorrectionRequest.Status.PENDING:
-            return Response({'detail': 'This correction was already reviewed.'}, status=400)
-        decision = request.data.get('status')
-        if decision not in (CorrectionRequest.Status.APPROVED, CorrectionRequest.Status.REJECTED):
-            return Response({'detail': 'Approve or reject this correction.'}, status=400)
-        if decision == CorrectionRequest.Status.APPROVED and row.grade.status == Grade.Status.RELEASED:
-            return Response(
-                {'detail': 'Hide this student’s report card before applying a correction.'},
-                status=400,
-            )
-        note = str(request.data.get('note') or '').strip()
-        with transaction.atomic():
-            row.mark_reviewed(by_user=request.user, status=decision, note=note)
-            if decision == CorrectionRequest.Status.APPROVED:
-                grade = row.grade
-                previous = grade.score
-                grade.score = row.proposed_score
-                grade.updated_by = request.user
-                grade.save(update_fields=['score', 'updated_by', 'updated_at'])
-                write_history(
-                    grade=grade,
-                    from_status=grade.status,
-                    to_status=grade.status,
-                    previous_score=previous,
-                    new_score=grade.score,
-                    user=request.user,
-                    reason='Head teacher approved correction',
-                    duty=HEAD_TEACHER,
-                )
-        audit.record(
-            user=request.user,
-            action='correction_approved' if decision == CorrectionRequest.Status.APPROVED else 'correction_rejected',
-            summary=f'{decision.title()} correction for {row.grade.student.user.get_full_name()} · {row.grade.subject.name}',
-            target_type='CorrectionRequest',
-            target_id=row.id,
-        )
-        notify(
-            [row.requested_by],
-            title=f'Correction {decision}',
-            body=f'{request.user.get_full_name()} {decision} the correction for {row.grade.student.user.get_full_name()} · {row.grade.subject.name}.',
-            level='warning' if decision == CorrectionRequest.Status.REJECTED else 'success',
-            category=GRADES,
-            action_path='/teacher/classes',
-        )
+        if row.grade.section_id:
+            require_grade_in_scope(request.user, row.grade.section.grade_level)
+        try:
+            review_correction(row, request.data.get('status'), str(request.data.get('note') or '').strip(), request.user)
+        except CorrectionBlocked as exc:
+            return Response({'detail': str(exc)}, status=400)
         return Response(_payload(row))

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import DeskMark from '../../components/DeskMark/DeskMark';
 import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
@@ -31,6 +32,7 @@ function toIso(value) {
 }
 
 export default function HeadYearPage() {
+  const confirm = useConfirm();
   const [years, setYears] = useState([]);
   const [terms, setTerms] = useState([]);
   const [label, setLabel] = useState('');
@@ -86,6 +88,13 @@ export default function HeadYearPage() {
   }
 
   async function makeCurrent(year) {
+    const answer = await confirm({
+      title: `Make ${year.label} the current school year?`,
+      body: 'Registration, placements, grade encoding and dashboards switch to this year for everyone. The year that is current now stops being current.',
+      confirmLabel: 'Make current',
+      tone: 'warning',
+    });
+    if (!answer) return;
     setBusy(`year-${year.id}`);
     setError('');
     try {
@@ -100,6 +109,14 @@ export default function HeadYearPage() {
   }
 
   async function setCurriculum(year, gradeLevel, code) {
+    const name = year.curriculum_options?.find((row) => row.code === code)?.name || code;
+    const answer = await confirm({
+      title: `Change the ${gradeLevel} curriculum?`,
+      body: `${year.label} ${gradeLevel} will follow the ${name}. Programs offered, enrollment and the forecast plan use this setting.`,
+      confirmLabel: 'Change curriculum',
+      tone: 'warning',
+    });
+    if (!answer) return;
     setBusy(`curriculum-${year.id}`);
     setError('');
     try {
@@ -114,6 +131,13 @@ export default function HeadYearPage() {
   }
 
   async function archive(year) {
+    const answer = await confirm({
+      title: `Archive ${year.label}?`,
+      body: 'The year moves to the Archive with its sections. Teacher duties in it end, and the enrollment forecast is retrained. You can restore it from the Archive later.',
+      confirmLabel: 'Archive year',
+      tone: 'warning',
+    });
+    if (!answer) return;
     setBusy(`archive-${year.id}`);
     setError('');
     setMessage('');
@@ -129,6 +153,13 @@ export default function HeadYearPage() {
   }
 
   async function remove(year) {
+    const answer = await confirm({
+      title: `Delete ${year.label}?`,
+      body: 'This empty school year and its terms are removed permanently. This cannot be undone.',
+      confirmLabel: 'Delete year',
+      tone: 'danger',
+    });
+    if (!answer) return;
     setBusy(`delete-${year.id}`);
     setError('');
     setMessage('');

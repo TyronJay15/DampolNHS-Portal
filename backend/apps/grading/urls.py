@@ -3,13 +3,13 @@ from django.urls import path
 from .views_advisory import (
     AdvisoryGradesView,
     HideGradesView,
-    PtpaAttendanceView,
-    PtpaBulkView,
     ShowGradesView,
     ShowReadyView,
 )
 from .views_corrections import CorrectionListCreateView, CorrectionReviewView
 from .views_history import GradeHistoryListView, GradeReportView
+from .views_print import GradePrintView
+from .views_print_records import GradeRecordsPrintView
 from .views_student import StudentGradesView
 from .views_teacher import (
     TeacherClassGradesView,
@@ -34,8 +34,6 @@ urlpatterns = [
     path('advisory/', AdvisoryGradesView.as_view(), name='grade-advisory'),
     path('show/', ShowGradesView.as_view(), name='grade-show'),
     path('hide/', HideGradesView.as_view(), name='grade-hide'),
-    path('ptpa/', PtpaAttendanceView.as_view(), name='grade-ptpa'),
-    path('ptpa/bulk/', PtpaBulkView.as_view(), name='grade-ptpa-bulk'),
     path('show-ready/', ShowReadyView.as_view(), name='grade-show-ready'),
     path('queues/', GradeQueueView.as_view(), name='grade-queues'),
     path('approve/', ApproveGradesView.as_view(), name='grade-approve'),
@@ -44,6 +42,8 @@ urlpatterns = [
     path('return/', ReturnGradesView.as_view(), name='grade-return'),
     path('history/', GradeHistoryListView.as_view(), name='grade-history'),
     path('report/', GradeReportView.as_view(), name='grade-report'),
+    path('print/', GradePrintView.as_view(), name='grade-print'),
+    path('print/records/', GradeRecordsPrintView.as_view(), name='grade-print-records'),
     path('corrections/', CorrectionListCreateView.as_view(), name='grade-corrections'),
     path('corrections/<int:pk>/review/', CorrectionReviewView.as_view(), name='grade-correction-review'),
 ]

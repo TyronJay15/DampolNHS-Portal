@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 
 from .views import SchoolYearViewSet
 from .views_archive import SchoolYearArchiveView, SchoolYearDeleteView, SchoolYearRestoreView
-from .views_purge import SchoolYearPurgeSummaryView, SchoolYearPurgeView
+from .views_purge import SchoolYearPurgeView
+from .views_term_plan import TermPlanView
 
 router = DefaultRouter()
 router.register('', SchoolYearViewSet, basename='school-year')
@@ -13,5 +14,5 @@ urlpatterns = [
     path('<int:pk>/restore/', SchoolYearRestoreView.as_view(), name='school-year-restore'),
     path('<int:pk>/delete/', SchoolYearDeleteView.as_view(), name='school-year-delete'),
     path('<int:pk>/purge/', SchoolYearPurgeView.as_view(), name='school-year-purge'),
-    path('<int:pk>/purge/summary/', SchoolYearPurgeSummaryView.as_view(), name='school-year-purge-summary'),
+    path('<int:pk>/term-plan/', TermPlanView.as_view(), name='school-year-term-plan'),
 ] + router.urls

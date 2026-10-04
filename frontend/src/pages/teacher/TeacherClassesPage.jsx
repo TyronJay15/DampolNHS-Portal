@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { groupByProgramSection, openAllGroups } from './groupTeacherDuties';
 import { useTeacherDuties } from './useTeacherDuties';
 import { progressChipClass } from '../../utils/gradeStatus';
+import { dutyTermNote } from './dutyTerms';
 
 function EncodeChips({ row }) {
   const current = row.progress?.current;
@@ -21,9 +22,15 @@ function EncodeChips({ row }) {
   );
 }
 
+// Subjects can run in different terms, so the columns are every term any subject here runs in,
+// and a subject shows "—" under a term it is not scheduled for.
 function SectionEncodeSummary({ tasks }) {
-  const terms = tasks[0]?.progress?.terms || [];
-  if (!tasks.length) return null;
+  const terms = useMemo(() => {
+    const byId = new Map();
+    tasks.forEach((row) => (row.progress?.terms || []).forEach((term) => byId.set(term.term_id, term)));
+    return [...byId.values()].sort((a, b) => a.term_number - b.term_number);
+  }, [tasks]);
+  if (!tasks.length || !terms.length) return null;
   return (
     <div className="studio-table-wrap studio-summary-table">
       <table className="studio-table">
@@ -39,12 +46,14 @@ function SectionEncodeSummary({ tasks }) {
           {tasks.map((row) => (
             <tr key={row.id}>
               <td>{row.subject}</td>
-              {(row.progress?.terms || terms).map((term) => (
-                <td key={term.term_id}>
-                  {term.progress_label}
-                  {term.workflow_label ? ` · ${term.workflow_label}` : ''}
-                </td>
-              ))}
+              {terms.map((column) => {
+                const term = row.progress?.terms?.find((item) => item.term_id === column.term_id);
+                return (
+                  <td key={column.term_id} className={term ? '' : 'studio-empty'}>
+                    {term ? `${term.progress_label}${term.workflow_label ? ` · ${term.workflow_label}` : ''}` : '—'}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
@@ -156,7 +165,7 @@ export default function TeacherClassesPage() {
                                       </h3>
                                       <p>
                                         {row.grade_level} · {row.school_year}
-                                        {row.progress?.current?.term ? ` · ${row.progress.current.term}` : ''}
+                                        {` · ${dutyTermNote(row)}`}
                                       </p>
                                       <EncodeChips row={row} />
                                     </div>

@@ -6,6 +6,7 @@ from apps.accounts.models import StudentProfile, User
 from apps.accounts.passwords import validate_password_strength
 from apps.accounts.recaptcha import verify_recaptcha
 from apps.people.models import Registration
+from apps.school.curriculum import programs_for
 from apps.school.models import Program, SchoolYear
 from apps.school.program_catalog import grade_for
 
@@ -28,7 +29,7 @@ class StudentRegisterSerializer(serializers.Serializer):
     contact_number = serializers.CharField(max_length=20)
     address = serializers.CharField(max_length=255)
     birthdate = serializers.DateField(required=False, allow_null=True)
-    gender = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    gender = serializers.ChoiceField(choices=StudentProfile.Gender.choices)
     guardian_name = serializers.CharField(max_length=120, required=False, allow_blank=True)
     guardian_contact = serializers.CharField(max_length=20, required=False, allow_blank=True)
     previous_school = serializers.CharField(max_length=255, required=False, allow_blank=True)
@@ -93,9 +94,15 @@ class StudentRegisterSerializer(serializers.Serializer):
         if not year:
             raise ValidationError({'school_year': 'No school year is available for registration.'})
         verify_recaptcha(attrs.pop('recaptcha_token', ''))
-        required_grade = grade_for(attrs['program'].code)
-        if required_grade:
-            attrs['grade_level_enrollment'] = required_grade
+        program = attrs['program']
+        chosen = (attrs.get('grade_level_enrollment') or '').strip()
+        required = program.grade_level or grade_for(program.code)
+        if required and chosen and chosen != required:
+            raise ValidationError({'program': f'{program.code} is a {required} program, not a {chosen} program.'})
+        grade = required or chosen
+        if program.grade_level and not programs_for(year, grade).filter(pk=program.pk).exists():
+            raise ValidationError({'program': f'{program.code} is not offered for {grade} in {year.label}.'})
+        attrs['grade_level_enrollment'] = grade
         attrs['school_year'] = year
         return attrs
 
@@ -124,7 +131,7 @@ class StudentRegisterSerializer(serializers.Serializer):
             contact_number=validated_data['contact_number'],
             address=validated_data['address'],
             birthdate=validated_data.get('birthdate'),
-            gender=validated_data.get('gender', ''),
+            gender=validated_data['gender'],
             guardian_name=validated_data.get('guardian_name', ''),
             guardian_contact=validated_data.get('guardian_contact', ''),
             grade_level=validated_data['grade_level_enrollment'],
@@ -149,6 +156,7 @@ class RegistrationReviewSerializer(serializers.ModelSerializer):
     approval_status = serializers.CharField(source='user.approval_status', read_only=True)
     account_status = serializers.CharField(source='user.account_status', read_only=True)
     lrn = serializers.SerializerMethodField()
+    gender = serializers.SerializerMethodField()
     contact_number = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     guardian_name = serializers.SerializerMethodField()
@@ -157,6 +165,7 @@ class RegistrationReviewSerializer(serializers.ModelSerializer):
     program_name = serializers.CharField(source='program.name', read_only=True)
     school_year = serializers.CharField(source='school_year.label', read_only=True)
     reviewed_by_email = serializers.SerializerMethodField()
+    email_delivery = serializers.SerializerMethodField()
 
     class Meta:
         model = Registration
@@ -167,6 +176,7 @@ class RegistrationReviewSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'lrn',
+            'gender',
             'contact_number',
             'address',
             'guardian_name',
@@ -182,6 +192,7 @@ class RegistrationReviewSerializer(serializers.ModelSerializer):
             'submitted_at',
             'reviewed_at',
             'reviewed_by_email',
+            'email_delivery',
         )
 
     def _profile(self, row):
@@ -190,6 +201,10 @@ class RegistrationReviewSerializer(serializers.ModelSerializer):
     def get_lrn(self, row):
         profile = self._profile(row)
         return profile.lrn if profile else ''
+
+    def get_gender(self, row):
+        profile = self._profile(row)
+        return profile.gender if profile else ''
 
     def get_contact_number(self, row):
         profile = self._profile(row)
@@ -210,10 +225,15 @@ class RegistrationReviewSerializer(serializers.ModelSerializer):
     def get_reviewed_by_email(self, row):
         return row.reviewed_by.email if row.reviewed_by_id else ''
 
+    def get_email_delivery(self, row):
+        """The result email's state, given by the Admin's list view. None when there is none to show."""
+        return self.context.get('email_states', {}).get(row.id)
+
 
 class StudentProfileUpdateSerializer(serializers.Serializer):
     contact_number = serializers.CharField(max_length=20)
     address = serializers.CharField(max_length=255)
+    gender = serializers.ChoiceField(choices=StudentProfile.Gender.choices)
     guardian_name = serializers.CharField(max_length=120, required=False, allow_blank=True)
     guardian_contact = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
@@ -236,6 +256,12 @@ class StudentProfileUpdateSerializer(serializers.Serializer):
         if not value:
             return ''
         return digits_only(value, 'guardian_contact')
+
+
+class StudentGenderSerializer(serializers.Serializer):
+    """The admin's correction of a student's gender, e.g. before a DepEd report."""
+
+    gender = serializers.ChoiceField(choices=StudentProfile.Gender.choices)
 
 
 class RejectRegistrationSerializer(serializers.Serializer):
@@ -265,10 +291,6 @@ class StaffCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError('An account with this email already exists.')
         return email
 
-    def validate_role(self, value):
-        if value == User.Role.HEAD_TEACHER and User.objects.filter(role=User.Role.HEAD_TEACHER).exists():
-            raise serializers.ValidationError('A head teacher account already exists.')
-        return value
 
     def create(self, validated_data):
         user = User.objects.create_user(

@@ -7,9 +7,10 @@ from apps.accounts.permissions import IsHeadTeacher
 from apps.audit import services as audit
 from apps.audit.catalog import ASSIGNMENTS
 from apps.notifications.services import notify
+from apps.people.scope import require_grade_in_scope
 from apps.school.labels import section_label
 from apps.school.models import Section
-from apps.school.section_progress import activation_checks, recompute_status, section_progress
+from apps.school.section_progress import activation_checks, section_progress
 from apps.school.serializers import SectionSerializer
 
 
@@ -34,6 +35,7 @@ class SectionDetailView(APIView):
             Section.objects.select_related('school_year', 'program'),
             pk=pk,
         )
+        require_grade_in_scope(request.user, section.grade_level)
         payload = SectionSerializer(section).data
         payload['progress'] = section_progress(section)
         payload['activation'] = activation_checks(section)
@@ -50,6 +52,7 @@ class SectionActivateView(APIView):
             pk=pk,
             archived_at__isnull=True,
         )
+        require_grade_in_scope(request.user, section.grade_level)
         if section.status == Section.Status.ACTIVE:
             return Response({'detail': 'This section is already active.'}, status=400)
         validation = activation_checks(section)

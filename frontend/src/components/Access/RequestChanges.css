@@ -1,0 +1,89 @@
+/* Before/after view of an access request. */
+.rc {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.rc-toggle {
+  justify-self: start;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 999px;
+  background: var(--dash-field);
+  color: var(--dash-ink);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rc-toggle:hover,
+.rc-toggle[aria-expanded='true'] {
+  background: var(--dash-hover);
+}
+
+.rc-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--dash-line);
+  border-radius: 12px;
+}
+
+.rc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.rc-table th,
+.rc-table td {
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid var(--dash-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.rc-table tbody tr:last-child th,
+.rc-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.rc-table thead th {
+  background: var(--dash-field);
+  color: var(--dash-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rc-table tbody th {
+  width: 28%;
+  font-weight: 700;
+}
+
+.rc-after {
+  background: var(--dash-gold-soft);
+}
+
+/* Long copy (e.g. a page paragraph) scrolls inside its cell instead of stretching the card. */
+.rc-text {
+  display: block;
+  max-height: 7.5rem;
+  overflow-y: auto;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.rc-empty {
+  color: var(--dash-muted);
+}
+
+.rc-photo {
+  display: block;
+  width: 7rem;
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--dash-field);
+}

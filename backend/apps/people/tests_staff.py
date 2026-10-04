@@ -60,7 +60,7 @@ class StaffAccountTests(APITestCase):
         self.assertEqual(login.status_code, 401)
         self.assertEqual(login.data.get('code'), 'account_needs_activation')
 
-    def test_admin_creates_one_head_teacher_only(self):
+    def test_admin_can_create_several_head_teachers(self):
         self._admin()
         first = self.client.post(
             '/api/admin/staff/',
@@ -83,8 +83,8 @@ class StaffAccountTests(APITestCase):
             },
             format='json',
         )
-        self.assertEqual(second.status_code, 400)
-        self.assertEqual(User.objects.filter(role=User.Role.HEAD_TEACHER).count(), 1)
+        self.assertEqual(second.status_code, 201, second.data)
+        self.assertEqual(User.objects.filter(role=User.Role.HEAD_TEACHER).count(), 2)
 
     def test_staff_list_includes_head_teacher(self):
         User.objects.create_user(

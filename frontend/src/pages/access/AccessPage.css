@@ -1,0 +1,160 @@
+/* Access: owner requests, tags and history, plus the tagged person's own page. */
+
+.acc-tabs {
+  margin: 0 0 1rem;
+}
+
+.acc-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.acc-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 1rem;
+}
+
+.acc-card-main {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.acc-card-main .studio-chip {
+  justify-self: start;
+}
+
+.acc-card h2 {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.4;
+}
+
+.acc-meta,
+.acc-hint {
+  margin: 0;
+  color: var(--dash-muted);
+  font-size: 0.82rem;
+}
+
+.acc-note {
+  margin: 0.2rem 0 0;
+  padding: 0.55rem 0.8rem;
+  border-left: 3px solid var(--dash-gold);
+  border-radius: 0 10px 10px 0;
+  background: var(--dash-field);
+  font-size: 0.9rem;
+  white-space: pre-line;
+}
+
+.acc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.acc-grant {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.acc-grant h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.acc-grant-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: start;
+}
+
+.acc-grant-grid .acc-wide {
+  grid-column: 1 / -1;
+}
+
+.acc-until {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.acc-check {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Beats the dashboard's full-width field inputs so the box sits next to its label. */
+.acc-grant .acc-until .acc-check input {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.studio-table .acc-wrap {
+  min-width: 14rem;
+  white-space: normal;
+}
+
+.acc-requests h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+/* The tagged person's page. */
+.acc-held {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.acc-held article {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+}
+
+.acc-held h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.acc-held .btn {
+  justify-self: start;
+  margin-top: 0.3rem;
+}
+
+@media (max-width: 900px) {
+  .acc-grant-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .acc-card,
+  .acc-grant-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .acc-actions .btn {
+    flex: 1;
+  }
+}

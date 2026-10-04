@@ -1,15 +1,14 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
+import { beginPostLogin } from '../../components/PostLoginLoader/postLoginStore';
 import RecaptchaField from '../../components/auth/RecaptchaField';
 import PasswordInput from '../../components/Input/PasswordInput';
 import { useAuth } from '../../context/AuthContext';
-import { homePathForRole } from '../../services/authService';
 import AuthShell from './AuthShell';
 import './LoginPage.css';
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const notice = location.state?.notice || '';
   const [identifier, setIdentifier] = useState('');
@@ -20,6 +19,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState('');
   const [recaptchaError, setRecaptchaError] = useState('');
+  // Set only after a successful sign-in. The page stays mounted (blurred by the overlay) and inactive.
+  const [entering, setEntering] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -34,7 +35,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await login({ identifier, password, recaptcha_token: recaptchaToken });
-      navigate(homePathForRole(user.role));
+      setEntering(true);
+      beginPostLogin(user.role);
     } catch (err) {
       const captcha = err.data?.errors?.recaptcha_token;
       const code = err.code || err.data?.code;
@@ -49,7 +51,7 @@ export default function LoginPage() {
 
   return (
     <AuthShell title="Grading Portal" className="login-page">
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} inert={entering}>
         {notice ? <p className="alert alert-info">{notice}</p> : null}
         {error ? <p className={`alert ${pending || needsActivation ? 'alert-info' : 'alert-error'}`}>{error}</p> : null}
         {pending ? (
@@ -98,7 +100,7 @@ export default function LoginPage() {
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-      <div className="auth-foot">
+      <div className="auth-foot" inert={entering}>
         <p>
           New staff member? <Link to="/activate">Activate account</Link>
         </p>

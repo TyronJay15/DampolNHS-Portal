@@ -8,23 +8,26 @@ from apps.accounts.codes import issue_code
 from apps.accounts.mail import activation_email
 from apps.accounts.models import User
 from apps.accounts.permissions import IsAdmin
+from apps.accounts.staff_activation import activation_figures
 from apps.audit import services as audit
 from apps.people.serializers import StaffCreateSerializer
 
 
 def _send_activation(user):
-    activation_email(user, issue_code(user, 'activate'))
+    """Issue a fresh code and email it. Returns whether the email went out."""
+    return activation_email(user, issue_code(user, 'activate'))
 
 
 class StaffAccountView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        rows = (
+        rows = list(
             User.objects.filter(role__in=(User.Role.TEACHER, User.Role.HEAD_TEACHER, User.Role.ADMIN))
             .exclude(account_status=User.AccountStatus.REMOVED)
             .order_by('role', 'last_name', 'first_name')
         )
+        figures = activation_figures(rows)
         return Response(
             [
                 {
@@ -33,6 +36,7 @@ class StaffAccountView(APIView):
                     'email': row.email,
                     'role': row.role,
                     'account_status': row.account_status,
+                    'activation': figures.get(row.id),
                 }
                 for row in rows
             ]
@@ -43,7 +47,7 @@ class StaffAccountView(APIView):
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
             user = serializer.save()
-        _send_activation(user)
+        emailed = _send_activation(user)
         audit.record(
             user=request.user,
             action='staff_created',
@@ -59,6 +63,7 @@ class StaffAccountView(APIView):
                 'email': user.email,
                 'role': user.role,
                 'account_status': user.account_status,
+                'activation_emailed': emailed,
             },
             status=201,
         )
@@ -74,7 +79,7 @@ class StaffActivationResendView(APIView):
         )
         if user.account_status != User.AccountStatus.PENDING_ACTIVATION:
             return Response({'detail': 'That account is already active.'}, status=400)
-        _send_activation(user)
+        emailed = _send_activation(user)
         audit.record(
             user=request.user,
             action='staff_activation_resent',
@@ -82,4 +87,5 @@ class StaffActivationResendView(APIView):
             target_type='User',
             target_id=user.id,
         )
-        return Response({'detail': 'Activation email sent again.', 'email': user.email})
+        detail = 'Activation email sent again.' if emailed else 'A new code was made, but the email did not go out.'
+        return Response({'detail': detail, 'email': user.email, 'activation_emailed': emailed})

@@ -54,6 +54,25 @@ class AuthApiTests(APITestCase):
         self.assertEqual(res.data['user']['role'], 'teacher')
         self.assertIn('access', res.data)
 
+    def test_logout_revokes_only_that_sessions_refresh_token(self):
+        def sign_in():
+            return self.client.post(
+                '/api/auth/login/',
+                {'identifier': 'teacher@school.test', 'password': 'teacher-pass'},
+                format='json',
+            ).data
+
+        def refresh(token):
+            return self.client.post('/api/auth/refresh/', {'refresh': token}, format='json').status_code
+
+        signed_out, other_device = sign_in(), sign_in()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {signed_out["access"]}')
+        response = self.client.post('/api/auth/logout/', {'refresh': signed_out['refresh']}, format='json')
+        self.assertEqual(response.status_code, 204)
+        self.client.credentials()
+        self.assertEqual(refresh(signed_out['refresh']), 401)
+        self.assertEqual(refresh(other_device['refresh']), 200)
+
     def test_student_logs_in_with_lrn(self):
         res = self.client.post(
             '/api/auth/login/',
@@ -183,30 +202,6 @@ class AuthApiTests(APITestCase):
         )
         self.assertEqual(again.status_code, 200, again.data)
 
-    def test_public_password_otp_and_change(self):
-        otp = self.client.post(
-            '/api/auth/change-password-public/otp/',
-            {
-                'identifier': 'teacher@school.test',
-                'current_password': 'teacher-pass',
-            },
-            format='json',
-        )
-        self.assertEqual(otp.status_code, 200, otp.data)
-        code = extract_code(mail.outbox[-1].body)
-        changed = self.client.post(
-            '/api/auth/change-password-public/',
-            {
-                'identifier': 'teacher@school.test',
-                'current_password': 'teacher-pass',
-                'new_password': 'teacher-pass-2',
-                'confirm_password': 'teacher-pass-2',
-                'code': code,
-            },
-            format='json',
-        )
-        self.assertEqual(changed.status_code, 200, changed.data)
-
     def test_forgot_password_sends_code_without_current_password(self):
         otp = self.client.post(
             '/api/auth/forgot-password/otp/',
@@ -280,3 +275,61 @@ class AuthApiTests(APITestCase):
         )
         self.assertEqual(login.status_code, 200, login.data)
         self.assertEqual(EmailCode.objects.filter(user=user, used_at__isnull=False).count(), 1)
+
+
+class PasswordCodeSafetyTests(APITestCase):
+    """Resend waits RESEND_SECONDS; MAX_ATTEMPTS wrong guesses cancel a code."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='teacher@school.test',
+            password='teacher-pass',
+            role=User.Role.TEACHER,
+            approval_status=User.ApprovalStatus.APPROVED,
+            account_status=User.AccountStatus.ACTIVE,
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _send(self):
+        return self.client.post('/api/auth/change-password/otp/', {'current_password': 'teacher-pass'}, format='json')
+
+    def _verify(self, code):
+        return self.client.post(
+            '/api/auth/change-password/verify/', {'current_password': 'teacher-pass', 'code': code}, format='json'
+        )
+
+    def test_resend_must_wait(self):
+        first = self._send()
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.data['resend_in'], 60)
+        again = self._send()
+        self.assertEqual(again.status_code, 429)
+        self.assertIn('wait', again.data['detail'])
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_resend_works_after_the_wait(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        self._send()
+        EmailCode.objects.update(created_at=timezone.now() - timedelta(seconds=61))
+        self.assertEqual(self._send().status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_too_many_wrong_guesses_cancel_the_code(self):
+        self._send()
+        code = extract_code(mail.outbox[-1].body)
+        wrong = '000000' if code != '000000' else '111111'
+        for _ in range(5):
+            self.assertEqual(self._verify(wrong).status_code, 400)
+        self.assertEqual(self._verify(code).status_code, 400)
+
+    def test_forgot_password_cooldown_stays_silent(self):
+        self.client.force_authenticate(user=None)
+        body = {'identifier': 'teacher@school.test'}
+        first = self.client.post('/api/auth/forgot-password/otp/', body, format='json')
+        second = self.client.post('/api/auth/forgot-password/otp/', body, format='json')
+        self.assertEqual((first.status_code, second.status_code), (200, 200))
+        self.assertEqual(first.data['detail'], second.data['detail'])
+        self.assertEqual(len(mail.outbox), 1)

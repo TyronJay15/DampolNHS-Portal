@@ -1,8 +1,8 @@
 """Official Grade 11 SSHS and Grade 12 old-curriculum subjects.
 
 Cores are stored once and linked to every matching program. Electives and
-specialized subjects attach only to their cluster or strand. term is 1, 2, 3
-or None (year-long / all terms). Prerequisites are listed nowhere here.
+specialized subjects attach only to their cluster or strand. term is the default
+term (1, 2, 3) or None for every term; each school year's term plan starts from it. Prerequisites are listed nowhere here.
 """
 
 LEGACY_SUBJECT_CODES = ('eng', 'fil', 'math', 'sci', 'ap')

@@ -1,197 +1,45 @@
-from django.db import IntegrityError
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.access.permissions import filter_levels, reading_levels, role_or_tagged
 from apps.accounts.lifecycle import HIDDEN
 from apps.accounts.models import StudentProfile, User
 from apps.accounts.permissions import IsHeadTeacher
 from apps.audit import services as audit
-from apps.audit.catalog import ASSIGNMENTS, PLACEMENT
-from apps.notifications.services import advisers_for_section, head_teachers, notify
-from apps.people.models import Registration, StudentSection, TeacherAssignment
+from apps.people.assignments import DutyRejected, create_assignment
+from apps.people.placement import (
+    approved_registration,
+    current_year,
+    place_student,
+    student_grade,
+    student_program,
+)
+from apps.people.scope import require_grade_in_scope
+from apps.people.models import StudentSection, TeacherAssignment
 from apps.school.labels import section_label
-from apps.school.models import SchoolYear, Section, Subject
-from apps.school.offerings import program_offers_subject
+from apps.school.models import Section
 from apps.school.section_progress import recompute_status
 
 
-TRANSFER_TITLE = 'Roster change · transfer'
-PLACEMENT_TITLE = 'Roster change · placement'
+PREPARE_PLACEMENTS = 'prepare_placements'
+PREPARE_ASSIGNMENTS = 'prepare_assignments'
 
 
-def _current_year():
-    return SchoolYear.objects.filter(is_current=True, archived_at__isnull=True).first()
-
-
-def _current_placement(student, year):
-    return (
-        StudentSection.objects.filter(student=student, school_year=year, is_active=True)
-        .select_related('section', 'section__program', 'section__school_year')
-        .first()
-    )
-
-
-def _notify_placement(student, old_section, section, transfer):
-    name = student.user.get_full_name() or student.lrn
-    label = section_label(section)
-    if transfer and old_section:
-        notify(
-            advisers_for_section(old_section) + advisers_for_section(section),
-            title=TRANSFER_TITLE,
-            body=f'{name} moved from {section_label(old_section)} to {label}.',
-            category=PLACEMENT,
-            action_path='/teacher/advisory',
-        )
-        return
-    notify(
-        advisers_for_section(section),
-        title=PLACEMENT_TITLE,
-        body=f'{name} was placed in {label}.',
-        category=PLACEMENT,
-        action_path='/teacher/advisory',
-    )
-
-
-def _section_count(section):
-    return section.student_assignments.filter(is_active=True).count()
-
-
-def _capacity_error(section, incoming=1, override=False):
-    if not section.capacity:
-        return None
-    count = _section_count(section)
-    if count + incoming > section.capacity and not override:
-        return (
-            f'This section is at capacity ({count}/{section.capacity}). '
-            'Confirm to exceed the limit.'
-        )
-    return None
-
-
-def _place_student(student, section, year, user, transfer=False, override_capacity=False, reason=''):
-    if student.user.account_status in HIDDEN:
-        return 'That student account is archived.'
-    registration = _approved_registration(student.user)
-    if (
-        not transfer
-        and registration
-        and section.program_id
-        and registration.program_id != section.program_id
-    ):
-        return 'Place the student in a section of their enrolled program.'
-    student_grade = _student_grade(student, registration)
-    if student_grade and section.grade_level and student_grade != section.grade_level:
-        return 'Place the student in a section of their grade level.'
-    if section.archived_at or section.school_year.archived_at:
-        return 'That section is archived.'
-    current = _current_placement(student, year)
-    old_section = current.section if current else None
-    if old_section and old_section.id == section.id:
-        return None
-    cap_error = _capacity_error(section, override=override_capacity)
-    if cap_error:
-        return cap_error
-    StudentSection.objects.filter(student=student, school_year=year, is_active=True).update(
-        is_active=False,
-        ended_at=timezone.now(),
-    )
-    StudentSection.objects.create(
-        student=student,
-        section=section,
-        school_year=year,
-        assigned_by=user,
-    )
-    old_program = _follow_section_program(registration, section, year)
-    name = student.user.get_full_name() or student.lrn
-    label = section_label(section)
-    if transfer or old_section:
-        audit.record(
-            user=user,
-            action='student_transferred',
-            summary=f'Transferred {name} to {label}',
-            target_type='StudentSection',
-            target_id=student.id,
-            details={
-                'student': name,
-                'from': section_label(old_section) if old_section else '',
-                'to': label,
-                'program_from': old_program.code if old_program else '',
-                'program_to': section.program.code if old_program else '',
-                'reason': reason,
-            },
-        )
-        program_note = f' Program changed from {old_program.code} to {section.program.code}.' if old_program else ''
-        notify(
-            head_teachers(),
-            title=TRANSFER_TITLE,
-            body=f'{name} was transferred to {label}.{program_note}',
-            level='info',
-            category=PLACEMENT,
-            action_path=f'/head/sections/{section.id}/setup?step=students',
-        )
-    else:
-        audit.record(
-            user=user,
-            action='student_placed',
-            summary=f'Placed {name} in {label}',
-            target_type='StudentSection',
-            target_id=student.id,
-            details={'student': name, 'section': label, 'reason': reason},
-        )
-    _notify_placement(student, old_section, section, transfer or bool(old_section))
-    recompute_status(section)
-    if old_section and old_section.id != section.id:
-        recompute_status(old_section)
-    return None
-
-
-def _follow_section_program(registration, section, year):
-    """A transfer into another program's section moves this year's registration with it.
-
-    Registrations from earlier years stay as they were, so enrollment history is kept.
-    Returns the previous program when it changed, else None.
-    """
-    if (
-        registration is None
-        or not section.program_id
-        or registration.program_id == section.program_id
-        or registration.school_year_id != year.id
-    ):
-        return None
-    old_program = registration.program
-    registration.program = section.program
-    registration.save(update_fields=['program'])
-    return old_program
-
-
-def _approved_registration(user):
-    return (
-        Registration.objects.filter(user=user, status=Registration.Status.APPROVED)
-        .select_related('program')
-        .first()
-    )
-
-
-def _student_grade(profile, registration):
-    return profile.grade_level or (registration.grade_level_enrollment if registration else '')
-
-
-def _student_program(profile, registration, placement=None):
-    if placement and placement.section and placement.section.program_id:
-        return placement.section.program
-    if registration:
-        return registration.program
-    return None
+def _require_duty_in_scope(user, row):
+    if row.section_id:
+        require_grade_in_scope(user, row.section.grade_level)
 
 
 class PlacementListView(APIView):
-    permission_classes = [IsAuthenticated, IsHeadTeacher]
+    """Head teachers place students; a teacher tagged to prepare placements reads the list in their levels."""
+
+    permission_classes = [IsAuthenticated, role_or_tagged(User.Role.HEAD_TEACHER, PREPARE_PLACEMENTS)]
 
     def get(self, request):
-        year = _current_year()
+        year = current_year()
         profiles = (
             StudentProfile.objects.select_related('user')
             .filter(user__role=User.Role.STUDENT, user__approval_status=User.ApprovalStatus.APPROVED)
@@ -209,9 +57,9 @@ class PlacementListView(APIView):
             }
         rows = []
         for profile in profiles:
-            registration = _approved_registration(profile.user)
+            registration = approved_registration(profile.user)
             placement = assignments.get(profile.id)
-            program = _student_program(profile, registration, placement)
+            program = student_program(profile, registration, placement)
             section = placement.section if placement else None
             rows.append(
                 {
@@ -220,8 +68,9 @@ class PlacementListView(APIView):
                     'last_name': profile.user.last_name,
                     'first_name': profile.user.first_name,
                     'lrn': profile.lrn,
+                    'gender': profile.gender,
                     'contact_number': profile.contact_number,
-                    'grade_level': section.grade_level if section else _student_grade(profile, registration),
+                    'grade_level': section.grade_level if section else student_grade(profile, registration),
                     'program_id': program.id if program else None,
                     'program_code': program.code if program else '',
                     'program_name': program.name if program else '',
@@ -230,6 +79,9 @@ class PlacementListView(APIView):
                     'placed': bool(section),
                 }
             )
+        scope = reading_levels(request.user, PREPARE_PLACEMENTS)
+        if scope is not None:
+            rows = [row for row in rows if row['grade_level'] in scope]
         rows.sort(
             key=lambda row: (
                 0 if row['grade_level'] == 'Grade 11' else 1 if row['grade_level'] == 'Grade 12' else 2,
@@ -241,7 +93,7 @@ class PlacementListView(APIView):
         return Response(rows)
 
     def post(self, request):
-        year = _current_year()
+        year = current_year()
         if year is None:
             return Response({'detail': 'No current school year is set.'}, status=400)
         student = get_object_or_404(StudentProfile, pk=request.data.get('student'))
@@ -251,7 +103,8 @@ class PlacementListView(APIView):
             school_year=year,
             archived_at__isnull=True,
         )
-        error = _place_student(
+        require_grade_in_scope(request.user, section.grade_level)
+        error = place_student(
             student,
             section,
             year,
@@ -271,7 +124,7 @@ class PlacementBulkView(APIView):
     permission_classes = [IsAuthenticated, IsHeadTeacher]
 
     def post(self, request):
-        year = _current_year()
+        year = current_year()
         if year is None:
             return Response({'detail': 'No current school year is set.'}, status=400)
         section = get_object_or_404(
@@ -280,6 +133,7 @@ class PlacementBulkView(APIView):
             school_year=year,
             archived_at__isnull=True,
         )
+        require_grade_in_scope(request.user, section.grade_level)
         ids = request.data.get('students') or []
         override_capacity = bool(request.data.get('override_capacity'))
         reason = str(request.data.get('reason') or '').strip()
@@ -287,7 +141,7 @@ class PlacementBulkView(APIView):
         failed = []
         for student_id in ids:
             student = get_object_or_404(StudentProfile, pk=student_id)
-            error = _place_student(
+            error = place_student(
                 student,
                 section,
                 year,
@@ -311,7 +165,7 @@ class PlacementBulkView(APIView):
 
 
 class TeacherStaffListView(APIView):
-    permission_classes = [IsAuthenticated, IsHeadTeacher]
+    permission_classes = [IsAuthenticated, role_or_tagged(User.Role.HEAD_TEACHER, PREPARE_ASSIGNMENTS)]
 
     def get(self, request):
         rows = (
@@ -328,7 +182,9 @@ class TeacherStaffListView(APIView):
 
 
 class AssignmentAdminView(APIView):
-    permission_classes = [IsAuthenticated, IsHeadTeacher]
+    """Head teachers give duties; a teacher tagged to prepare assignments reads them in their levels."""
+
+    permission_classes = [IsAuthenticated, role_or_tagged(User.Role.HEAD_TEACHER, PREPARE_ASSIGNMENTS)]
 
     def get(self, request):
         rows = (
@@ -336,6 +192,7 @@ class AssignmentAdminView(APIView):
             .select_related('teacher', 'subject', 'section', 'section__program', 'school_year')
             .order_by('section__grade_level', 'section__name', 'teacher__last_name', 'subject__name')
         )
+        rows = filter_levels(rows, reading_levels(request.user, PREPARE_ASSIGNMENTS), 'section__grade_level')
         return Response(
             [
                 {
@@ -356,139 +213,19 @@ class AssignmentAdminView(APIView):
         )
 
     def post(self, request):
-        year = _current_year()
-        if year is None:
-            return Response({'detail': 'No current school year is set.'}, status=400)
-        teacher = get_object_or_404(User, pk=request.data.get('teacher'), role=User.Role.TEACHER)
-        if teacher.account_status in HIDDEN:
-            return Response({'detail': 'That teacher account is archived.'}, status=400)
-        assignment_type = request.data.get('type') or TeacherAssignment.Type.SUBJECT_TEACHER
-        allowed = {TeacherAssignment.Type.SUBJECT_TEACHER, TeacherAssignment.Type.ADVISER}
-        if assignment_type not in allowed:
-            return Response({'detail': 'Choose subject teacher or adviser.'}, status=400)
-        section = None
-        subject = None
-        if request.data.get('section'):
-            section = get_object_or_404(Section, pk=request.data.get('section'), archived_at__isnull=True)
-            if section.school_year.archived_at:
-                return Response({'detail': 'That section is archived.'}, status=400)
-        if request.data.get('subject'):
-            subject = get_object_or_404(Subject, pk=request.data.get('subject'))
-        if assignment_type == TeacherAssignment.Type.SUBJECT_TEACHER and (not section or not subject):
-            return Response({'detail': 'Subject teachers need a section and a subject.'}, status=400)
-        if assignment_type == TeacherAssignment.Type.ADVISER and not section:
-            return Response({'detail': 'Advisers need a section.'}, status=400)
-        if (
-            assignment_type == TeacherAssignment.Type.SUBJECT_TEACHER
-            and section
-            and section.program_id
-            and subject
-            and not program_offers_subject(section.program, subject)
-        ):
-            return Response(
-                {'detail': f'{subject.name} is not a {section.program.code} subject.'},
-                status=400,
-            )
-        previous = None
-        if assignment_type == TeacherAssignment.Type.ADVISER and section:
-            previous = TeacherAssignment.objects.filter(
-                section=section,
-                school_year=year,
-                assignment_type=TeacherAssignment.Type.ADVISER,
-                status=TeacherAssignment.Status.ACTIVE,
-            ).select_related('teacher').first()
-            if previous:
-                previous.status = TeacherAssignment.Status.ENDED
-                previous.ended_at = timezone.now()
-                previous.save(update_fields=['status', 'ended_at'])
-        if assignment_type == TeacherAssignment.Type.SUBJECT_TEACHER and section and subject:
-            previous = TeacherAssignment.objects.filter(
-                section=section,
-                school_year=year,
-                assignment_type=TeacherAssignment.Type.SUBJECT_TEACHER,
-                subject=subject,
-                status=TeacherAssignment.Status.ACTIVE,
-            ).select_related('teacher').first()
-            if previous:
-                previous.status = TeacherAssignment.Status.ENDED
-                previous.ended_at = timezone.now()
-                previous.save(update_fields=['status', 'ended_at'])
         try:
-            row = TeacherAssignment.objects.create(
-                teacher=teacher,
-                assignment_type=assignment_type,
-                school_year=year,
-                section=section,
-                subject=subject,
-                grade_level=section.grade_level if section else request.data.get('grade_level', ''),
-                assigned_by=request.user,
+            payload = create_assignment(
+                request.user,
+                teacher_id=request.data.get('teacher'),
+                assignment_type=request.data.get('type'),
+                section_id=request.data.get('section'),
+                subject_id=request.data.get('subject'),
+                grade_level=request.data.get('grade_level', ''),
+                reason=str(request.data.get('reason') or '').strip(),
             )
-        except IntegrityError:
-            if assignment_type == TeacherAssignment.Type.ADVISER:
-                return Response({'detail': 'That section already has an adviser.'}, status=400)
-            return Response({'detail': 'That teacher already has this duty.'}, status=400)
-        reason = str(request.data.get('reason') or '').strip()
-        label = section_label(section) if section else ''
-        teacher_name = teacher.get_full_name() or teacher.email
-        if assignment_type == TeacherAssignment.Type.ADVISER:
-            audit.record(
-                user=request.user,
-                action='adviser_assigned',
-                summary=f'Assigned {teacher_name} as adviser for {label}',
-                target_type='TeacherAssignment',
-                target_id=row.id,
-                details={
-                    'previous': (
-                        previous.teacher.get_full_name() or previous.teacher.email if previous else ''
-                    ),
-                    'new': teacher_name,
-                    'reason': reason,
-                },
-            )
-            notify(
-                [teacher],
-                title='Adviser assignment',
-                body=f'You are now adviser for {label}.',
-                level='info',
-                category=ASSIGNMENTS,
-                action_path='/teacher/advisory',
-            )
-        else:
-            audit.record(
-                user=request.user,
-                action='subject_teacher_assigned',
-                summary=f'Assigned {teacher_name} to {subject.name} · {label}',
-                target_type='TeacherAssignment',
-                target_id=row.id,
-                details={
-                    'subject': subject.name if subject else '',
-                    'previous': (
-                        previous.teacher.get_full_name() or previous.teacher.email if previous else ''
-                    ),
-                    'new': teacher_name,
-                    'reason': reason,
-                },
-            )
-            notify(
-                [teacher],
-                title='Subject assignment',
-                body=f'You are assigned to {subject.name} · {label}.',
-                level='info',
-                category=ASSIGNMENTS,
-                action_path='/teacher/classes',
-            )
-        if section:
-            recompute_status(section)
-        return Response(
-            {
-                'id': row.id,
-                'teacher': teacher_name,
-                'type': row.assignment_type,
-                'section': label,
-                'subject': subject.name if subject else '',
-            },
-            status=201,
-        )
+        except DutyRejected as exc:
+            return Response({'detail': str(exc)}, status=400)
+        return Response(payload, status=201)
 
 
 class AssignmentAdminDetailView(APIView):
@@ -500,6 +237,7 @@ class AssignmentAdminDetailView(APIView):
             pk=pk,
             status=TeacherAssignment.Status.ACTIVE,
         )
+        _require_duty_in_scope(request.user, row)
         row.status = TeacherAssignment.Status.ENDED
         row.ended_at = timezone.now()
         row.save(update_fields=['status', 'ended_at'])
@@ -520,6 +258,7 @@ class AssignmentAdminDetailView(APIView):
             pk=pk,
             status=TeacherAssignment.Status.ENDED,
         )
+        _require_duty_in_scope(request.user, row)
         if row.section_id and (row.section.archived_at or row.section.school_year.archived_at):
             return Response({'detail': 'Restore the section first.'}, status=400)
         if row.assignment_type == TeacherAssignment.Type.ADVISER and row.section_id:
@@ -546,6 +285,7 @@ class AssignmentPurgeView(APIView):
             pk=pk,
             status=TeacherAssignment.Status.ENDED,
         )
+        _require_duty_in_scope(request.user, row)
         label = (
             f'{row.teacher.get_full_name()} · {row.subject.name if row.subject_id else "Adviser"}'
             f' · {section_label(row.section) if row.section_id else row.school_year.label}'

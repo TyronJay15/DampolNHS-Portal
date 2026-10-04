@@ -105,18 +105,6 @@ class GradeWorkflowTests(TestCase):
             format='json',
         )
 
-    def _mark_ptpa(self, attended=True, student=None):
-        return self.adviser_client.post(
-            '/api/grades/ptpa/',
-            {
-                'assignment': self.advisory.id,
-                'term': self.term.id,
-                'student': (student or self.student).id,
-                'attended': attended,
-            },
-            format='json',
-        )
-
     def _show(self, student=None):
         return self.adviser_client.post(
             '/api/grades/show/',

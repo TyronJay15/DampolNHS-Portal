@@ -1,0 +1,16 @@
+/* The CMS tabs as buttons (the Admin's version uses links), sized for four pages. */
+.website-work-tabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.website-work-tabs .cms-tab {
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .website-work-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

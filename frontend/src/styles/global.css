@@ -45,10 +45,7 @@ img {
 
 button, input, select, textarea {
   font: inherit;
-}
-
-.page-wrap,
-.lp-container {
+}.lp-container {
   width: min(var(--max), calc(100% - 48px));
   margin: 0 auto;
 }

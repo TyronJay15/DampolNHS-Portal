@@ -2,6 +2,7 @@ from apps.accounts.lifecycle import HIDDEN
 from apps.grading.models import Grade
 from apps.grading.recommend import RecommendationContext, recommend_payload
 from apps.people.models import StudentSection, TeacherAssignment
+from apps.school.term_plan import TermPlan
 
 
 def section_roster(section):
@@ -32,6 +33,21 @@ def section_subject_assignments(section):
 
 def assigned_subject_ids(section):
     return [row.subject_id for row in section_subject_assignments(section)]
+
+
+def term_subject_ids(section, term):
+    """Assigned subjects that run in this term by the year's term plan."""
+    plan = TermPlan(section.school_year_id, program_ids=[section.program_id])
+    return {
+        subject_id
+        for subject_id in assigned_subject_ids(section)
+        if plan.runs_in(section.program_id, subject_id, term.number)
+    }
+
+
+def counted_subject_ids(scheduled_ids, grades):
+    """What a student's card is measured against: scheduled subjects plus any already graded."""
+    return set(scheduled_ids) | {row.subject_id for row in grades}
 
 
 def _counts(roster_ids, grades_by_student):
@@ -88,6 +104,10 @@ def advisory_snapshot(section, term):
     assignments = section_subject_assignments(section)
     subject_ids = [row.subject_id for row in assignments]
     roster_ids = [row.student_id for row in roster]
+    plan = TermPlan(section.school_year_id, program_ids=[section.program_id])
+    scheduled_ids = {
+        subject_id for subject_id in subject_ids if plan.runs_in(section.program_id, subject_id, term.number)
+    }
     year_grades = list(
         Grade.objects.filter(student_id__in=roster_ids, school_year=section.school_year)
         .filter(status__in=[Grade.Status.APPROVED, Grade.Status.RELEASED])
@@ -106,6 +126,8 @@ def advisory_snapshot(section, term):
 
     subjects = []
     for assignment in assignments:
+        if assignment.subject_id not in scheduled_ids and assignment.subject_id not in term_by_subject:
+            continue
         counts = _counts(roster_ids, term_by_subject.get(assignment.subject_id, {}))
         subjects.append(
             {
@@ -113,6 +135,7 @@ def advisory_snapshot(section, term):
                 'subject': assignment.subject.name,
                 'teacher': assignment.teacher.get_full_name() or assignment.teacher.email,
                 **counts,
+                'scheduled': assignment.subject_id in scheduled_ids,
                 'ready': bool(roster_ids) and counts['missing'] == 0 and counts['draft'] == 0 and counts['submitted'] == 0,
             }
         )
@@ -121,12 +144,14 @@ def advisory_snapshot(section, term):
     context = RecommendationContext()
     students = []
     for row in roster:
-        state = _student_state(subject_ids, term_by_student.get(row.student_id, []))
+        graded = term_by_student.get(row.student_id, [])
+        state = _student_state(counted_subject_ids(scheduled_ids, graded), graded)
         students.append(
             {
                 'student_id': row.student_id,
                 'name': row.student.user.get_full_name(),
                 'lrn': row.student.lrn,
+                'gender': row.student.gender,
                 'contact_number': row.student.contact_number,
                 'guardian_name': row.student.guardian_name,
                 'guardian_contact': row.student.guardian_contact,

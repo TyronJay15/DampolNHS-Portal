@@ -8,7 +8,8 @@ from apps.grading.recommend import recommend_payload
 from apps.grading.scores import average
 from apps.people.models import Registration, StudentSection
 from apps.school.models import SchoolYear, Term
-from apps.school.offerings import subject_payloads_for_program, subject_rows_for_program
+from apps.school.offerings import subject_rows_for_program
+from apps.school.term_plan import TermPlan, scheduled_subject_payloads
 
 
 def _placement(profile):
@@ -36,10 +37,12 @@ def _year(placement):
     return SchoolYear.objects.filter(is_current=True).first()
 
 
-def _subjects(section, program):
+def _subjects(section, program, plan):
+    """The card's subject rows, each with the terms it runs in this year."""
+    program_id = program.id if program else None
     assigned = section_subject_assignments(section) if section else []
     if not assigned:
-        return subject_payloads_for_program(program)
+        return scheduled_subject_payloads(program, None, plan)
 
     catalog = {row.subject_id: row for row in subject_rows_for_program(program)}
     rows = []
@@ -51,13 +54,13 @@ def _subjects(section, program):
                 'code': item.subject.code,
                 'name': item.subject.name,
                 'kind': link.kind if link else '',
-                'term': link.term if link else None,
+                'terms': plan.terms_for(program_id, item.subject_id),
             }
         )
     return rows
 
 
-def _append_released_subjects(subjects, grades):
+def _append_released_subjects(subjects, grades, plan, program):
     known = {row['id'] for row in subjects}
     for grade in grades:
         if grade.subject_id in known:
@@ -68,7 +71,7 @@ def _append_released_subjects(subjects, grades):
                 'code': grade.subject.code,
                 'name': grade.subject.name,
                 'kind': '',
-                'term': None,
+                'terms': plan.terms_for(program.id if program else None, grade.subject_id),
             }
         )
         known.add(grade.subject_id)
@@ -86,11 +89,7 @@ def _summary(values, possible):
 
 
 def _offered_terms(subject, terms):
-    numbers = [term.number for term in terms]
-    offered = subject.get('term')
-    if offered in numbers:
-        return {offered}
-    return set(numbers)
+    return set(subject['terms']) & {term.number for term in terms}
 
 
 def _averages(released, subjects, terms):
@@ -143,7 +142,11 @@ def student_grade_card(profile: StudentProfile):
         .select_related('subject', 'term')
         .order_by('term__number', 'subject__name')
     )
-    subjects = _append_released_subjects(_subjects(section, program), released)
+    plan = TermPlan(year.id if year else None)
+    subjects = _append_released_subjects(_subjects(section, program, plan), released, plan, program)
+    # A term with no scheduled subject and no shown grade is left off the card entirely.
+    in_use = {number for row in subjects for number in row['terms']} | {grade.term.number for grade in released}
+    terms = [term for term in terms if term.number in in_use] if subjects else []
     averages = _averages(released, subjects, terms)
     posted = len(released)
     term_coverage = []
@@ -169,7 +172,9 @@ def student_grade_card(profile: StudentProfile):
 
     return {
         'school_year': year.label if year else '',
-        'terms': [{'id': term.id, 'number': term.number, 'label': term.label} for term in terms],
+        'terms': [
+            {'id': term.id, 'number': term.number, 'label': term.label, 'is_current': term.is_current} for term in terms
+        ],
         'subjects': subjects,
         'grades': [
             {

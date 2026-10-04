@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import DeskMark from '../../components/DeskMark/DeskMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import YearChip from '../../components/YearChip';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -16,6 +17,7 @@ import { fetchTerms } from '../../services/teacherService';
 
 export default function HeadApprovePage() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [terms, setTerms] = useState([]);
   const [termId, setTermId] = useState('');
   const [teachers, setTeachers] = useState([]);
@@ -80,7 +82,14 @@ export default function HeadApprovePage() {
     setOpenTeachers((current) => ({ ...current, [key]: !current[key] }));
   }
 
-  async function runSubject(sectionId, subjectId) {
+  async function runSubject(group, sectionName) {
+    const { section_id: sectionId, subject_id: subjectId } = group;
+    const answer = await confirm({
+      title: `Approve ${group.subject}?`,
+      body: `${group.submitted} submitted grade(s) for ${sectionName} will be approved. The subject teacher is notified, and the adviser can then show the cards.`,
+      confirmLabel: `Approve ${group.submitted}`,
+    });
+    if (!answer) return;
     const key = `subject-${sectionId}-${subjectId}`;
     setBusyKey(key);
     setMessage('');
@@ -96,7 +105,15 @@ export default function HeadApprovePage() {
     }
   }
 
-  async function runTeacher(teacherId) {
+  async function runTeacher(teacher) {
+    const teacherId = teacher.teacher_id;
+    const answer = await confirm({
+      title: `Approve all grades from ${teacher.teacher}?`,
+      body: 'Every submitted grade from this teacher for the selected term will be approved. The teacher is notified.',
+      confirmLabel: `Approve ${teacher.submitted}`,
+      facts: [{ label: 'Submitted grades', value: teacher.submitted }],
+    });
+    if (!answer) return;
     setBusyKey(`teacher-${teacherId}`);
     setMessage('');
     setError('');
@@ -112,6 +129,16 @@ export default function HeadApprovePage() {
   }
 
   async function runAll() {
+    const answer = await confirm({
+      title: 'Approve all submitted grades?',
+      body: 'Every submitted grade for the selected term will be approved. Teachers are notified, and advisers can then show the report cards.',
+      confirmLabel: `Approve ${waiting}`,
+      facts: [
+        { label: 'Submitted grades', value: waiting },
+        { label: 'Teachers waiting', value: teachers.filter((teacher) => teacher.submitted > 0).length },
+      ],
+    });
+    if (!answer) return;
     setBusyKey('all');
     setMessage('');
     setError('');
@@ -126,7 +153,18 @@ export default function HeadApprovePage() {
     }
   }
 
-  async function runReturn(group) {
+  async function runReturn(group, sectionName) {
+    const answer = await confirm({
+      title: `Return ${group.subject} to draft?`,
+      body: `Submitted and approved grades for ${sectionName} go back to draft. The teacher is notified and must fix and submit again. Cards that are already shown are left untouched.`,
+      confirmLabel: 'Return to draft',
+      tone: 'warning',
+      facts: [
+        { label: 'Submitted', value: group.submitted },
+        { label: 'Approved', value: group.approved },
+      ],
+    });
+    if (!answer) return;
     const key = `return-${group.section_id}-${group.subject_id}`;
     setBusyKey(key);
     setMessage('');
@@ -198,7 +236,7 @@ export default function HeadApprovePage() {
                       disabled={!teacher.submitted || busyKey === `teacher-${teacher.teacher_id}`}
                       onClick={(event) => {
                         event.stopPropagation();
-                        runTeacher(teacher.teacher_id);
+                        runTeacher(teacher);
                       }}
                     >
                       Approve all
@@ -251,8 +289,8 @@ export default function HeadApprovePage() {
                                   <td>{group.approved}</td>
                                   <td>
                                     <div className="studio-actions">
-                                      <button className="btn" type="button" disabled={!group.submitted} onClick={() => runSubject(group.section_id, group.subject_id)}>Approve</button>
-                                      <button className="btn btn-secondary" type="button" disabled={!group.submitted && !group.approved} onClick={() => runReturn(group)}>Return</button>
+                                      <button className="btn" type="button" disabled={!group.submitted} onClick={() => runSubject(group, section.section)}>Approve</button>
+                                      <button className="btn btn-secondary" type="button" disabled={!group.submitted && !group.approved} onClick={() => runReturn(group, section.section)}>Return</button>
                                     </div>
                                   </td>
                                 </tr>

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.exceptions import APIException
 
-from apps.accounts.codes import check_code, consume_code, issue_code
+from apps.accounts.codes import check_code, consume_code, issue_code, resend_wait
 from apps.accounts.identity import find_portal_user
 from apps.accounts.mail import password_otp_email
 from apps.accounts.models import User
@@ -12,6 +12,11 @@ from apps.accounts.recaptcha import verify_recaptcha
 class AuthDenied(APIException):
     status_code = 401
     default_code = 'authentication_failed'
+
+
+class CodeCooldown(APIException):
+    status_code = 429
+    default_code = 'code_cooldown'
 
 
 class LoginSerializer(serializers.Serializer):
@@ -232,43 +237,9 @@ class ForgotPasswordSerializer(serializers.Serializer):
         return attrs
 
 
-class PublicPasswordOtpSerializer(serializers.Serializer):
-    identifier = serializers.CharField()
-    current_password = serializers.CharField(write_only=True)
-
-    def validate(self, attrs):
-        user = find_portal_user(attrs['identifier'])
-        if user is None or not user.has_usable_password() or not user.check_password(attrs['current_password']):
-            raise AuthDenied('Invalid credentials.')
-        if not user.email:
-            raise serializers.ValidationError({'identifier': 'This account has no email for a code.'})
-        attrs['user'] = user
-        return attrs
-
-
-class PublicChangePasswordSerializer(serializers.Serializer):
-    identifier = serializers.CharField()
-    current_password = serializers.CharField(write_only=True)
-    code = serializers.CharField()
-    new_password = serializers.CharField(write_only=True)
-    confirm_password = serializers.CharField(write_only=True)
-
-    def validate_new_password(self, value):
-        return validate_password_strength(value)
-
-    def validate(self, attrs):
-        user = find_portal_user(attrs['identifier'])
-        if user is None or not user.has_usable_password() or not user.check_password(attrs['current_password']):
-            raise AuthDenied('Invalid credentials.')
-        if attrs['new_password'] != attrs['confirm_password']:
-            raise serializers.ValidationError({'confirm_password': 'Passwords do not match.'})
-        if attrs['new_password'] == attrs['current_password']:
-            raise serializers.ValidationError({'new_password': 'Choose a password that is different from the current one.'})
-        if not consume_code(user, 'password', attrs['code']):
-            raise serializers.ValidationError({'code': 'That code is invalid or has expired.'})
-        attrs['user'] = user
-        return attrs
-
-
 def send_password_otp(user):
+    """Email a fresh password code, at most one per resend window so an inbox cannot be flooded."""
+    wait = resend_wait(user, 'password')
+    if wait:
+        raise CodeCooldown(f'Please wait {wait} seconds before asking for a new code.')
     password_otp_email(user, issue_code(user, 'password', minutes=10))

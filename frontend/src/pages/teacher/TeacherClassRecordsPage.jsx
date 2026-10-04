@@ -7,6 +7,8 @@ import YearChip from '../../components/YearChip';
 import { useAuth } from '../../context/AuthContext';
 import { fetchClassGrades, fetchGradeTimeline, fetchTeacherAssignments, fetchTerms } from '../../services/teacherService';
 import { when } from '../../utils/when';
+import DutyTermTabs from './DutyTermTabs';
+import { defaultTermId, dutyTerms } from './dutyTerms';
 
 export default function TeacherClassRecordsPage() {
   const { assignmentId } = useParams();
@@ -31,11 +33,10 @@ export default function TeacherClassRecordsPage() {
         if (!assignment || !assignment.can_encode) {
           throw new Error('You cannot open records for that class.');
         }
-        const termRows = await fetchTerms(assignment.school_year_id);
-        const current = termRows.find((row) => row.is_current) || termRows[0];
+        const termRows = dutyTerms(await fetchTerms(assignment.school_year_id), assignment);
         if (cancelled) return;
         setTerms(termRows);
-        setTermId(current ? String(current.id) : '');
+        setTermId(defaultTermId(termRows));
       } catch (err) {
         if (!cancelled) setError(err.message);
       } finally {
@@ -109,84 +110,82 @@ export default function TeacherClassRecordsPage() {
       </p>
       {error ? <p className="alert alert-error">{error}</p> : null}
 
-      <div className="studio-tabs">
-        {terms.map((term) => (
-          <button
-            key={term.id}
-            type="button"
-            className={String(term.id) === termId ? 'is-active' : ''}
-            onClick={() => setTermId(String(term.id))}
-          >
-            {term.label}
-          </button>
-        ))}
-      </div>
+      <DutyTermTabs
+        terms={terms}
+        termId={termId}
+        onChange={setTermId}
+        empty="This subject has no term scheduled yet. The Head Teacher sets it in the term plan."
+      />
 
-      <label className="studio-search">
-        <span className="desk-line">
-          <LineMark name="search" size={14} />
-          Search
-        </span>
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or LRN" />
-      </label>
+      {terms.length ? (
+        <>
+          <label className="studio-search">
+            <span className="desk-line">
+              <LineMark name="search" size={14} />
+              Search
+            </span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or LRN" />
+          </label>
 
-      <section className="card studio-panel studio-table-wrap">
-        {rows.length === 0 ? (
-          <p className="studio-empty">No students match that search.</p>
-        ) : (
-          <table className="studio-table">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>LRN</th>
-                <th>Score</th>
-                <th>Status</th>
-                <th>Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.student_id} className={row.student_id === selectedId ? 'is-open' : ''}>
-                  <td>
-                    <button className="studio-link desk-line" type="button" onClick={() => openRow(row)}>
-                      <LineMark name="user" size={14} />
-                      {row.name}
-                    </button>
-                  </td>
-                  <td>{row.lrn}</td>
-                  <td>{row.score ?? '—'}</td>
-                  <td>{row.status || 'Not encoded'}</td>
-                  <td>{when(row.updated_at) || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+          <section className="card studio-panel studio-table-wrap">
+            {rows.length === 0 ? (
+              <p className="studio-empty">No students match that search.</p>
+            ) : (
+              <table className="studio-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>LRN</th>
+                    <th>Score</th>
+                    <th>Status</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.student_id} className={row.student_id === selectedId ? 'is-open' : ''}>
+                      <td>
+                        <button className="studio-link desk-line" type="button" onClick={() => openRow(row)}>
+                          <LineMark name="user" size={14} />
+                          {row.name}
+                        </button>
+                      </td>
+                      <td>{row.lrn}</td>
+                      <td>{row.score ?? '—'}</td>
+                      <td>{row.status || 'Not encoded'}</td>
+                      <td>{when(row.updated_at) || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
 
-      <section className="card studio-panel">
-        <h2>
-          <LineMark name="history" />
-          {selected ? selected.name : 'Term timeline'}
-        </h2>
-        {!selected ? <p className="studio-empty">Click a student name to open this term’s history.</p> : null}
-        {selected && busy ? <p className="studio-empty">Loading timeline…</p> : null}
-        {selected && !busy && events.length === 0 ? (
-          <p className="studio-empty">No encoded history for this student in this term yet.</p>
-        ) : null}
-        {events.map((row) => (
-          <article className="studio-event" key={row.id}>
-            <p className="studio-kicker">{when(row.changed_at)}</p>
+          <section className="card studio-panel">
             <h2>
-              {row.previous_score || '—'} → {row.new_score || '—'}
+              <LineMark name="history" />
+              {selected ? selected.name : 'Term timeline'}
             </h2>
-            <p>
-              {row.from_status || 'new'} to {row.to_status} · {row.changed_by || 'System'}
-              {row.reason ? ` · ${row.reason}` : ''}
-            </p>
-          </article>
-        ))}
-      </section>
+            {!selected ? <p className="studio-empty">Click a student name to open this term’s history.</p> : null}
+            {selected && busy ? <p className="studio-empty">Loading timeline…</p> : null}
+            {selected && !busy && events.length === 0 ? (
+              <p className="studio-empty">No encoded history for this student in this term yet.</p>
+            ) : null}
+            {events.map((row) => (
+              <article className="studio-event" key={row.id}>
+                <p className="studio-kicker">{when(row.changed_at)}</p>
+                <h2>
+                  {row.previous_score || '—'} → {row.new_score || '—'}
+                </h2>
+                <p>
+                  {row.from_status || 'new'} to {row.to_status} · {row.changed_by || 'System'}
+                  {row.reason ? ` · ${row.reason}` : ''}
+                </p>
+              </article>
+            ))}
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }

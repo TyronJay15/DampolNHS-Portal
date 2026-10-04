@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import LineMark from '../../../components/LineMark/LineMark';
 import Loading from '../../../components/Loading/Loading';
 import FieldLabel from './FieldLabel';
-import { fetchCms, saveCmsDocument } from '../../../services/cmsService';
+import { fetchCms } from '../../../services/cmsService';
 import { DEFAULT_CMS } from '../../../utils/cmsDefaults';
 import CmsPhotoField from './CmsPhotoField';
 import './AdminCms.css';
+import { useCmsPublish } from './useCmsPublish';
 
 const JUMPS = [
   ['cms-hero', 'Hero slides'],
@@ -21,8 +22,18 @@ function jumpTo(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+const PAGE = {
+  document: 'landing',
+  name: 'home page',
+  saved: 'Landing copy saved.',
+  publishBody: 'The public home page updates as soon as you confirm.',
+};
+
 export default function AdminCmsLandingPage() {
+  const { publish, proposing } = useCmsPublish(PAGE);
   const [form, setForm] = useState(null);
+  // The page as loaded, so a tagged editor's proposal carries only what changed.
+  const [loaded, setLoaded] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -34,6 +45,7 @@ export default function AdminCmsLandingPage() {
         const next = { ...defaults, ...(data.landing || {}) };
         next.banner = { ...defaults.banner, ...(next.banner || {}) };
         setForm(next);
+        setLoaded(next);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -42,9 +54,10 @@ export default function AdminCmsLandingPage() {
   async function handleSave(event) {
     event.preventDefault();
     setError('');
+    setMessage('');
     try {
-      await saveCmsDocument('landing', form);
-      setMessage('Landing copy saved.');
+      const done = await publish(form, loaded);
+      if (done) setMessage(done);
     } catch (err) {
       setError(err.message);
     }
@@ -161,7 +174,7 @@ export default function AdminCmsLandingPage() {
 
         <div className="cms-save">
           <button className="btn" type="submit">
-            Save landing
+            {proposing ? 'Submit for approval' : 'Save landing'}
           </button>
         </div>
       </form>

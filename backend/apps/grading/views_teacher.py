@@ -20,6 +20,7 @@ from apps.people.models import StudentSection
 from apps.school.deadlines import encode_closed_response, encode_is_open
 from apps.school.labels import section_label
 from apps.school.models import Term
+from apps.school.term_plan import TermPlan, not_scheduled_detail, section_runs_subject
 
 EDITABLE = {Grade.Status.DRAFT}
 
@@ -32,6 +33,9 @@ class TeacherClassGradesView(APIView):
             return Response({'detail': 'You cannot encode grades for that class.'}, status=403)
 
         term = get_object_or_404(Term, pk=request.query_params.get('term'), school_year=assignment.school_year)
+        plan = TermPlan(assignment.school_year_id, program_ids=[assignment.section.program_id])
+        scheduled_terms = plan.terms_for(assignment.section.program_id, assignment.subject_id)
+        scheduled = term.number in scheduled_terms
         roster = (
             StudentSection.objects.filter(
                 section=assignment.section,
@@ -55,7 +59,7 @@ class TeacherClassGradesView(APIView):
                 status=CorrectionRequest.Status.PENDING,
             ).values_list('grade_id', flat=True)
         )
-        students = [_row_payload(item.student, grades.get(item.student_id), pending) for item in roster]
+        students = [_row_payload(item.student, grades.get(item.student_id), pending, scheduled) for item in roster]
         draft = submitted = approved = released = 0
         for row in students:
             if row['status'] == Grade.Status.DRAFT:
@@ -74,6 +78,7 @@ class TeacherClassGradesView(APIView):
                     'section_label': section_label(assignment.section),
                     'subject': assignment.subject.name,
                     'school_year': assignment.school_year.label,
+                    'terms': scheduled_terms,
                 },
                 'term': {
                     'id': term.id,
@@ -82,6 +87,7 @@ class TeacherClassGradesView(APIView):
                     'encode_opens_at': term.encode_opens_at,
                     'encode_closes_at': term.encode_closes_at,
                     'encode_open': encode_is_open(term),
+                    'scheduled': scheduled,
                 },
                 'summary': pack_counts(len(students), draft=draft, submitted=submitted, approved=approved, released=released),
                 'students': students,
@@ -100,6 +106,8 @@ class TeacherEncodeGradeView(APIView):
         term = get_object_or_404(Term, pk=request.data.get('term'), school_year=assignment.school_year)
         if not encode_is_open(term):
             return Response(encode_closed_response(term), status=400)
+        if not section_runs_subject(assignment.section, assignment.subject_id, term):
+            return Response(not_scheduled_detail(assignment.subject, term), status=400)
         student = get_object_or_404(StudentProfile.objects.select_related('user'), pk=request.data.get('student'))
         if not StudentSection.objects.filter(
             student=student,
@@ -174,6 +182,8 @@ class TeacherSubmitClassView(APIView):
         term = get_object_or_404(Term, pk=request.data.get('term'), school_year=assignment.school_year)
         if not encode_is_open(term):
             return Response(encode_closed_response(term), status=400)
+        if not section_runs_subject(assignment.section, assignment.subject_id, term):
+            return Response(not_scheduled_detail(assignment.subject, term), status=400)
         drafts = Grade.objects.filter(
             subject=assignment.subject,
             section=assignment.section,
@@ -222,7 +232,7 @@ class TeacherSubmitClassView(APIView):
         return Response({'submitted': moved})
 
 
-def _row_payload(student, grade, pending=None):
+def _row_payload(student, grade, pending=None, scheduled=True):
     pending = pending or set()
     return {
         'student_id': student.id,
@@ -231,7 +241,7 @@ def _row_payload(student, grade, pending=None):
         'grade_id': grade.id if grade else None,
         'score': str(grade.score) if grade else '',
         'status': grade.status if grade else '',
-        'editable': grade is None or grade.status in EDITABLE,
+        'editable': scheduled and (grade is None or grade.status in EDITABLE),
         'can_correct': bool(grade and grade.status not in EDITABLE),
         'correction_pending': bool(grade and grade.id in pending),
         'updated_at': grade.updated_at if grade else None,

@@ -48,6 +48,7 @@ class AccountReactivateView(APIView):
                 'email': result['email'],
                 'account_status': result['account_status'],
                 'activation_sent': result['activation_sent'],
+                'activation_emailed': result['activation_emailed'],
             }
         )
 

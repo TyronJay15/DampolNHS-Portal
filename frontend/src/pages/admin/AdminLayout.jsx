@@ -1,12 +1,14 @@
 import { Outlet } from 'react-router-dom';
+import { useAccessSummary } from '../../components/Access/useAccessSummary';
 import DashboardShell from '../../components/Sidebar/DashboardShell';
 import './AdminChrome.css';
 import '../../styles/studio.css';
 
 export default function AdminLayout() {
+  const access = useAccessSummary();
   return (
     <DashboardShell
-      title="Admin Dashboard"
+      title="Admission Dashboard"
       initials="AD"
       accountTo="/admin/password"
       links={[
@@ -17,6 +19,7 @@ export default function AdminLayout() {
         { to: '/admin/forecast', label: 'Grade 11 forecast', icon: 'forecast' },
         { to: '/admin/assistant', label: 'Assistant', icon: 'bell' },
         { to: '/admin/audit', label: 'Audit log', icon: 'audit' },
+        { to: '/admin/access', label: 'Access', icon: 'access', badge: access.inbox || null },
         { to: '/admin/history', label: 'Grade history', icon: 'history' },
         { to: '/admin/cms', label: 'Website CMS', icon: 'cms' },
         { to: '/admin/notifications', label: 'Notifications', icon: 'bell' },

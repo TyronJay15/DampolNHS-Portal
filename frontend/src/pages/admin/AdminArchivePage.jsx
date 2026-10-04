@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import DeskMark from '../../components/DeskMark/DeskMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
@@ -22,9 +23,9 @@ const ROLE_LABEL = {
 };
 
 export default function AdminArchivePage() {
+  const confirm = useConfirm();
   const [tab, setTab] = useState('students');
   const [rows, setRows] = useState([]);
-  const [deleteTarget, setDeleteTarget] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -55,7 +56,17 @@ export default function AdminArchivePage() {
     }
   }
 
+  function nameOf(row) {
+    return tab === 'staff' ? row.name : `${row.first_name} ${row.last_name}`;
+  }
+
   async function handleReactivate(row) {
+    const answer = await confirm({
+      title: `Reactivate ${nameOf(row)}?`,
+      body: 'Their account is restored and they appear in the active lists again. They may be asked to set a new password.',
+      confirmLabel: 'Reactivate',
+    });
+    if (!answer) return;
     const userId = row.user_id || row.id;
     setBusy(String(userId));
     setError('');
@@ -76,6 +87,12 @@ export default function AdminArchivePage() {
   }
 
   async function handleRestorePending(row) {
+    const answer = await confirm({
+      title: `Restore ${nameOf(row)} to pending?`,
+      body: 'The registration returns to Pending so you can approve or reject it again. They still cannot sign in until it is approved.',
+      confirmLabel: 'Restore to pending',
+    });
+    if (!answer) return;
     setBusy(String(row.user_id));
     setError('');
     setMessage('');
@@ -90,15 +107,20 @@ export default function AdminArchivePage() {
     }
   }
 
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    const userId = deleteTarget.user_id || deleteTarget.id;
+  async function handleDelete(row) {
+    const answer = await confirm({
+      title: `Delete ${nameOf(row)} permanently?`,
+      body: 'This clears their login details. Grades and school records stay. It cannot be undone.',
+      confirmLabel: 'Delete permanently',
+      tone: 'danger',
+    });
+    if (!answer) return;
+    const userId = row.user_id || row.id;
     setBusy('delete');
     setError('');
     try {
       await removeAccount(userId);
       setMessage('Account permanently removed.');
-      setDeleteTarget(null);
       await load(tab);
     } catch (err) {
       setError(err.message);
@@ -171,7 +193,7 @@ export default function AdminArchivePage() {
                     {busy === String(userId) ? 'Working…' : 'Reactivate'}
                   </button>
                 )}
-                <button className="btn btn-danger" type="button" disabled={Boolean(busy)} onClick={() => setDeleteTarget(row)}>
+                <button className="btn btn-danger" type="button" disabled={Boolean(busy)} onClick={() => handleDelete(row)}>
                   Delete permanently
                 </button>
               </div>
@@ -179,31 +201,6 @@ export default function AdminArchivePage() {
           );
         })}
       </div>
-
-      {deleteTarget ? (
-        <div className="studio-modal-backdrop">
-          <div className="card studio-panel studio-modal">
-            <h2>Delete permanently?</h2>
-            <p>
-              This clears login details for{' '}
-              <strong>
-                {tab === 'staff'
-                  ? deleteTarget.name
-                  : `${deleteTarget.first_name} ${deleteTarget.last_name}`}
-              </strong>
-              . Grades and school records stay. This cannot be undone.
-            </p>
-            <div className="studio-actions">
-              <button className="btn btn-secondary" type="button" onClick={() => setDeleteTarget(null)}>
-                Cancel
-              </button>
-              <button className="btn btn-danger" type="button" disabled={busy === 'delete'} onClick={handleDelete}>
-                {busy === 'delete' ? 'Deleting…' : 'Delete permanently'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

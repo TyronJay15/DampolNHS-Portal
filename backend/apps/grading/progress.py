@@ -7,7 +7,8 @@ from django.db.models import Count, Max, Q
 from apps.accounts.lifecycle import HIDDEN
 from apps.grading.models import Grade
 from apps.people.models import StudentSection, TeacherAssignment
-from apps.school.models import Term
+from apps.school.models import Section, Term
+from apps.school.term_plan import TermPlan
 
 
 def describe_counts(roster, *, missing, draft, submitted, approved, released, updated_at=None):
@@ -115,7 +116,59 @@ def grade_count_map(section_ids, year_ids):
     return buckets
 
 
-def assignment_progress(assignments):
+def offered_term_ids(assignments):
+    """Term ids each duty has work in, in term order.
+
+    A subject duty has the terms its subject runs in by the year's term plan. An advisory duty has
+    every term in which at least one of the section's subjects runs. A term that already holds
+    grades for the duty is always kept, so no recorded grade drops out of view.
+    """
+    duties = [row for row in assignments if row.section_id]
+    section_ids = {row.section_id for row in duties}
+    year_ids = {row.school_year_id for row in duties}
+    terms_by_year = defaultdict(list)
+    for term in Term.objects.filter(school_year_id__in=year_ids).order_by('number'):
+        terms_by_year[term.school_year_id].append(term)
+    plans = {year_id: TermPlan(year_id) for year_id in year_ids}
+    programs = dict(Section.objects.filter(id__in=section_ids).values_list('id', 'program_id'))
+    graded = defaultdict(set)
+    for section_id, subject_id, term_id in (
+        Grade.objects.filter(section_id__in=section_ids).values_list('section_id', 'subject_id', 'term_id').distinct()
+    ):
+        graded[(section_id, subject_id)].add(term_id)
+    section_subjects = defaultdict(set)
+    for section_id, subject_id in TeacherAssignment.objects.filter(
+        section_id__in=section_ids,
+        assignment_type=TeacherAssignment.Type.SUBJECT_TEACHER,
+        status=TeacherAssignment.Status.ACTIVE,
+        subject__isnull=False,
+    ).values_list('section_id', 'subject_id'):
+        section_subjects[section_id].add(subject_id)
+
+    def subject_terms(row, subject_id):
+        plan = plans[row.school_year_id]
+        program_id = programs.get(row.section_id)
+        scheduled = {
+            term.id
+            for term in terms_by_year[row.school_year_id]
+            if plan.runs_in(program_id, subject_id, term.number)
+        }
+        return scheduled | graded[(row.section_id, subject_id)]
+
+    offered = {}
+    for row in duties:
+        if row.assignment_type == TeacherAssignment.Type.SUBJECT_TEACHER and row.subject_id:
+            ids = subject_terms(row, row.subject_id)
+        elif row.assignment_type == TeacherAssignment.Type.ADVISER:
+            ids = set().union(*(subject_terms(row, subject_id) for subject_id in section_subjects[row.section_id]))
+        else:
+            continue
+        offered[row.id] = [term.id for term in terms_by_year[row.school_year_id] if term.id in ids]
+    return offered
+
+
+def assignment_progress(assignments, offered):
+    """Encode progress per subject duty, for the terms the duty has work in (see offered_term_ids)."""
     encode_rows = [
         row
         for row in assignments
@@ -135,6 +188,8 @@ def assignment_progress(assignments):
         roster = rosters.get(row.section_id, 0)
         term_rows = []
         for term in terms:
+            if term.id not in offered.get(row.id, ()):
+                continue
             counts = grades.get((row.section_id, row.subject_id, term.id), {})
             packed = pack_counts(
                 roster,
@@ -169,12 +224,15 @@ def duty_queue_rows(term):
     section_ids.update(extra_ids)
     rosters = roster_counts(section_ids)
     grades = grade_count_map(section_ids, [term.school_year_id])
+    plan = TermPlan(term.school_year_id)
     seen = set()
     rows = []
     for row in assignments:
         key = (row.section_id, row.subject_id)
-        seen.add(key)
         counts = grades.get((row.section_id, row.subject_id, term.id), {})
+        if not counts and not plan.runs_in(row.section.program_id, row.subject_id, term.number):
+            continue
+        seen.add(key)
         packed = pack_counts(
             rosters.get(row.section_id, 0),
             draft=counts.get('draft', 0),
@@ -206,8 +264,6 @@ def duty_queue_rows(term):
             updated_at=Max('updated_at'),
         )
     )
-    from apps.school.models import Section
-
     sections = {
         item.id: item
         for item in Section.objects.filter(id__in=[row['section_id'] for row in leftovers if row['section_id']]).select_related(

@@ -4,7 +4,6 @@ from django.db import transaction
 
 from apps.grading.models import Grade
 from apps.people.models import StudentSection, TeacherAssignment
-from apps.school.models import SchoolYear, Section
 
 
 def section_delete_summary(section):

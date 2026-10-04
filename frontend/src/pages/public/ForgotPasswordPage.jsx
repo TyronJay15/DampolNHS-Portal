@@ -1,7 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import RecaptchaField from '../../components/auth/RecaptchaField';
 import PasswordRules from '../../components/auth/PasswordRules';
+import RecaptchaField from '../../components/auth/RecaptchaField';
+import ResendCodeButton from '../../components/auth/ResendCodeButton';
+import { nextResendAt } from '../../components/auth/resendTime';
+import StepTrail from '../../components/auth/StepTrail';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import PasswordInput from '../../components/Input/PasswordInput';
 import {
   requestForgotPasswordOtp,
@@ -12,8 +16,21 @@ import { checkPassword, checkPasswordMatch, firstApiError } from '../../utils/au
 import AuthShell from './AuthShell';
 import './LoginPage.css';
 
+// Same three steps as Change password: find the account and email a code, verify it, set the new password.
+const STEPS = [
+  { id: 'send', label: 'Your account' },
+  { id: 'verify', label: 'Verify code' },
+  { id: 'password', label: 'New password' },
+];
+
+function captchaMessage(err) {
+  const captcha = err.data?.errors?.recaptcha_token;
+  return captcha ? [].concat(captcha).join(' ') : '';
+}
+
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [step, setStep] = useState('send');
   const [identifier, setIdentifier] = useState('');
   const [code, setCode] = useState('');
@@ -23,74 +40,69 @@ export default function ForgotPasswordPage() {
   const [recaptchaError, setRecaptchaError] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [sending, setSending] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [resendAt, setResendAt] = useState(0);
 
-  async function handleSendCode() {
+  function startRequest() {
     setError('');
     setMessage('');
     setRecaptchaError('');
     if (!recaptchaToken) {
       setRecaptchaError('Please complete the reCAPTCHA.');
-      return;
+      return false;
     }
-    setSending(true);
+    return true;
+  }
+
+  function showError(err) {
+    const captcha = captchaMessage(err);
+    setRecaptchaError(captcha);
+    setError(captcha ? '' : firstApiError(err));
+  }
+
+  async function handleSendCode() {
+    if (!startRequest()) return;
+    setBusy('send');
     try {
       const data = await requestForgotPasswordOtp({ identifier, recaptcha_token: recaptchaToken });
+      setResendAt(nextResendAt(data));
       setStep('verify');
-      setMessage(data.detail || 'If that account exists, a code was sent.');
+      setMessage('If that account exists, a 6-digit code was sent to its email. It expires in 10 minutes.');
     } catch (err) {
-      const captcha = err.data?.errors?.recaptcha_token;
-      setRecaptchaError(captcha ? [].concat(captcha).join(' ') : '');
-      setError(captcha ? '' : firstApiError(err));
+      showError(err);
     } finally {
-      setSending(false);
+      setBusy('');
     }
   }
 
   async function handleVerifyCode(event) {
     event.preventDefault();
-    setError('');
-    setMessage('');
-    setRecaptchaError('');
-    if (!recaptchaToken) {
-      setRecaptchaError('Please complete the reCAPTCHA.');
-      return;
-    }
+    if (!startRequest()) return;
     if (code.length !== 6) {
       setError('Enter the 6-digit code from your email.');
       return;
     }
-    setVerifying(true);
+    setBusy('verify');
     try {
       await verifyForgotPasswordOtp({ identifier, code, recaptcha_token: recaptchaToken });
       setStep('password');
       setMessage('Code verified. Set a new password.');
     } catch (err) {
-      const captcha = err.data?.errors?.recaptcha_token;
-      setRecaptchaError(captcha ? [].concat(captcha).join(' ') : '');
-      setError(captcha ? '' : firstApiError(err));
+      showError(err);
     } finally {
-      setVerifying(false);
+      setBusy('');
     }
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setError('');
-    setMessage('');
-    setRecaptchaError('');
-    if (!recaptchaToken) {
-      setRecaptchaError('Please complete the reCAPTCHA.');
-      return;
-    }
+    if (!startRequest()) return;
     const passwordError = checkPassword(newPassword) || checkPasswordMatch(newPassword, confirmPassword);
     if (passwordError) {
       setError(passwordError);
       return;
     }
-    setSaving(true);
+    setBusy('save');
     try {
       await resetForgottenPassword({
         identifier,
@@ -99,18 +111,30 @@ export default function ForgotPasswordPage() {
         confirm_password: confirmPassword,
         recaptcha_token: recaptchaToken,
       });
-      navigate('/login', { replace: true, state: { notice: 'Password updated. Sign in with the new password.' } });
     } catch (err) {
-      const captcha = err.data?.errors?.recaptcha_token;
-      setRecaptchaError(captcha ? [].concat(captcha).join(' ') : '');
-      setError(captcha ? '' : firstApiError(err));
-    } finally {
-      setSaving(false);
+      showError(err);
+      setBusy('');
+      return;
     }
+    await confirm({
+      title: 'Password reset',
+      body: 'Your password has been reset. Sign in with your new password to continue.',
+      confirmLabel: 'Go to sign in',
+      cancelLabel: null,
+    });
+    navigate('/login', { replace: true });
+  }
+
+  function chooseAnotherAccount() {
+    setStep('send');
+    setCode('');
+    setMessage('');
+    setError('');
   }
 
   return (
     <AuthShell title="Forgot password" className="login-page">
+      <StepTrail steps={STEPS} current={step} className="auth-steps" />
       {message ? <p className="alert alert-info">{message}</p> : null}
       {error ? <p className="alert alert-error">{error}</p> : null}
 
@@ -133,15 +157,14 @@ export default function ForgotPasswordPage() {
             />
           </label>
           <RecaptchaField onChange={setRecaptchaToken} error={recaptchaError} />
-          <button className="btn" type="submit" disabled={sending || !identifier}>
-            {sending ? 'Sending…' : 'Send reset code'}
+          <button className="btn" type="submit" disabled={Boolean(busy) || !identifier}>
+            {busy === 'send' ? 'Sending…' : 'Send reset code'}
           </button>
         </form>
       ) : null}
 
       {step === 'verify' ? (
         <form onSubmit={handleVerifyCode}>
-          <p className="auth-hint">A code was sent if that account exists. Enter it to continue.</p>
           <label className="form-field">
             Email code
             <input
@@ -154,11 +177,12 @@ export default function ForgotPasswordPage() {
             />
           </label>
           <RecaptchaField onChange={setRecaptchaToken} error={recaptchaError} />
-          <button className="btn btn-secondary" type="button" onClick={handleSendCode} disabled={sending}>
-            {sending ? 'Sending…' : 'Resend code'}
+          <button className="btn" type="submit" disabled={Boolean(busy)}>
+            {busy === 'verify' ? 'Verifying…' : 'Verify code'}
           </button>
-          <button className="btn" type="submit" disabled={verifying}>
-            {verifying ? 'Verifying…' : 'Verify code'}
+          <ResendCodeButton availableAt={resendAt} onResend={handleSendCode} busy={busy === 'send'} />
+          <button className="auth-link-button" type="button" onClick={chooseAnotherAccount}>
+            Use a different account
           </button>
         </form>
       ) : null}
@@ -187,8 +211,8 @@ export default function ForgotPasswordPage() {
             />
           </label>
           <RecaptchaField onChange={setRecaptchaToken} error={recaptchaError} />
-          <button className="btn" type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Save new password'}
+          <button className="btn" type="submit" disabled={Boolean(busy)}>
+            {busy === 'save' ? 'Saving…' : 'Save new password'}
           </button>
         </form>
       ) : null}

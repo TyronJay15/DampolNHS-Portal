@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useProposal } from '../../components/Access/proposalContext';
 import AdvancedToolBanner from '../../components/AdvancedToolBanner/AdvancedToolBanner';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
 import { fetchPlacements, fetchSections, savePlacement, savePlacementsBulk } from '../../services/adminService';
 import { isCapacityError, programChangeNote } from '../../utils/placement';
 import { sectionLabel } from '../../utils/sectionLabel';
+import { genderLabel } from '../../utils/gender';
 
 function matches(row, query) {
   if (!query) return true;
@@ -14,6 +17,9 @@ function matches(row, query) {
 }
 
 export default function HeadPlacePage() {
+  const confirm = useConfirm();
+  // Set when a teacher tagged to prepare placements opens this page: placements become requests.
+  const proposal = useProposal();
   const [students, setStudents] = useState([]);
   const [sections, setSections] = useState([]);
   const [sectionId, setSectionId] = useState('');
@@ -21,9 +27,6 @@ export default function HeadPlacePage() {
   const [studentQuery, setStudentQuery] = useState('');
   const [studentTab, setStudentTab] = useState('available');
   const [selected, setSelected] = useState({});
-  const [transferTarget, setTransferTarget] = useState(null);
-  const [capacityRetry, setCapacityRetry] = useState(null);
-  const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -70,56 +73,130 @@ export default function HeadPlacePage() {
 
   const chosen = pool.filter((row) => selected[row.student_id]);
 
-  function retryOnCapacity(err, retry) {
-    if (isCapacityError(err)) setCapacityRetry(retry);
-    else setError(err.message);
+  const reasonNote = { label: 'Reason', placeholder: 'Why is this change being made?' };
+
+  // Asked when the server reports the section is full; returns the reason, or null if declined.
+  async function confirmOverCapacity(reason) {
+    const answer = await confirm({
+      title: 'Section is full',
+      body: `${sectionLabel(section)} is at capacity (${section?.student_count || 0}${section?.capacity ? ` / ${section.capacity}` : ''}). Place anyway?`,
+      confirmLabel: 'Place anyway',
+      tone: 'warning',
+      note: { label: 'Reason', placeholder: 'Why exceed capacity?', required: true, initial: reason },
+    });
+    return answer ? answer.note : null;
   }
 
-  async function placeBulk(force = false) {
-    if (!section || chosen.length === 0) return;
-    setBusy('bulk');
+  // Runs a placement request; if the section is full, asks once and retries with the override.
+  async function submitPlacement(key, send, reason, onDone) {
+    let note = reason;
+    let force = false;
+    for (;;) {
+      setBusy(key);
+      setError('');
+      try {
+        await send(force, note);
+        await load();
+        onDone();
+        return;
+      } catch (err) {
+        if (force || !isCapacityError(err)) {
+          setError(err.message);
+          return;
+        }
+        setBusy('');
+        note = await confirmOverCapacity(note);
+        if (note === null) return;
+        force = true;
+      } finally {
+        setBusy('');
+      }
+    }
+  }
+
+  async function proposePlacement(rows, transfer) {
     setError('');
     try {
-      const result = await savePlacementsBulk({
-        section: Number(sectionId),
-        students: chosen.map((row) => row.student_id),
-        override_capacity: force,
-        reason,
-      });
+      const sent = await proposal.propose(
+        { section: Number(sectionId), students: rows.map((row) => row.student_id), transfer },
+        {
+          title: `Propose ${transfer ? 'transferring' : 'placing'} ${rows.length === 1 ? rows[0].name : `${rows.length} students`}?`,
+          facts: [
+            { label: 'Section', value: sectionLabel(section) },
+            { label: 'Students', value: rows.length },
+          ],
+          warning: transfer ? programChangeNote(rows[0], section) || undefined : undefined,
+        },
+      );
+      if (!sent) return;
       setSelected({});
-      setCapacityRetry(null);
-      await load();
-      const failedNote = result.failed?.length ? ` ${result.failed.length} could not be placed.` : '';
-      setMessage(`Placed ${result.placed} student(s) in ${sectionLabel(section)}.${failedNote}`);
+      setMessage('Sent to the Head Teacher for approval. Follow it under My access.');
     } catch (err) {
-      retryOnCapacity(err, { type: 'bulk' });
-    } finally {
-      setBusy('');
+      setError(err.message);
     }
   }
 
-  async function transferOne(row, force = false) {
-    setBusy(`move-${row.student_id}`);
-    setError('');
-    try {
-      await savePlacement({
-        student: row.student_id,
-        section: Number(sectionId),
-        transfer: Boolean(row.placed),
-        override_capacity: force,
-        reason,
+  async function placeBulk() {
+    if (!section || chosen.length === 0) return;
+    if (proposal) return proposePlacement(chosen, false);
+    const answer = await confirm({
+      title: `Assign ${chosen.length} student${chosen.length === 1 ? '' : 's'}?`,
+      body: `They are placed in ${sectionLabel(section)} and appear on its roster.`,
+      confirmLabel: 'Assign students',
+      facts: [
+        { label: 'Selected', value: chosen.length },
+        { label: 'Placed now', value: section.student_count || 0 },
+      ],
+      note: reasonNote,
+    });
+    if (!answer) return;
+    await submitPlacement(
+      'bulk',
+      async (force, note) => {
+        const result = await savePlacementsBulk({
+          section: Number(sectionId),
+          students: chosen.map((row) => row.student_id),
+          override_capacity: force,
+          reason: note,
+        });
+        const failedNote = result.failed?.length ? ` ${result.failed.length} could not be placed.` : '';
+        setSelected({});
+        setMessage(`Placed ${result.placed} student(s) in ${sectionLabel(section)}.${failedNote}`);
+      },
+      answer.note,
+      () => {},
+    );
+  }
+
+  async function transferOne(row) {
+    const moving = Boolean(row.placed);
+    if (proposal) return proposePlacement([row], moving);
+    let reason = '';
+    // Placing an unplaced student is routine; moving one between sections asks first.
+    if (moving) {
+      const answer = await confirm({
+        title: `Transfer ${row.name}?`,
+        body: `Move from ${row.section || 'unplaced'} to ${sectionLabel(section)}.`,
+        confirmLabel: 'Transfer',
+        warning: programChangeNote(row, section) || undefined,
+        note: reasonNote,
       });
-      setTransferTarget(null);
-      setCapacityRetry(null);
-      setReason('');
-      await load();
-      setMessage(`${row.placed ? 'Transferred' : 'Placed'} ${row.name} in ${sectionLabel(section)}.`);
-    } catch (err) {
-      setTransferTarget(null);
-      retryOnCapacity(err, { type: 'one', row });
-    } finally {
-      setBusy('');
+      if (!answer) return;
+      reason = answer.note;
     }
+    await submitPlacement(
+      `move-${row.student_id}`,
+      (force, note) =>
+        savePlacement({
+          student: row.student_id,
+          section: Number(sectionId),
+          transfer: moving,
+          override_capacity: force,
+          reason: note,
+        }),
+      reason,
+      () => setMessage(`${moving ? 'Transferred' : 'Placed'} ${row.name} in ${sectionLabel(section)}.`),
+    );
   }
 
   if (loading) return <Loading label="Loading placements…" />;
@@ -129,7 +206,7 @@ export default function HeadPlacePage() {
       <PageHead kicker="Advanced" title="Place students" icon="place">
         <p>Pick a section, then assign or transfer students. Every change syncs with Section Management and Workspace.</p>
       </PageHead>
-      <AdvancedToolBanner />
+      {proposal ? null : <AdvancedToolBanner />}
       {message ? <p className="alert alert-info">{message}</p> : null}
       {error ? <p className="alert alert-error">{error}</p> : null}
 
@@ -152,7 +229,7 @@ export default function HeadPlacePage() {
               </button>
             ))}
           </div>
-          {section ? (
+          {section && !proposal ? (
             <Link className="btn btn-secondary" to={`/head/sections/${section.id}/setup?step=students`}>
               Open in Section Workspace
             </Link>
@@ -177,8 +254,8 @@ export default function HeadPlacePage() {
           </label>
           {studentTab === 'available' ? (
             <div className="studio-actions">
-              <button className="btn" type="button" disabled={busy === 'bulk' || chosen.length === 0} onClick={() => placeBulk(false)}>
-                {busy === 'bulk' ? 'Placing…' : `Assign selected (${chosen.length})`}
+              <button className="btn" type="button" disabled={busy === 'bulk' || chosen.length === 0} onClick={placeBulk}>
+                {busy === 'bulk' ? 'Placing…' : `${proposal ? 'Propose assigning' : 'Assign selected'} (${chosen.length})`}
               </button>
             </div>
           ) : null}
@@ -213,13 +290,16 @@ export default function HeadPlacePage() {
                         />
                       </td>
                     ) : null}
-                    <td>{row.name}</td>
+                    <td>
+                      {row.name}
+                      {row.gender ? <p className="studio-table-sub">{genderLabel(row.gender)}</p> : null}
+                    </td>
                     <td>{row.lrn}</td>
                     <td>{row.program_code || '—'}</td>
                     <td>{row.section || '—'}</td>
                     <td>
                       {studentTab === 'other' ? (
-                        <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => setTransferTarget(row)}>
+                        <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => transferOne(row)}>
                           Transfer here
                         </button>
                       ) : null}
@@ -236,52 +316,6 @@ export default function HeadPlacePage() {
           </div>
         </section>
       </div>
-
-      {transferTarget ? (
-        <div className="studio-modal-backdrop">
-          <div className="card studio-panel studio-modal">
-            <h2>Confirm transfer</h2>
-            <p>
-              Move <strong>{transferTarget.name}</strong> from <strong>{transferTarget.section || 'unplaced'}</strong> to{' '}
-              <strong>{section ? sectionLabel(section) : ''}</strong>?
-            </p>
-            {programChangeNote(transferTarget, section) ? (
-              <p className="alert alert-info">{programChangeNote(transferTarget, section)}</p>
-            ) : null}
-            <label className="form-field is-wide">
-              <span>Reason (optional)</span>
-              <input value={reason} onChange={(e) => setReason(e.target.value)} />
-            </label>
-            <div className="studio-actions">
-              <button className="btn btn-secondary" type="button" onClick={() => setTransferTarget(null)}>Cancel</button>
-              <button className="btn" type="button" onClick={() => transferOne(transferTarget)} disabled={Boolean(busy)}>Confirm transfer</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {capacityRetry ? (
-        <div className="studio-modal-backdrop">
-          <div className="card studio-panel studio-modal">
-            <h2>Section is full</h2>
-            <p>
-              <strong>{section ? sectionLabel(section) : ''}</strong> is at capacity ({section?.student_count || 0}
-              {section?.capacity ? ` / ${section.capacity}` : ''}). Place anyway?
-            </p>
-            <div className="studio-actions">
-              <button className="btn btn-secondary" type="button" onClick={() => setCapacityRetry(null)}>Cancel</button>
-              <button
-                className="btn"
-                type="button"
-                disabled={Boolean(busy)}
-                onClick={() => (capacityRetry.type === 'bulk' ? placeBulk(true) : transferOne(capacityRetry.row, true))}
-              >
-                Place anyway
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

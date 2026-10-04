@@ -4,18 +4,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.accounts.codes import RESEND_SECONDS
 from apps.accounts.mail import account_ready_email
 from apps.accounts.serializers import (
     ActivateAccountSerializer,
     ChangePasswordSerializer,
+    CodeCooldown,
     ForgotPasswordOtpSerializer,
     ForgotPasswordSerializer,
     ForgotPasswordVerifySerializer,
     LoginSerializer,
     PasswordCodeVerifySerializer,
     PasswordOtpSerializer,
-    PublicChangePasswordSerializer,
-    PublicPasswordOtpSerializer,
     UserSerializer,
     send_password_otp,
 )
@@ -107,7 +107,7 @@ class PasswordOtpView(APIView):
             target_type='User',
             target_id=request.user.id,
         )
-        return Response({'detail': 'A code was sent to your email.'})
+        return Response({'detail': 'A code was sent to your email.', 'resend_in': RESEND_SECONDS})
 
 
 class PasswordCodeVerifyView(APIView):
@@ -145,16 +145,21 @@ class ForgotPasswordOtpView(APIView):
         serializer = ForgotPasswordOtpSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data.get('user')
+        # The answer is the same whether or not the account exists, or a code was just sent.
         if user is not None:
-            send_password_otp(user)
-            audit.record(
-                user=user,
-                action='password_otp_requested',
-                summary=f'{user.email} requested a password reset code',
-                target_type='User',
-                target_id=user.id,
-            )
-        return Response({'detail': 'If that account exists, a code was sent.'})
+            try:
+                send_password_otp(user)
+            except CodeCooldown:
+                pass
+            else:
+                audit.record(
+                    user=user,
+                    action='password_otp_requested',
+                    summary=f'{user.email} requested a password reset code',
+                    target_type='User',
+                    target_id=user.id,
+                )
+        return Response({'detail': 'If that account exists, a code was sent.', 'resend_in': RESEND_SECONDS})
 
 
 class ForgotPasswordVerifyView(APIView):
@@ -185,42 +190,3 @@ class ForgotPasswordView(APIView):
             target_id=user.id,
         )
         return Response({'detail': 'Password updated. You can sign in now.'})
-
-
-class PublicPasswordOtpView(APIView):
-    permission_classes = [AllowAny]
-    authentication_classes = []
-
-    def post(self, request):
-        serializer = PublicPasswordOtpSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
-        send_password_otp(user)
-        audit.record(
-            user=user,
-            action='password_otp_requested',
-            summary=f'{user.email} requested a password code',
-            target_type='User',
-            target_id=user.id,
-        )
-        return Response({'detail': 'A code was sent to your email.'})
-
-
-class PublicChangePasswordView(APIView):
-    permission_classes = [AllowAny]
-    authentication_classes = []
-
-    def post(self, request):
-        serializer = PublicChangePasswordSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
-        user.set_password(serializer.validated_data['new_password'])
-        user.save(update_fields=['password'])
-        audit.record(
-            user=user,
-            action='password_change',
-            summary=f'{user.email} changed password',
-            target_type='User',
-            target_id=user.id,
-        )
-        return Response({'detail': 'Password updated.'})

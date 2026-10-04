@@ -180,10 +180,3 @@ def activation_checks(section):
     ]
     blocked = [row['label'] for row in checks if not row['ok']]
     return {'checks': checks, 'can_activate': not blocked, 'blocked': blocked}
-
-
-IDENTITY_FIELDS = frozenset({'school_year', 'grade_level', 'program', 'name'})
-
-
-def section_identity_locked(section):
-    return section.status == Section.Status.ACTIVE or bool(section.archived_at)

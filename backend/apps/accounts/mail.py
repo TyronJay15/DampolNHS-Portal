@@ -1,11 +1,31 @@
 import logging
 from html import escape
-from smtplib import SMTP, SMTPAuthenticationError, SMTPException
+from smtplib import (
+    SMTPAuthenticationError,
+    SMTPConnectError,
+    SMTPDataError,
+    SMTPException,
+    SMTPRecipientsRefused,
+    SMTPServerDisconnected,
+)
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives, get_connection
+from django.db import DatabaseError, transaction
+from django.utils import timezone
+
+from apps.accounts.models import MailOutbox
 
 logger = logging.getLogger('apps.accounts.mail')
+FALLBACK_PORT = 2525  # Brevo's alternative when the usual port is blocked
+
+
+class MailError(RuntimeError):
+    """A send that did not go through. permanent: retrying the same message cannot help."""
+
+    def __init__(self, message, permanent=False):
+        super().__init__(message)
+        self.permanent = permanent
 
 
 def _from_header():
@@ -37,41 +57,13 @@ def _html_body(subject, body):
 def _smtp_ready():
     backend = settings.EMAIL_BACKEND
     if 'console' in backend:
-        raise RuntimeError('Mail is using the console backend. Restart Django so SMTP is loaded.')
+        raise MailError('Mail is using the console backend. Restart Django so SMTP is loaded.')
     if 'smtp' in backend and not (settings.EMAIL_HOST_PASSWORD or '').strip():
-        raise RuntimeError('EMAIL_HOST_PASSWORD is missing from backend/.env.')
+        raise MailError('EMAIL_HOST_PASSWORD is missing from backend/.env.')
     return backend
 
 
-def _login_port():
-    host = settings.EMAIL_HOST
-    user = settings.EMAIL_HOST_USER
-    password = (settings.EMAIL_HOST_PASSWORD or '').strip()
-    ports = [settings.EMAIL_PORT]
-    if settings.EMAIL_PORT != 2525:
-        ports.append(2525)
-    last_error = None
-    for port in ports:
-        try:
-            with SMTP(host, port, timeout=settings.EMAIL_TIMEOUT) as smtp:
-                smtp.ehlo()
-                smtp.starttls()
-                smtp.ehlo()
-                smtp.login(user, password)
-            return port
-        except SMTPAuthenticationError as exc:
-            raise RuntimeError(f'SMTP login was rejected ({exc.smtp_code}). Check the Brevo SMTP key.') from exc
-        except (OSError, SMTPException) as exc:
-            last_error = exc
-    raise RuntimeError(f'SMTP could not connect. {last_error}') from last_error
-
-
-def send_portal_mail(to, subject, body):
-    backend = _smtp_ready()
-    port = settings.EMAIL_PORT
-    if 'smtp' in backend:
-        port = _login_port()
-
+def _message(to, subject, body, port):
     connection = get_connection(
         host=settings.EMAIL_HOST,
         port=port,
@@ -92,29 +84,75 @@ def send_portal_mail(to, subject, body):
     )
     message.attach_alternative(_html_body(subject, body), 'text/html')
     message.extra_headers['X-Auto-Response-Suppress'] = 'All'
+    return message
+
+
+def send_message(to, subject, body):
+    """Send one email over one connection, trying the fallback port if the usual one is unreachable.
+
+    Raises MailError and writes nothing to the database. smtplib errors are OSErrors too, so the
+    specific ones are caught first.
+    """
+    backend = _smtp_ready()
+    ports = [settings.EMAIL_PORT]
+    if 'smtp' in backend and settings.EMAIL_PORT != FALLBACK_PORT:
+        ports.append(FALLBACK_PORT)
+    unreachable = None
+    for port in ports:
+        try:
+            sent = _message(to, subject, body, port).send(fail_silently=False)
+        except SMTPAuthenticationError as exc:
+            raise MailError(f'SMTP login was rejected ({exc.smtp_code}). Check the Brevo SMTP key.') from exc
+        except SMTPRecipientsRefused as exc:
+            raise MailError(f'The mail server refused {to}.', permanent=True) from exc
+        except SMTPDataError as exc:
+            raise MailError(f'Mail was rejected for {to} ({exc.smtp_code}).', permanent=exc.smtp_code >= 500) from exc
+        except (SMTPConnectError, SMTPServerDisconnected) as exc:
+            unreachable = exc
+        except SMTPException as exc:
+            raise MailError(f'Mail was rejected for {to}. {getattr(exc, "smtp_code", "")}'.strip()) from exc
+        except OSError as exc:
+            unreachable = exc
+        else:
+            if not sent:
+                raise MailError(f'Mail was not accepted for {to}.')
+            logger.info('Mail accepted for %s via %s:%s', to, backend, port)
+            if 'locmem' not in backend:
+                print(f'Mail accepted by Brevo for {to}', flush=True)
+            return sent
+    raise MailError(f'Could not reach the mail server. {unreachable}') from unreachable
+
+
+def _log(to, subject, kind, user, **fields):
+    """Record mail sent at once. Its body is never stored, so a code cannot leak from the log."""
     try:
-        sent = message.send(fail_silently=False)
-    except SMTPException as exc:
-        logger.exception('SMTP send failed for %s', to)
-        code = getattr(exc, 'smtp_code', '')
-        raise RuntimeError(f'Mail was rejected for {to}. {code}'.strip()) from exc
-    if not sent:
-        raise RuntimeError(f'Mail was not accepted for {to}.')
-    logger.info('Mail accepted for %s via %s:%s', to, backend, port)
-    if 'locmem' not in backend:
-        print(f'Mail accepted by Brevo for {to}', flush=True)
+        with transaction.atomic():
+            MailOutbox.objects.create(kind=kind, to_email=to, subject=subject[:200], user=user, attempts=1, **fields)
+    except DatabaseError:
+        logger.exception('Could not log the mail for %s', to)
+
+
+def send_portal_mail(to, subject, body, kind=MailOutbox.Kind.NOTICE, user=None):
+    """Send now, for codes and account notices, and log it. Raises MailError."""
+    sent = send_message(to, subject, body)
+    _log(to, subject, kind, user, status=MailOutbox.Status.SENT, sent_at=timezone.now())
     return sent
 
 
-def _try_send(to, subject, body):
+def _try_send(to, subject, body, kind, user):
+    """Send a code without breaking the request. A failure is logged for the Admin. Returns whether it went out."""
     try:
-        send_portal_mail(to, subject, body)
-    except Exception:
+        send_portal_mail(to, subject, body, kind, user)
+    except MailError as exc:
         logger.exception('Mail skipped for %s; use the code in the Django terminal.', to)
+        _log(to, subject, kind, user, status=MailOutbox.Status.FAILED, last_error=str(exc)[:255])
+        return False
+    return True
 
 
 def activation_email(user, code):
-    _try_send(
+    """Email the activation code. Returns whether it went out."""
+    return _try_send(
         user.email,
         'Dampol 1st NHS activation code',
         (
@@ -123,6 +161,8 @@ def activation_email(user, code):
             f'Open {settings.FRONTEND_URL}/activate, enter the code, and choose a new password.\n'
             'The code expires in 24 hours.\n'
         ),
+        MailOutbox.Kind.ACTIVATION,
+        user,
     )
 
 
@@ -161,10 +201,10 @@ def account_ready_email(user):
     )
 
 
-def registration_result_email(user, approved, reason=''):
+def registration_result_message(user, approved, reason=''):
+    """Subject and body of the registration result. The outbox queues it; it is not sent here."""
     if approved:
-        send_portal_mail(
-            user.email,
+        return (
             'Dampol 1st NHS registration approved',
             (
                 f'Hello {user.first_name},\n\n'
@@ -172,9 +212,7 @@ def registration_result_email(user, approved, reason=''):
                 f'{settings.FRONTEND_URL}/login\n'
             ),
         )
-        return
-    send_portal_mail(
-        user.email,
+    return (
         'Dampol 1st NHS registration not approved',
         (
             f'Hello {user.first_name},\n\n'
@@ -190,4 +228,6 @@ def password_otp_email(user, code):
         user.email,
         'Dampol 1st NHS password change code',
         f'Hello {user.first_name},\n\nYour password change code is {code}. It expires in 10 minutes.\n',
+        MailOutbox.Kind.CODE,
+        user,
     )

@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import { useProposal } from '../../../components/Access/proposalContext';
+import { useConfirm } from '../../../components/ConfirmDialog/useConfirm';
 import LineMark from '../../../components/LineMark/LineMark';
 import { fileUrl } from '../../../services/api';
 import { deleteCmsPhoto, uploadCmsPhoto } from '../../../services/cmsService';
@@ -7,7 +9,11 @@ function isUpload(url) {
   return String(url || '').includes('/media/cms/');
 }
 
+// In proposal mode the server keeps any photo the live site still uses, so replacing or removing one
+// only changes the proposal; the Admin's approval decides what the website shows.
 export default function CmsPhotoField({ label, value, fallback = '', onChange }) {
+  const confirm = useConfirm();
+  const proposal = useProposal();
   const inputRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +36,15 @@ export default function CmsPhotoField({ label, value, fallback = '', onChange })
   }
 
   async function remove() {
+    const answer = await confirm({
+      title: 'Remove this photo?',
+      body: proposal
+        ? 'The photo is removed from your proposal. The website keeps it until the Admin approves.'
+        : 'The photo is taken off the website and the uploaded file is deleted.',
+      confirmLabel: 'Remove photo',
+      tone: 'warning',
+    });
+    if (!answer) return;
     setBusy(true);
     setError('');
     try {

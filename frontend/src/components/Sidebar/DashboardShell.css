@@ -79,7 +79,7 @@
 
 .dash.is-side-open .dash-side {
   width: 292px;
-  padding: 28px 20px 22px;
+  padding: 22px 18px 18px;
   visibility: visible;
   pointer-events: auto;
   transition:
@@ -104,8 +104,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 28px;
-  padding: 0 4px 20px;
+  margin-bottom: 14px;
+  padding: 0 4px 14px;
   border-bottom: 1px solid rgba(255, 215, 0, 0.22);
 }
 
@@ -150,13 +150,28 @@
   color: rgba(232, 243, 234, 0.72);
 }
 
+/* Every link stays reachable: the list scrolls (with a slim bar) when the screen is short. */
 .dash-side nav {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
+  margin-right: -6px;
+  padding-right: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(244, 231, 176, 0.35) transparent;
+}
+
+.dash-side nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dash-side nav::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(244, 231, 176, 0.35);
 }
 
 .dash-side nav a,
@@ -176,12 +191,17 @@
   text-decoration: none;
   cursor: pointer;
   width: 100%;
+  flex-shrink: 0;
   transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
+.dash-side nav a {
+  padding: 0.38rem 0.65rem;
+}
+
 .dash-nav-well {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -215,11 +235,11 @@
   position: relative;
   z-index: 1;
   margin-top: auto;
-  padding-top: 22px;
+  padding-top: 12px;
   border-top: 1px solid rgba(255, 215, 0, 0.18);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .dash-motto {
@@ -460,25 +480,15 @@
   font-size: clamp(1.55rem, 2vw, 1.9rem);
   letter-spacing: -0.03em;
   line-height: 1.15;
-}
-
-.dash-main > p,
-.dash-lede,
-.dash-main .admin-lede {
+}.dash-main > p {
   margin: 0 0 1.35rem;
   color: var(--dash-muted);
   font-size: 0.98rem;
   line-height: 1.55;
   max-width: 62ch;
-}
-
-.dash-main .card,
+}.dash-main .card,
 .dash-main .admin-stat,
-.dash-main .admin-toolbar,
-.dash-main .admin-panel,
-.dash-main .admin-modal,
 .dash-main .student-panel,
-.dash-main .student-recommend,
 .dash-main .account-password-form {
   background: var(--dash-panel);
   border: 1px solid var(--dash-line);
@@ -575,7 +585,7 @@
     left: 0;
     top: 0;
     width: 292px;
-    padding: 28px 20px 22px;
+    padding: 22px 18px 18px;
     visibility: hidden;
     pointer-events: none;
     transform: translateX(-100%);
@@ -609,7 +619,8 @@
   }
 }
 
-@media (max-height: 760px) {
+/* Laptop-height screens (768–800px and shorter) use the compact sidebar so every link fits. */
+@media (max-height: 860px) {
   .dash.is-side-open .dash-side {
     padding: 16px 16px 14px;
   }
@@ -619,23 +630,19 @@
     padding-bottom: 10px;
   }
 
-  .dash-side nav {
-    gap: 4px;
-  }
-
   .dash-side nav a,
   .dash-account,
   .dash-logout {
-    padding: 0.4rem 0.6rem;
+    padding: 0.3rem 0.55rem;
   }
 
   .dash-nav-well {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
   }
 
   .dash-foot {
-    padding-top: 12px;
-    gap: 8px;
+    padding-top: 10px;
+    gap: 6px;
   }
 }

@@ -1,0 +1,189 @@
+.gp-screen {
+  min-height: 100vh;
+  padding: 1.5rem 1rem 3rem;
+  background: #eef0ec;
+  color: #1d2520;
+}
+
+.gp-toolbar {
+  max-width: 210mm;
+  margin: 0 auto 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.gp-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gp-toolbar-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: #b42318;
+  font-size: 0.85rem;
+}
+
+.gp-toolbar select {
+  min-height: 2.5rem;
+  padding: 0 0.7rem;
+  border: 1px solid #c7d0c9;
+  border-radius: 10px;
+  background: #fff;
+  color: #1d2520;
+  font: inherit;
+}
+
+.gp-sheet {
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 16mm;
+  background: #fff;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.12);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.gp-head {
+  text-align: center;
+  border-bottom: 2px solid #1d2520;
+  padding-bottom: 0.8rem;
+  margin-bottom: 1.1rem;
+}
+
+.gp-head h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gp-head p {
+  margin: 0.15rem 0 0.6rem;
+  font-size: 0.85rem;
+}
+
+.gp-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.gp-info {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.35rem 1.5rem;
+  margin: 0 0 1.2rem;
+  font-size: 0.92rem;
+}
+
+.gp-info div {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.gp-info dt {
+  min-width: 8.5rem;
+  font-weight: 700;
+}
+
+.gp-info dd {
+  margin: 0;
+}
+
+.gp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  table-layout: fixed;
+}
+
+.gp-table th,
+.gp-table td {
+  border: 1px solid #1d2520;
+  padding: 0.4rem 0.55rem;
+  text-align: left;
+  word-wrap: break-word;
+}
+
+.gp-table th {
+  background: #e8ece6;
+}
+
+.gp-table .gp-num {
+  text-align: center;
+  width: 4.5rem;
+}
+
+.gp-table tfoot td {
+  font-weight: 700;
+}
+
+.gp-group + .gp-group {
+  margin-top: 1.1rem;
+}
+
+.gp-group h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.98rem;
+}
+
+.gp-note {
+  margin: 0.9rem 0 0;
+  font-size: 0.8rem;
+}
+
+.gp-foot {
+  margin-top: 1.4rem;
+  font-size: 0.82rem;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .gp-screen {
+    min-height: 0;
+    padding: 0;
+    background: #fff;
+  }
+
+  .gp-sheet {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .gp-table tr,
+  .gp-info div {
+    break-inside: avoid;
+  }
+
+  /* Keep a class title on the same page as its table. */
+  .gp-group h3 {
+    break-after: avoid;
+  }
+
+  .gp-table thead {
+    display: table-header-group;
+  }
+}
+
+@media (max-width: 640px) {
+  .gp-sheet {
+    padding: 1rem;
+  }
+
+  .gp-info {
+    grid-template-columns: 1fr;
+  }
+}

@@ -206,28 +206,6 @@ class SectionRestoreView(APIView):
         return Response(SectionSerializer(section).data)
 
 
-class SectionRosterView(APIView):
-    permission_classes = [IsAuthenticated, IsHeadTeacher]
-
-    def get(self, request, pk):
-        section = get_object_or_404(Section.objects.select_related('program', 'school_year'), pk=pk)
-        rows = section.student_assignments.filter(is_active=True).select_related('student', 'student__user')
-        return Response(
-            {
-                'section': SectionSerializer(section).data,
-                'students': [
-                    {
-                        'student_id': row.student_id,
-                        'name': row.student.user.get_full_name(),
-                        'lrn': row.student.lrn,
-                        'contact_number': row.student.contact_number,
-                    }
-                    for row in rows.order_by('student__user__last_name', 'student__user__first_name')
-                ],
-            }
-        )
-
-
 class ArchiveDeskView(APIView):
     permission_classes = [IsAuthenticated, IsHeadTeacher]
 

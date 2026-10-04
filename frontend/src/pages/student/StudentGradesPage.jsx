@@ -25,6 +25,11 @@ function summaryMap(rows, key) {
   return map;
 }
 
+// A subject belongs to a term when the term plan schedules it there, or a score was already shown there.
+function inTerm(subject, term, scores) {
+  return (subject.terms || []).includes(term.number) || Boolean(scores[`${subject.id}:${term.number}`]);
+}
+
 function AverageCell({ summary, unit }) {
   if (!summary?.average) return <>—</>;
   const partial = summary.included < summary.possible;
@@ -37,6 +42,127 @@ function AverageCell({ summary, unit }) {
         </small>
       ) : null}
     </span>
+  );
+}
+
+function TermTable({ term, subjects, scores, average }) {
+  const rows = subjects.filter((subject) => inTerm(subject, term, scores));
+  return (
+    <div className="student-grade-table-wrap">
+      <table className="student-grade-table">
+        <thead>
+          <tr>
+            <th>Subject</th>
+            <th className="student-grade-score">{term.label}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={2} className="student-grade-pending">
+                No subjects are scheduled in {term.label}.
+              </td>
+            </tr>
+          ) : null}
+          {rows.map((subject) => {
+            const score = scores[`${subject.id}:${term.number}`];
+            return (
+              <tr key={subject.id || subject.code || subject.name}>
+                <td>
+                  <span className="desk-line">
+                    <LineMark name="classes" size={14} />
+                    {subject.name}
+                  </span>
+                </td>
+                <td className="student-grade-score">
+                  <span className={score ? '' : 'student-grade-pending'}>{score || 'Not yet posted'}</span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row">
+              <span className="desk-line">
+                <LineMark name="forecast" size={14} />
+                {term.label} average
+              </span>
+            </th>
+            <td className="student-grade-score student-grade-avg student-grade-overall">
+              <AverageCell summary={average} unit="subjects" />
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+function YearTable({ card, scores, subjectAverages, termAverages }) {
+  return (
+    <div className="student-grade-table-wrap">
+      <table className="student-grade-table">
+        <thead>
+          <tr>
+            <th>Subject</th>
+            {card.terms.map((term) => (
+              <th key={term.id} className="student-grade-score">
+                {term.label}
+              </th>
+            ))}
+            <th className="student-grade-score student-grade-avg">Subject average</th>
+          </tr>
+        </thead>
+        <tbody>
+          {card.subjects.map((subject) => (
+            <tr key={subject.id || subject.code || subject.name}>
+              <td>
+                <span className="desk-line">
+                  <LineMark name="classes" size={14} />
+                  {subject.name}
+                </span>
+              </td>
+              {card.terms.map((term) => {
+                const score = scores[`${subject.id}:${term.number}`];
+                return (
+                  <td key={term.id} className="student-grade-score">
+                    {inTerm(subject, term, scores) ? (
+                      <span className={score ? '' : 'student-grade-pending'}>{score || 'Not yet posted'}</span>
+                    ) : (
+                      <span className="student-grade-off" title={`Not scheduled in ${term.label}`}>
+                        —
+                      </span>
+                    )}
+                  </td>
+                );
+              })}
+              <td className="student-grade-score student-grade-avg">
+                <AverageCell summary={subjectAverages[subject.id]} unit="terms" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row">
+              <span className="desk-line">
+                <LineMark name="forecast" size={14} />
+                Term average
+              </span>
+            </th>
+            {card.terms.map((term) => (
+              <td key={term.id} className="student-grade-score student-grade-avg">
+                <AverageCell summary={termAverages[term.number]} unit="subjects" />
+              </td>
+            ))}
+            <td className="student-grade-score student-grade-avg student-grade-overall">
+              <AverageCell summary={card.overall_average} unit="scores" />
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   );
 }
 
@@ -56,10 +182,13 @@ export default function StudentGradesPage() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('all');
 
   useEffect(() => {
     fetchStudentGrades()
-      .then((data) =>
+      .then((data) => {
+        const current = (data.terms || []).find((term) => term.is_current);
+        setView(current ? current.number : 'all');
         setCard({
           terms: data.terms || [],
           subjects: data.subjects || [],
@@ -71,8 +200,8 @@ export default function StudentGradesPage() {
           recommendation: data.recommendation || null,
           partial: Boolean(data.partial),
           coverage_note: data.coverage_note || '',
-        }),
-      )
+        });
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -90,6 +219,7 @@ export default function StudentGradesPage() {
   if (loading) return <Loading label="Loading grades…" />;
 
   const hasGrid = card.subjects.length > 0 && card.terms.length > 0;
+  const term = card.terms.find((row) => row.number === view);
   const shownScores = card.grades.filter((row) => row.score != null && row.score !== '').length;
   const rec = card.recommendation;
 
@@ -150,63 +280,41 @@ export default function StudentGradesPage() {
           {!error && !hasGrid ? <p className="student-empty">No subjects or terms are ready yet.</p> : null}
           {hasGrid ? (
             <>
-              <div className="student-grade-table-wrap">
-                <table className="student-grade-table">
-                  <thead>
-                    <tr>
-                      <th>Subject</th>
-                      {card.terms.map((term) => (
-                        <th key={term.id} className="student-grade-score">
-                          {term.label}
-                        </th>
-                      ))}
-                      <th className="student-grade-score student-grade-avg">Subject average</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {card.subjects.map((subject) => (
-                      <tr key={subject.id || subject.code || subject.name}>
-                        <td>
-                          <span className="desk-line">
-                            <LineMark name="classes" size={14} />
-                            {subject.name}
-                          </span>
-                        </td>
-                        {card.terms.map((term) => (
-                          <td key={term.id} className="student-grade-score">
-                            <span className={scores[`${subject.id}:${term.number}`] ? '' : 'student-grade-pending'}>
-                              {scores[`${subject.id}:${term.number}`] || 'Not yet posted'}
-                            </span>
-                          </td>
-                        ))}
-                        <td className="student-grade-score student-grade-avg">
-                          <AverageCell summary={subjectAverages[subject.id]} unit="terms" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <th scope="row">
-                        <span className="desk-line">
-                          <LineMark name="forecast" size={14} />
-                          Term average
-                        </span>
-                      </th>
-                      {card.terms.map((term) => (
-                        <td key={term.id} className="student-grade-score student-grade-avg">
-                          <AverageCell summary={termAverages[term.number]} unit="subjects" />
-                        </td>
-                      ))}
-                      <td className="student-grade-score student-grade-avg student-grade-overall">
-                        <AverageCell summary={card.overall_average} unit="scores" />
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+              <div className="student-term-tabs" role="tablist" aria-label="Report card view">
+                {card.terms.map((term) => (
+                  <button
+                    key={term.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={view === term.number}
+                    className={view === term.number ? 'is-active' : ''}
+                    onClick={() => setView(term.number)}
+                  >
+                    {term.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={view === 'all'}
+                  className={view === 'all' ? 'is-active' : ''}
+                  onClick={() => setView('all')}
+                >
+                  Whole year
+                </button>
               </div>
+              {term ? <TermTable term={term} subjects={card.subjects} scores={scores} average={termAverages[term.number]} /> : null}
+              {view === 'all' ? (
+                <YearTable
+                  card={card}
+                  scores={scores}
+                  subjectAverages={subjectAverages}
+                  termAverages={termAverages}
+                />
+              ) : null}
               <p className="student-grade-foot">
-                Averages use shown scores only, so they move as more terms are released.
+                Each term lists only the subjects scheduled in it. Averages use shown scores only, so they move as
+                more terms are released.
               </p>
             </>
           ) : null}

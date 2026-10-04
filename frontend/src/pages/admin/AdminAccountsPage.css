@@ -245,6 +245,26 @@
   overflow-wrap: anywhere;
 }
 
+/* Gender is edited in place: it reads like the other facts until opened. */
+.acct-inline-select {
+  max-width: 100%;
+  margin: -0.15rem 0 0 -0.35rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dash-green-dark);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.acct-inline-select:hover,
+.acct-inline-select:focus-visible {
+  border-color: var(--dash-line);
+  background: var(--dash-field);
+}
+
 .acct-reason {
   margin: 0 0 0.7rem;
   color: #8f1d16;
@@ -254,6 +274,181 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* Bulk bar above the pending list: the count on the left, the approve-all action on the right. */
+.acct-bulk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 14px;
+  background: var(--dash-panel);
+}
+
+.acct-bulk p {
+  margin: 0;
+  color: var(--dash-muted);
+}
+
+.acct-bulk strong {
+  color: var(--dash-ink);
+}
+
+/* Email delivery strip (Admin only): message, four counts, today's allowance and Resend in one row. */
+.acct-mail {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.3fr) auto minmax(150px, 0.8fr) auto;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 14px;
+  background: var(--dash-panel);
+}
+
+.acct-mail-head .desk-line {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dash-muted);
+}
+
+.acct-mail-head p {
+  margin: 0.2rem 0 0;
+  color: var(--dash-ink);
+  font-size: 0.9rem;
+}
+
+.acct-mail-counts {
+  display: flex;
+  gap: 1.1rem;
+  margin: 0;
+}
+
+.acct-mail-counts dt {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dash-muted);
+}
+
+.acct-mail-counts dd {
+  margin: 0.1rem 0 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--dash-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.acct-mail-counts .is-sent dd {
+  color: var(--dash-green);
+}
+
+.acct-mail-counts .is-queued dd {
+  color: var(--dash-green-dark);
+}
+
+.acct-mail-counts .is-waiting dd {
+  color: var(--dash-gold-ink);
+}
+
+.acct-mail-counts .is-failed dd {
+  color: #b3261e;
+}
+
+.acct-mail-meter {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--dash-muted);
+}
+
+.acct-mail-meter strong {
+  color: var(--dash-ink);
+}
+
+.acct-mail-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--dash-field);
+  overflow: hidden;
+}
+
+.acct-mail-track i {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--dash-green);
+  transition: width 0.4s ease;
+}
+
+.acct-mail-track i.is-full {
+  background: var(--dash-gold);
+}
+
+.acct-mail-warn {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  background: var(--dash-field);
+  color: var(--dash-gold-ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+/* The staff activation strip has only a message and counts. */
+.acct-mail.is-compact {
+  grid-template-columns: minmax(200px, 1.3fr) auto;
+}
+
+/* A staff member's activation: three facts in one shaded row. */
+.acct-activation {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem 0.9rem;
+  margin: 0.7rem 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 12px;
+  background: var(--dash-field);
+}
+
+.acct-activation dt {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dash-muted);
+}
+
+.acct-activation dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--dash-green-dark);
+  overflow-wrap: anywhere;
+}
+
+.acct-review-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.acct-chip.is-idle {
+  background: var(--dash-field);
+  color: var(--dash-muted);
 }
 
 .acct-btn {
@@ -324,37 +519,9 @@
   font-weight: 600;
 }
 
-.admin-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 1rem 0;
-}
-
-.admin-tab {
-  border: 2px solid var(--dash-line, var(--color-line));
-  background: var(--dash-field, #e4eee6);
-  color: var(--dash-ink, #1e3326);
-  border-radius: 12px;
-  padding: 8px 14px;
-  cursor: pointer;
-}
-
-.admin-tab.is-active {
-  background: var(--dash-green, var(--lp-green-700));
-  color: #fff;
-  border-color: var(--dash-green, var(--lp-green-700));
-}
-
 .admin-empty,
 .admin-meta {
   color: var(--dash-muted);
-}
-
-.admin-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .admin-staff-table-wrap {
@@ -374,28 +541,25 @@
   border-bottom: 1px solid var(--dash-line);
 }
 
-.admin-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(22, 53, 35, 0.45);
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  z-index: 20;
-}
-
-.admin-modal {
-  width: min(520px, 100%);
-  padding: 1.2rem;
-}
-
 @media (max-width: 900px) {
   .acct-stats,
   .acct-grid,
   .acct-staff,
   .acct-staff-list,
   .acct-facts,
-  .acct-card-head {
+  .acct-card-head,
+  .acct-mail,
+  .acct-mail.is-compact {
     grid-template-columns: 1fr;
+  }
+
+  .acct-activation {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acct-mail-track i {
+    transition: none;
   }
 }

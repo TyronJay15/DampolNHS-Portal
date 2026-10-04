@@ -6,6 +6,7 @@ import RecaptchaField from '../../components/auth/RecaptchaField';
 import PasswordInput from '../../components/Input/PasswordInput';
 import { registerStudent } from '../../services/authService';
 import { fetchPrograms } from '../../services/publicService';
+import { GENDER_OPTIONS } from '../../utils/gender';
 import {
   checkAddress,
   checkContact,
@@ -22,6 +23,7 @@ const emptyForm = {
   middle_name: '',
   first_name: '',
   lrn: '',
+  gender: '',
   email: '',
   contact_number: '',
   address: '',
@@ -48,33 +50,44 @@ export default function RegisterPage() {
   const [recaptchaToken, setRecaptchaToken] = useState('');
   const [recaptchaError, setRecaptchaError] = useState('');
 
+  // A ?program= link (from the Programs page) picks the grade level and program once.
   useEffect(() => {
     const selected = (params.get('program') || '').toUpperCase();
+    if (!selected) return;
     fetchPrograms()
       .then((data) => {
         const items = Array.isArray(data) ? data : data.results || [];
-        setPrograms(items);
         const match = items.find((item) => item.code === selected);
-        setForm((prev) => ({
-          ...prev,
-          program: match ? match.code : prev.program,
-          grade_level_enrollment: match?.grade_level || prev.grade_level_enrollment,
-        }));
+        if (match) {
+          setForm((prev) => ({ ...prev, grade_level_enrollment: match.grade_level || '', program: match.code }));
+        }
       })
       .catch(() => {});
   }, [params]);
+
+  // The program list always comes from the API for the chosen grade level.
+  useEffect(() => {
+    if (!form.grade_level_enrollment) return;
+    let current = true;
+    fetchPrograms(form.grade_level_enrollment)
+      .then((data) => {
+        if (current) setPrograms(Array.isArray(data) ? data : data.results || []);
+      })
+      .catch(() => {
+        if (current) setPrograms([]);
+      });
+    return () => {
+      current = false;
+    };
+  }, [form.grade_level_enrollment]);
 
   function update(event) {
     const { name, value } = event.target;
     if (name === 'lrn' && value && /[^0-9-]/.test(value)) return;
     if (name === 'contact_number' && value && /[^0-9]/.test(value)) return;
-    if (name === 'program') {
-      const chosen = programs.find((item) => item.code === value);
-      setForm((prev) => ({
-        ...prev,
-        program: value,
-        grade_level_enrollment: chosen?.grade_level || prev.grade_level_enrollment,
-      }));
+    if (name === 'grade_level_enrollment') {
+      setPrograms([]);
+      setForm((prev) => ({ ...prev, grade_level_enrollment: value, program: '' }));
       return;
     }
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -119,11 +132,21 @@ export default function RegisterPage() {
     }
   }
 
+  const chosen = programs.find((program) => program.code === form.program);
+
   return (
     <AuthShell title="Admission Registration" wide className="register-page">
       <form onSubmit={handleSubmit}>
         {error ? <p className="alert alert-error">{error}</p> : null}
-        {form.program ? <p className="auth-hint">Selected program: {form.program}</p> : null}
+        {chosen ? (
+          <p className="register-applying">
+            <span>
+              Applying to <strong>{chosen.code}</strong>
+              {chosen.name && chosen.name !== chosen.code ? ` — ${chosen.name}` : ''} · {form.grade_level_enrollment}
+            </span>
+            <small>You can change the grade level or program below.</small>
+          </p>
+        ) : null}
         <div className="register-grid-3">
           <label className="form-field">
             Last name
@@ -157,39 +180,40 @@ export default function RegisterPage() {
             <FieldError errors={fieldErrors} name="contact_number" />
           </label>
           <label className="form-field">
-            Grade level
-            <input value={form.grade_level_enrollment} readOnly />
-            <span className="auth-hint">
-              {form.grade_level_enrollment
-                ? `Locked to ${form.grade_level_enrollment} for this program.`
-                : 'Grade locks when you choose a Grade 12 strand or Grade 11 cluster.'}
-            </span>
+            Gender
+            <select name="gender" value={form.gender} onChange={update} required>
+              <option value="">Select gender</option>
+              {GENDER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <FieldError errors={fieldErrors} name="gender" />
           </label>
         </div>
-        <label className="form-field">
-          Program
-          <select name="program" value={form.program} onChange={update} required>
-            <option value="">Select program</option>
-            <optgroup label="Grade 12 Strands">
-              {programs
-                .filter((item) => item.grade_level === 'Grade 12')
-                .map((program) => (
-                  <option key={program.code} value={program.code}>
-                    {program.code} — {program.name}
-                  </option>
-                ))}
-            </optgroup>
-            <optgroup label="Grade 11 Cluster Programs">
-              {programs
-                .filter((item) => item.grade_level === 'Grade 11')
-                .map((program) => (
-                  <option key={program.code} value={program.code}>
-                    {program.code} — {program.name}
-                  </option>
-                ))}
-            </optgroup>
-          </select>
-        </label>
+        <div className="register-grid-2">
+          <label className="form-field">
+            Grade level
+            <select name="grade_level_enrollment" value={form.grade_level_enrollment} onChange={update} required>
+              <option value="">Select grade level</option>
+              <option value="Grade 11">Grade 11</option>
+              <option value="Grade 12">Grade 12</option>
+            </select>
+          </label>
+          <label className="form-field">
+            Program
+            <select name="program" value={form.program} onChange={update} required disabled={!form.grade_level_enrollment}>
+              <option value="">{form.grade_level_enrollment ? 'Select program' : 'Choose a grade level first'}</option>
+              {programs.map((program) => (
+                <option key={program.code} value={program.code}>
+                  {program.code} — {program.name}
+                </option>
+              ))}
+            </select>
+            <FieldError errors={fieldErrors} name="program" />
+          </label>
+        </div>
         <label className="form-field">
           Address
           <textarea name="address" rows={3} value={form.address} onChange={update} maxLength={255} required />

@@ -9,22 +9,31 @@ from apps.grading.recommend import RecommendationContext, recommend_payload
 from apps.people.models import StudentSection, TeacherAssignment
 from apps.school.labels import section_label
 from apps.school.models import SchoolYear, Section, Term
+from apps.school.term_plan import TermPlan
+
+LOG_LIMIT = 200
 
 
 class GradeHistoryListView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        rows = (
-            GradeHistory.objects.select_related(
-                'grade__student__user',
-                'grade__subject',
-                'grade__term',
-                'grade__school_year',
-                'grade__section',
-                'changed_by',
-            ).order_by('-changed_at')[:200]
+        """Latest score changes, optionally narrowed to ?school_year= and ?term=."""
+        rows = GradeHistory.objects.select_related(
+            'grade__student__user',
+            'grade__subject',
+            'grade__term',
+            'grade__school_year',
+            'grade__section',
+            'changed_by',
         )
+        year_id = request.query_params.get('school_year')
+        term_id = request.query_params.get('term')
+        if year_id:
+            rows = rows.filter(grade__school_year_id=year_id)
+        if term_id:
+            rows = rows.filter(grade__term_id=term_id)
+        rows = rows.order_by('-changed_at')[:LOG_LIMIT]
         return Response(
             [
                 {
@@ -81,9 +90,22 @@ class GradeReportView(APIView):
 
         payload = []
         context = RecommendationContext()
+        plan = TermPlan(year.id)
         for section in sections:
             program_code = section.program.code if section.program_id else None
-            subjects = section_subject_assignments(section)
+            graded_ids = (
+                set(Grade.objects.filter(section=section, term=term).values_list('subject_id', flat=True))
+                if term
+                else set()
+            )
+            # Only the subjects that run this term (plus any that already hold grades in it).
+            subjects = [
+                row
+                for row in section_subject_assignments(section)
+                if term is None
+                or row.subject_id in graded_ids
+                or plan.runs_in(section.program_id, row.subject_id, term.number)
+            ]
             subject_ids = [row.subject_id for row in subjects]
             roster = list(
                 StudentSection.objects.filter(section=section, school_year=year, is_active=True)

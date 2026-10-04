@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { useAccessSummary } from '../../components/Access/useAccessSummary';
 import DashboardShell from '../../components/Sidebar/DashboardShell';
 import { fetchNotifications } from '../../services/studentService';
 import '../admin/AdminChrome.css';
@@ -7,6 +8,7 @@ import '../../styles/studio.css';
 
 export default function HeadLayout() {
   const [unread, setUnread] = useState(0);
+  const access = useAccessSummary();
 
   useEffect(() => {
     fetchNotifications()
@@ -24,10 +26,13 @@ export default function HeadLayout() {
       links={[
         { to: '/head', label: 'Overview', icon: 'home', end: true },
         { to: '/head/year', label: 'School year', icon: 'year' },
+        { to: '/head/term-plan', label: 'Term plan', icon: 'termplan' },
         { to: '/head/sections', label: 'Section management', icon: 'sections' },
         { to: '/head/approve', label: 'Approve grades', icon: 'approve' },
         { to: '/head/corrections', label: 'Corrections', icon: 'corrections' },
         { to: '/head/archive', label: 'Archive', icon: 'archive' },
+        { to: '/head/access', label: 'Access', icon: 'access', badge: access.inbox || null },
+        ...(access.holds ? [{ to: '/head/my-access', label: 'My access', icon: 'access' }] : []),
         { to: '/head/notifications', label: 'Notifications', icon: 'bell', badge: unread || null },
         { to: '/head/events', label: 'Events', icon: 'year' },
       ]}

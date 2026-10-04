@@ -10,23 +10,6 @@ from apps.school.models import SchoolYear, Section
 from apps.school.purge import purge_school_year, purge_section, section_delete_summary, year_delete_summary
 
 
-class SectionPurgeSummaryView(APIView):
-    permission_classes = [IsAuthenticated, IsHeadTeacher]
-
-    def get(self, request, pk):
-        section = get_object_or_404(Section.objects.select_related('program', 'school_year'), pk=pk)
-        summary = section_delete_summary(section)
-        return Response(
-            {
-                'id': section.id,
-                'label': section_label(section),
-                'archived': bool(section.archived_at),
-                'summary': summary,
-                'grades_protected': summary['grades'] > 0,
-            }
-        )
-
-
 class SectionPurgeView(APIView):
     permission_classes = [IsAuthenticated, IsHeadTeacher]
 
@@ -54,23 +37,6 @@ class SectionPurgeView(APIView):
             details={'reason': reason, **summary},
         )
         return Response({'id': pk, 'deleted': True})
-
-
-class SchoolYearPurgeSummaryView(APIView):
-    permission_classes = [IsAuthenticated, IsHeadTeacher]
-
-    def get(self, request, pk):
-        year = get_object_or_404(SchoolYear, pk=pk)
-        summary = year_delete_summary(year)
-        return Response(
-            {
-                'id': year.id,
-                'label': year.label,
-                'archived': bool(year.archived_at),
-                'summary': summary,
-                'grades_protected': summary['grades'] > 0,
-            }
-        )
 
 
 class SchoolYearPurgeView(APIView):

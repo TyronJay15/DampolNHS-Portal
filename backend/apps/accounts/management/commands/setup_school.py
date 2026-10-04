@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from apps.accounts.models import User
-from apps.chatbot.models import FaqEntry
+from apps.chatbot.seeds import seed_faqs
 from apps.cms import defaults as cms_defaults
 from apps.cms.models import SiteContent
 from apps.ml.intent import train_intent
@@ -15,53 +15,7 @@ from apps.school.offerings import (
     seed_programs,
     sync_subject_catalog,
 )
-
-FAQS = [
-    (
-        'registration',
-        'register, sign up, create account, registration',
-        'How do I register?',
-        'Open Register, complete the student form, and submit. Your account stays pending until an administrator approves it.',
-    ),
-    (
-        'programs',
-        'stem, abm, humss, ict, he, cluster, program, strand',
-        'What programs are offered?',
-        # The live program list is added by the chatbot from the Program table.
-        'See every program and its subjects on the Programs page, then click Register Now.',
-    ),
-    (
-        'login',
-        'login, sign in, lrn, email, password',
-        'How do I log in?',
-        'Students sign in with LRN and password. Teachers and administrators sign in with school email and password.',
-    ),
-    (
-        'approval',
-        'pending, approval, approved, rejected, waiting',
-        'Why is my account pending?',
-        'New student accounts wait for administrator review. You cannot sign in until the account is approved.',
-    ),
-    (
-        'grades',
-        'grades, report card, approved, released',
-        'When can I see my grades?',
-        'Students only see grades after the Head Teacher approves them and the adviser shows the report card.',
-    ),
-    (
-        'contact',
-        'contact, facebook, deped, phone, email, address',
-        'How do I contact the school?',
-        'Use the Contact page. Official DepEd and school Facebook links are listed there.',
-    ),
-    (
-        'events',
-        'event, events, calendar, activity, upcoming',
-        'Where do I see upcoming events?',
-        'Upcoming events appear on the dashboards after you sign in. Public news stays on the Announcements page.',
-    ),
-]
-
+from apps.school.term_plan import seed_year_plan
 
 class Command(BaseCommand):
     help = 'Create the first admin, current school year, programs, and default CMS copy.'
@@ -94,6 +48,7 @@ class Command(BaseCommand):
         seed_matching_exclusions()
         seed_college_programs()
         carry_forward(year)
+        seed_year_plan(year)
 
         admin, created = User.objects.get_or_create(
             email='admin@dampol1nhs.edu.ph',
@@ -131,16 +86,7 @@ class Command(BaseCommand):
             defaults={'payload': cms_defaults.FOOTER},
         )
 
-        # Create missing FAQs only; answers edited by staff are kept.
-        for topic, keywords, question, answer in FAQS:
-            FaqEntry.objects.get_or_create(
-                question=question,
-                defaults={
-                    'topic': topic,
-                    'keywords': keywords,
-                    'answer': answer,
-                },
-            )
+        seed_faqs()
 
         try:
             train_intent()

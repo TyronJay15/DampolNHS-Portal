@@ -6,6 +6,7 @@ from apps.school.curriculum import GRADE_LEVELS, curriculum_for, set_year_curric
 from apps.school.models import Curriculum, Program, ProgramSubject, SchoolYear, Section, SkillDomain, Subject, Term
 from apps.school.offerings import replace_program_subjects, subject_payloads_for_program
 from apps.school.program_catalog import extra_for, grade_for
+from apps.school.term_plan import clean_terms
 
 CODE_RE = re.compile(r'^[A-Z0-9]{2,16}$')
 
@@ -15,6 +16,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     subjects = serializers.SerializerMethodField()
     pathways = serializers.SerializerMethodField()
     grade_level = serializers.SerializerMethodField()
+    curriculum = serializers.SerializerMethodField()
 
     class Meta:
         model = Program
@@ -30,25 +32,27 @@ class ProgramSerializer(serializers.ModelSerializer):
             'subjects',
             'pathways',
             'grade_level',
+            'curriculum',
         )
 
     def get_track(self, obj):
         return obj.track or extra_for(obj.code).get('track', '')
 
     def get_subjects(self, obj):
+        """Public subject list. Default terms are internal planning data, so they are left out."""
         rows = subject_payloads_for_program(obj)
         if rows:
-            return rows
-        return [
-            {'id': None, 'code': '', 'name': name, 'kind': '', 'term': None}
-            for name in extra_for(obj.code).get('subjects', [])
-        ]
+            return [{key: value for key, value in row.items() if key != 'terms'} for row in rows]
+        return [{'id': None, 'code': '', 'name': name, 'kind': ''} for name in extra_for(obj.code).get('subjects', [])]
 
     def get_pathways(self, obj):
         return obj.pathways or extra_for(obj.code).get('pathways', [])
 
     def get_grade_level(self, obj):
         return obj.grade_level or grade_for(obj.code)
+
+    def get_curriculum(self, obj):
+        return obj.curriculum.name if obj.curriculum_id else ''
 
 
 class AdminProgramSerializer(serializers.ModelSerializer):
@@ -135,20 +139,14 @@ class AdminProgramSerializer(serializers.ModelSerializer):
             kind = item.get('kind') or ProgramSubject.Kind.CORE
             if kind not in ProgramSubject.Kind.values:
                 raise serializers.ValidationError({'subjects': 'Choose core, elective, applied, or specialized.'})
-            term = item.get('term')
-            if term in ('', None):
-                term = None
-            else:
-                try:
-                    term = int(term)
-                except (TypeError, ValueError) as exc:
-                    raise serializers.ValidationError({'subjects': 'Term must be 1, 2, 3, or blank.'}) from exc
-                if term < 1 or term > 3:
-                    raise serializers.ValidationError({'subjects': 'Term must be 1, 2, or 3.'})
+            try:
+                terms = clean_terms(item.get('terms') or [])
+            except ValueError as exc:
+                raise serializers.ValidationError({'subjects': 'Default terms must be 1, 2, or 3.'}) from exc
             if subject_id in seen:
                 raise serializers.ValidationError({'subjects': 'A subject can only appear once.'})
             seen.add(subject_id)
-            cleaned.append({'subject_id': subject_id, 'kind': kind, 'term': term})
+            cleaned.append({'subject_id': subject_id, 'kind': kind, 'terms': terms})
         found = set(Subject.objects.filter(id__in=seen, is_active=True).values_list('id', flat=True))
         if seen - found:
             raise serializers.ValidationError({'subjects': 'One or more subjects are not in the catalog.'})

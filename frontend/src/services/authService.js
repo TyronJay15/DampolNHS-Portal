@@ -9,16 +9,21 @@ export async function login({ identifier, password, recaptcha_token }) {
   return data.user;
 }
 
+// Revokes the refresh token on the server, then always clears both tokens here. Returns false only when the
+// server could not be told, so the screen can say the sign-out happened on this device only.
 export async function logout() {
   const refresh = localStorage.getItem('refreshToken');
+  let confirmed = true;
   try {
     if (refresh) {
       await apiRequest('/auth/logout/', { method: 'POST', auth: true, body: { refresh } });
     }
   } catch {
     // Local sign-out still proceeds.
+    confirmed = false;
   }
   clearTokens();
+  return confirmed;
 }
 
 export async function fetchMe() {

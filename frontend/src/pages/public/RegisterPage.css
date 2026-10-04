@@ -18,6 +18,24 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Shown when the student arrives from a program's "Apply" button. */
+.register-applying {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.95rem;
+  border-left: 4px solid var(--lp-green-600);
+  border-radius: 10px;
+  background: #eef4f0;
+  color: var(--lp-green-900);
+  font-size: 0.95rem;
+}
+
+.register-applying small {
+  color: #5a6b60;
+  font-size: 0.8rem;
+}
+
 .register-consent {
   display: flex;
   gap: 0.55rem;

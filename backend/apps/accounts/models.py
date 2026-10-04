@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
+from django.utils import timezone
 
 
 class PortalUserManager(UserManager):
@@ -87,12 +88,17 @@ class StudentProfile(models.Model):
         on_delete=models.CASCADE,
         related_name='student_profile',
     )
+    class Gender(models.TextChoices):
+        FEMALE = 'female', 'Female'
+        MALE = 'male', 'Male'
+        PREFER_NOT_TO_SAY = 'prefer_not_to_say', 'Prefer not to say'
+
     lrn = models.CharField(max_length=32, unique=True, db_index=True)
     middle_name = models.CharField(max_length=100, blank=True)
     contact_number = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
     birthdate = models.DateField(null=True, blank=True)
-    gender = models.CharField(max_length=32, blank=True)
+    gender = models.CharField(max_length=32, blank=True, choices=Gender.choices)
     guardian_name = models.CharField(max_length=120, blank=True)
     guardian_contact = models.CharField(max_length=20, blank=True)
     grade_level = models.CharField(max_length=32, blank=True, db_index=True)
@@ -141,8 +147,67 @@ class EmailCode(models.Model):
     code_hash = models.CharField(max_length=128)
     expires_at = models.DateTimeField()
     used_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0, help_text='Wrong guesses so far; too many cancel the code.')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'accounts_email_codes'
         ordering = ['-created_at']
+
+
+class MailOutbox(models.Model):
+    """Every portal email. Registration results wait here for the sender (see apps.accounts.outbox).
+
+    Mail sent at once, such as codes, is logged without its body so the daily Brevo budget counts
+    everything. A queued body is cleared once it is sent. Activation rows also record failures and
+    are kept, so the Admin can see how many codes each staff member was sent.
+    """
+
+    class Kind(models.TextChoices):
+        REGISTRATION = 'registration', 'Registration result'
+        ACTIVATION = 'activation', 'Activation code'
+        CODE = 'code', 'Password code'
+        NOTICE = 'notice', 'Account notice'
+
+    class Status(models.TextChoices):
+        QUEUED = 'queued', 'Queued'
+        SENDING = 'sending', 'Sending'
+        SENT = 'sent', 'Sent'
+        FAILED = 'failed', 'Failed'
+
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.QUEUED)
+    to_email = models.EmailField()
+    subject = models.CharField(max_length=200)
+    body = models.TextField(blank=True)
+    registration = models.ForeignKey(
+        'people.Registration',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='emails',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='mail_rows',
+    )
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.CharField(max_length=255, blank=True)
+    next_attempt_at = models.DateTimeField(default=timezone.now)
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'accounts_mail_outbox'
+        ordering = ['id']
+        indexes = [
+            models.Index(fields=['status', 'next_attempt_at'], name='mail_outbox_due'),
+            models.Index(fields=['sent_at'], name='mail_outbox_sent_at'),
+        ]
+
+    def __str__(self):
+        return f'{self.kind} to {self.to_email} ({self.status})'

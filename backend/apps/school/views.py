@@ -4,11 +4,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 
-from apps.accounts.permissions import IsAdminOrHeadTeacher, IsHeadTeacher, IsStaffUser
+from apps.access.permissions import filter_levels, reading_levels, role_or_tagged
+from apps.accounts.models import User
+from apps.accounts.permissions import IsHeadTeacher, IsStaffUser
 from apps.audit import services as audit
 from apps.audit.models import AuditLog
 from apps.notifications.services import notify, teachers_for_year
-from apps.school.curriculum import carry_forward
+from apps.people.scope import require_grade_in_scope
+from apps.school.curriculum import carry_forward, programs_for
 from apps.school.models import Program, SchoolYear, Section, Subject, Term
 from apps.school.serializers import (
     ProgramSerializer,
@@ -17,6 +20,11 @@ from apps.school.serializers import (
     SubjectSerializer,
     TermSerializer,
 )
+from apps.school.term_plan import seed_year_plan
+
+
+# Teachers tagged for these activities read the section list (read only, within their levels).
+SECTION_READERS = ('prepare_placements', 'prepare_assignments')
 
 
 class ProgramViewSet(ReadOnlyModelViewSet):
@@ -24,9 +32,21 @@ class ProgramViewSet(ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
     authentication_classes = []
     pagination_class = None
-    queryset = Program.objects.filter(is_active=True).prefetch_related(
-        'program_subjects__subject',
-    )
+
+    def get_queryset(self):
+        """Active programs. ?grade_level= keeps only those offered at that grade in the current year."""
+        rows = (
+            Program.objects.filter(is_active=True)
+            .select_related('curriculum')
+            .prefetch_related('program_subjects__subject')
+        )
+        grade_level = self.request.query_params.get('grade_level', '').strip()
+        if not grade_level:
+            return rows
+        if grade_level not in Program.GradeLevel.values:
+            return rows.none()
+        year = SchoolYear.objects.filter(is_current=True, archived_at__isnull=True).first()
+        return rows.filter(pk__in=programs_for(year, grade_level).values('pk'))
 
 
 class SchoolYearViewSet(ModelViewSet):
@@ -40,11 +60,14 @@ class SchoolYearViewSet(ModelViewSet):
         return SchoolYear.objects.filter(archived_at__isnull=True)
 
     def get_permissions(self):
-        return [IsAuthenticated(), IsAdminOrHeadTeacher()]
+        # A teacher tagged to prepare the term plan may read the list of years.
+        allowed = role_or_tagged((User.Role.ADMIN, User.Role.HEAD_TEACHER), 'prepare_term_plan')
+        return [IsAuthenticated(), allowed()]
 
     def perform_create(self, serializer):
         year = serializer.save()
         carry_forward(year)
+        seed_year_plan(year)
         for number in (1, 2, 3):
             Term.objects.get_or_create(
                 school_year=year,
@@ -156,9 +179,9 @@ class SubjectViewSet(ReadOnlyModelViewSet):
 
 class SectionViewSet(ModelViewSet):
     serializer_class = SectionSerializer
-    permission_classes = [IsAuthenticated, IsHeadTeacher]
+    permission_classes = [IsAuthenticated, role_or_tagged(User.Role.HEAD_TEACHER, *SECTION_READERS)]
     pagination_class = None
-    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+    http_method_names = ['get', 'post', 'patch', 'head', 'options']
 
     def get_queryset(self):
         rows = Section.objects.select_related('school_year', 'program')
@@ -181,9 +204,10 @@ class SectionViewSet(ModelViewSet):
                 rows = rows.filter(program_id=program)
             else:
                 rows = rows.filter(program__code=str(program).upper())
-        return rows
+        return filter_levels(rows, reading_levels(self.request.user, *SECTION_READERS))
 
     def perform_create(self, serializer):
+        require_grade_in_scope(self.request.user, serializer.validated_data.get('grade_level'))
         section = serializer.save(status=Section.Status.DRAFT)
         audit.record(
             user=self.request.user,
@@ -200,25 +224,3 @@ class SectionViewSet(ModelViewSet):
             from apps.school.section_progress import recompute_status
 
             recompute_status(section)
-
-    def destroy(self, request, *args, **kwargs):
-        section = self.get_object()
-        if section.student_assignments.exists() or section.teacher_assignments.exists():
-            return Response({'detail': 'Remove or archive a section that has students or duties.'}, status=400)
-        from apps.grading.models import Grade
-
-        if Grade.objects.filter(section=section).exists():
-            return Response({'detail': 'Archive a section that has grades.'}, status=400)
-        if not section.archived_at and section.status == Section.Status.ACTIVE:
-            return Response({'detail': 'Archive this section before deleting it.'}, status=400)
-        label = section.name
-        section_id = section.id
-        section.delete()
-        audit.record(
-            user=request.user,
-            action='section_deleted',
-            summary=f'Deleted section {label}',
-            target_type='Section',
-            target_id=section_id,
-        )
-        return Response(status=204)

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useProposal } from '../../../components/Access/proposalContext';
+import { useConfirm } from '../../../components/ConfirmDialog/useConfirm';
 import LineMark from '../../../components/LineMark/LineMark';
 import Loading from '../../../components/Loading/Loading';
 import FieldLabel from './FieldLabel';
 import {
   createAnnouncement,
   deleteAnnouncement,
+  deleteCmsPhoto,
   fetchAnnouncementsAdmin,
   updateAnnouncement,
 } from '../../../services/cmsService';
@@ -40,6 +43,9 @@ function announcementPayload(form) {
 }
 
 export default function AdminCmsNewsPage() {
+  const confirm = useConfirm();
+  // Set when someone tagged to post news opens this page: every change becomes a request to the Admin.
+  const proposal = useProposal();
   const [rows, setRows] = useState([]);
   const [form, setForm] = useState(EMPTY);
   const [message, setMessage] = useState('');
@@ -56,8 +62,39 @@ export default function AdminCmsNewsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Proposal mode: send the change to the Admin; resolves to true when it was submitted.
+  async function propose(payload, title, warning) {
+    setError('');
+    setMessage('');
+    try {
+      const sent = await proposal.propose(payload, { title, warning });
+      if (sent) setMessage('Sent to the Admin for approval. Follow it under My access.');
+      return Boolean(sent);
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  }
+
   async function handleCreate(event) {
     event.preventDefault();
+    if (proposal) {
+      const kind = form.kind === 'event' ? 'event' : 'announcement';
+      const sent = await propose(
+        { action: 'create', fields: announcementPayload(form) },
+        `Propose this ${kind}${form.is_published ? ' for publishing' : ' as a draft'}?`,
+      );
+      if (sent) setForm(EMPTY);
+      return;
+    }
+    if (form.is_published) {
+      const answer = await confirm({
+        title: `Publish this ${form.kind === 'event' ? 'event' : 'announcement'}?`,
+        body: 'It appears on the public website as soon as you confirm.',
+        confirmLabel: 'Publish',
+      });
+      if (!answer) return;
+    }
     setError('');
     try {
       await createAnnouncement(announcementPayload(form));
@@ -70,6 +107,22 @@ export default function AdminCmsNewsPage() {
   }
 
   async function togglePublish(row) {
+    const publishing = !row.is_published;
+    if (proposal) {
+      return propose(
+        { action: 'update', announcement: row.id, fields: { is_published: publishing } },
+        `Propose ${publishing ? 'publishing' : 'unpublishing'} "${row.title}"?`,
+      );
+    }
+    const answer = await confirm({
+      title: publishing ? `Publish "${row.title}"?` : `Unpublish "${row.title}"?`,
+      body: publishing
+        ? 'It appears on the public website as soon as you confirm.'
+        : 'It is removed from the public website but stays here as a draft.',
+      confirmLabel: publishing ? 'Publish' : 'Unpublish',
+      tone: publishing ? 'standard' : 'warning',
+    });
+    if (!answer) return;
     setError('');
     try {
       await updateAnnouncement(row.id, { is_published: !row.is_published });
@@ -80,6 +133,15 @@ export default function AdminCmsNewsPage() {
   }
 
   async function savePhoto(row, image) {
+    if (proposal) {
+      const sent = await propose(
+        { action: 'update', announcement: row.id, fields: { image } },
+        `Propose a new photo for "${row.title}"?`,
+      );
+      // A cancelled proposal leaves the just-uploaded photo unused, so it is removed again.
+      if (!sent && image) await deleteCmsPhoto(image).catch(() => {});
+      return;
+    }
     setError('');
     try {
       await updateAnnouncement(row.id, { image });
@@ -90,6 +152,20 @@ export default function AdminCmsNewsPage() {
   }
 
   async function remove(row) {
+    if (proposal) {
+      return propose(
+        { action: 'delete', announcement: row.id },
+        `Propose deleting "${row.title}"?`,
+        'If the Admin approves, the post is removed permanently.',
+      );
+    }
+    const answer = await confirm({
+      title: `Delete "${row.title}"?`,
+      body: 'It is removed from the website and from this list permanently. This cannot be undone.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!answer) return;
     setError('');
     try {
       await deleteAnnouncement(row.id);
@@ -119,10 +195,14 @@ export default function AdminCmsNewsPage() {
         <p>{row.body}</p>
         <div className="cms-news-actions">
           <button className="btn" type="button" onClick={() => togglePublish(row)}>
-            {row.is_published ? 'Unpublish' : 'Publish'}
+            {proposal
+              ? `Propose ${row.is_published ? 'unpublish' : 'publish'}`
+              : row.is_published
+                ? 'Unpublish'
+                : 'Publish'}
           </button>
           <button className="btn btn-danger" type="button" onClick={() => remove(row)}>
-            Delete
+            {proposal ? 'Propose delete' : 'Delete'}
           </button>
         </div>
       </article>
@@ -207,7 +287,7 @@ export default function AdminCmsNewsPage() {
           </label>
           <div className="cms-save">
             <button className="btn" type="submit">
-              Add announcement
+              {proposal ? 'Submit for approval' : 'Add announcement'}
             </button>
           </div>
         </form>

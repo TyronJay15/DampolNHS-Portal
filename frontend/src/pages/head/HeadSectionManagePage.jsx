@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
@@ -27,6 +28,7 @@ function statusClass(status) {
 }
 
 export default function HeadSectionManagePage() {
+  const confirm = useConfirm();
   const [years, setYears] = useState([]);
   const [programs, setPrograms] = useState([]);
   const [sections, setSections] = useState([]);
@@ -36,7 +38,6 @@ export default function HeadSectionManagePage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [query, setQuery] = useState('');
   const [form, setForm] = useState({ name: '', grade_level: 'Grade 11', program: '', school_year: '', capacity: 40 });
-  const [archiveTarget, setArchiveTarget] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -126,14 +127,19 @@ export default function HeadSectionManagePage() {
     }
   }
 
-  async function confirmArchive() {
-    if (!archiveTarget) return;
-    setBusy(`archive-${archiveTarget.id}`);
+  async function handleArchive(row) {
+    const answer = await confirm({
+      title: `Archive ${sectionLabel(row)}?`,
+      body: 'It leaves this list and appears under Archive → Sections. Student and grade history stay protected.',
+      confirmLabel: 'Archive section',
+      tone: 'warning',
+    });
+    if (!answer) return;
+    setBusy(`archive-${row.id}`);
     setError('');
     try {
-      await archiveSection(archiveTarget.id);
-      setMessage(`${sectionLabel(archiveTarget)} archived. It now appears under Archive → Sections.`);
-      setArchiveTarget(null);
+      await archiveSection(row.id);
+      setMessage(`${sectionLabel(row)} archived. It now appears under Archive → Sections.`);
       await load();
     } catch (err) {
       setError(err.message);
@@ -289,7 +295,7 @@ export default function HeadSectionManagePage() {
                         <Link className="btn" to={`/head/sections/${row.id}/setup`}>
                           {row.status === 'active' ? 'View' : 'Setup'}
                         </Link>
-                        <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => setArchiveTarget(row)}>
+                        <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => handleArchive(row)}>
                           Archive
                         </button>
                       </div>
@@ -309,24 +315,6 @@ export default function HeadSectionManagePage() {
           </div>
         </div>
       </section>
-
-      {archiveTarget ? (
-        <div className="studio-modal-backdrop">
-          <div className="card studio-panel studio-modal">
-            <h2>Archive section</h2>
-            <p>
-              Archive <strong>{sectionLabel(archiveTarget)}</strong>? It will leave this list and appear under Archive → Sections.
-              Student and grade history stay protected.
-            </p>
-            <div className="studio-actions">
-              <button className="btn btn-secondary" type="button" onClick={() => setArchiveTarget(null)}>Cancel</button>
-              <button className="btn" type="button" onClick={confirmArchive} disabled={busy === `archive-${archiveTarget.id}`}>
-                {busy === `archive-${archiveTarget.id}` ? 'Archiving…' : 'Archive section'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

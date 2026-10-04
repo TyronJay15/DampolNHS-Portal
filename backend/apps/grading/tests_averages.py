@@ -130,7 +130,7 @@ class StudentCardAverageTests(TestCase):
             program=self.program,
             subject=elective,
             kind=ProgramSubject.Kind.ELECTIVE,
-            term=2,
+            terms=[2],
         )
         self._grade(elective, 2, '92.00')
 

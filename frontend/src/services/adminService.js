@@ -9,6 +9,18 @@ export function approveRegistration(id) {
   return apiRequest(`/admin/registrations/${id}/approve/`, { method: 'POST', auth: true, body: {} });
 }
 
+export function approveRegistrationsBulk(ids) {
+  return apiRequest('/admin/registrations/approve-bulk/', { method: 'POST', auth: true, body: { ids } });
+}
+
+export function fetchRegistrationEmails() {
+  return apiRequest('/admin/registrations/emails/', { auth: true });
+}
+
+export function resendRegistrationEmails() {
+  return apiRequest('/admin/registrations/emails/resend/', { method: 'POST', auth: true, body: {} });
+}
+
 export function rejectRegistration(id, reason) {
   return apiRequest(`/admin/registrations/${id}/reject/`, {
     method: 'POST',
@@ -41,6 +53,14 @@ export function restoreSchoolYear(id) {
 
 export function deleteSchoolYear(id) {
   return apiRequest(`/school-years/${id}/delete/`, { method: 'DELETE', auth: true });
+}
+
+export function fetchTermPlan(yearId) {
+  return apiRequest(`/school-years/${yearId}/term-plan/`, { auth: true });
+}
+
+export function saveTermPlan(yearId, rows) {
+  return apiRequest(`/school-years/${yearId}/term-plan/`, { method: 'PUT', auth: true, body: { rows } });
 }
 
 export function fetchGradeQueues(termId) {
@@ -118,28 +138,12 @@ export function saveSection(id, payload) {
   return apiRequest(`/sections/${id}/`, { method: 'PATCH', auth: true, body: payload });
 }
 
-export function deleteSection(id) {
-  return apiRequest(`/sections/${id}/`, { method: 'DELETE', auth: true });
-}
-
-export function fetchSectionPurgeSummary(id) {
-  return apiRequest(`/sections/${id}/purge/summary/`, { auth: true });
-}
-
 export function purgeSection(id, payload = {}) {
   return apiRequest(`/sections/${id}/purge/`, { method: 'POST', auth: true, body: payload });
 }
 
-export function fetchSchoolYearPurgeSummary(id) {
-  return apiRequest(`/school-years/${id}/purge/summary/`, { auth: true });
-}
-
 export function purgeSchoolYear(id, payload = {}) {
   return apiRequest(`/school-years/${id}/purge/`, { method: 'POST', auth: true, body: payload });
-}
-
-export function fetchSectionRoster(id) {
-  return apiRequest(`/sections/${id}/roster/`, { auth: true });
 }
 
 export function archiveSection(id) {
@@ -211,6 +215,10 @@ export function restoreRejectedToPending(id) {
   return apiRequest(`/admin/accounts/${id}/restore-pending/`, { method: 'POST', auth: true, body: {} });
 }
 
+export function setStudentGender(userId, gender) {
+  return apiRequest(`/admin/accounts/${userId}/gender/`, { method: 'PATCH', auth: true, body: { gender } });
+}
+
 export function removeAccount(id) {
   return apiRequest(`/admin/accounts/${id}/remove/`, { method: 'POST', auth: true, body: {} });
 }
@@ -244,22 +252,30 @@ export function saveTermDeadline(termId, payload) {
   return apiRequest(`/terms/${termId}/`, { method: 'PATCH', auth: true, body: payload });
 }
 
-export function fetchGradeHistory() {
-  return apiRequest('/grades/history/', { auth: true });
-}
-
-export function fetchGradeReport(params = {}) {
+function queryString(params) {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value) query.set(key, value);
   });
-  const suffix = query.toString() ? `?${query}` : '';
-  return apiRequest(`/grades/report/${suffix}`, { auth: true });
+  return query.toString() ? `?${query}` : '';
+}
+
+export function fetchGradeHistory(params = {}) {
+  return apiRequest(`/grades/history/${queryString(params)}`, { auth: true });
+}
+
+export function fetchGradeReport(params = {}) {
+  return apiRequest(`/grades/report/${queryString(params)}`, { auth: true });
 }
 
 export function fetchCorrections(status) {
   const query = status ? `?status=${encodeURIComponent(status)}` : '';
   return apiRequest(`/grades/corrections/${query}`, { auth: true });
+}
+
+// For a teacher tagged to review corrections: other teachers' pending requests in their levels.
+export function fetchCorrectionsToReview() {
+  return apiRequest('/grades/corrections/?review=1', { auth: true });
 }
 
 export function reviewCorrection(id, payload) {

@@ -1,7 +1,8 @@
 import { apiRequest } from './api';
 
-export function fetchPrograms() {
-  return apiRequest('/programs/');
+export function fetchPrograms(gradeLevel = '') {
+  const query = gradeLevel ? `?grade_level=${encodeURIComponent(gradeLevel)}` : '';
+  return apiRequest(`/programs/${query}`);
 }
 
 export function fetchCms() {

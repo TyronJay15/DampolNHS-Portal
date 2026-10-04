@@ -139,6 +139,14 @@
   margin: 0.15rem 0 0.7rem;
 }
 
+/* A waiting button (e.g. the resend countdown) stays readable on the photo. */
+.auth-shell .btn-secondary:disabled {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .auth-shell .btn-ghost {
   margin-top: 0.75rem;
   background: transparent;
@@ -162,6 +170,55 @@
 
 .auth-shell .recaptcha-label {
   color: #f4f7f5;
+}
+
+/* Step trail for multi-step forms (forgot password). */
+.auth-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 1.1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-steps li {
+  display: grid;
+  place-items: center;
+  min-height: 2.3rem;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.auth-steps li.is-active {
+  border-color: transparent;
+  background: #ffd700;
+  color: #1b2a14;
+}
+
+.auth-steps li.is-done {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.auth-link-button {
+  display: block;
+  margin: 0 auto;
+  padding: 0.3rem;
+  border: 0;
+  background: none;
+  color: #fff4c4;
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .auth-foot {

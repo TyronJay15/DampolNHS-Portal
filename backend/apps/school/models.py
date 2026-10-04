@@ -188,21 +188,44 @@ class ProgramSubject(models.Model):
     program = models.ForeignKey(Program, on_delete=models.CASCADE, related_name='program_subjects')
     subject = models.ForeignKey(Subject, on_delete=models.PROTECT, related_name='program_links')
     kind = models.CharField(max_length=16, choices=Kind.choices)
-    term = models.PositiveSmallIntegerField(null=True, blank=True)
+    terms = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Default term numbers (1-3) the subject runs in; empty means every term. '
+        'Each school year copies this into its own term plan.',
+    )
 
     class Meta:
         db_table = 'school_program_subjects'
         ordering = ['program', 'kind', 'subject__name']
         constraints = [
             models.UniqueConstraint(fields=['program', 'subject'], name='unique_subject_per_program'),
-            models.CheckConstraint(
-                condition=models.Q(term__isnull=True) | (models.Q(term__gte=1) & models.Q(term__lte=3)),
-                name='program_subject_term_1_to_3',
-            ),
         ]
 
     def __str__(self):
         return f'{self.program.code} {self.subject.code}'
+
+
+class SubjectTermPlan(models.Model):
+    """The terms a program subject runs in for one school year. Set by the head teacher."""
+
+    school_year = models.ForeignKey(SchoolYear, on_delete=models.CASCADE, related_name='term_plans')
+    program = models.ForeignKey(Program, on_delete=models.CASCADE, related_name='term_plans')
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='term_plans')
+    terms = models.JSONField(default=list, help_text='Term numbers (1-3) the subject runs in this year.')
+
+    class Meta:
+        db_table = 'school_subject_term_plans'
+        ordering = ['school_year', 'program', 'subject__name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['school_year', 'program', 'subject'],
+                name='one_term_plan_per_year_program_subject',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.school_year.label} {self.program.code} {self.subject.code}: {self.terms}'
 
 
 class Section(models.Model):

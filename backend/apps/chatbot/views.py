@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.ml.gemini import phrase_answer
-from apps.ml.intent import FALLBACK, answers_for, classify_question, school_pack
+from apps.ml.intent import FALLBACK, answers_for, classify_question, matching_faq_answer, school_pack
 from apps.ml.models import ChatQuestion
 
 
@@ -29,7 +29,7 @@ class ChatbotAskView(APIView):
                 answer = written
                 source = 'gemini'
             else:
-                answer = answers[0]
+                answer = matching_faq_answer(question, topic) or answers[0]
                 source = 'faq'
 
         ChatQuestion.objects.create(

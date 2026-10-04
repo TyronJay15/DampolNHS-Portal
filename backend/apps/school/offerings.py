@@ -64,7 +64,7 @@ def _seed_empty_program_subjects():
         subject = subjects.get(subject_code)
         if program is None or subject is None:
             continue
-        ProgramSubject.objects.create(program=program, subject=subject, kind=kind, term=term)
+        ProgramSubject.objects.create(program=program, subject=subject, kind=kind, terms=[term] if term else [])
         created += 1
     return created
 
@@ -140,7 +140,7 @@ def replace_program_subjects(program, rows):
                 program=program,
                 subject_id=row['subject_id'],
                 kind=row['kind'],
-                term=row['term'],
+                terms=row['terms'],
             )
             for row in rows
         ]
@@ -153,7 +153,7 @@ def subject_rows_for_program(program):
     return list(
         ProgramSubject.objects.filter(program=program, subject__is_active=True)
         .select_related('subject')
-        .order_by('kind', 'term', 'subject__name')
+        .order_by('kind', 'subject__name')
     )
 
 
@@ -164,7 +164,7 @@ def subject_payloads_for_program(program):
             'code': row.subject.code,
             'name': row.subject.name,
             'kind': row.kind,
-            'term': row.term,
+            'terms': row.terms,
         }
         for row in subject_rows_for_program(program)
     ]

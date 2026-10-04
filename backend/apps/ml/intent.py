@@ -15,6 +15,14 @@ PARAPHRASES = {
         'where do i enroll',
         'start my registration',
         'i want to apply',
+        'how do i enroll in dampol nhs',
+        'paano mag enroll',
+        'paano mag register ng student account',
+        'gusto kong mag apply sa school',
+        'what do i need for student registration',
+        'i submitted my registration what now',
+        'mali ang nailagay ko sa registration',
+        'where can i check my application status',
     ),
     'programs': (
         'what strands are offered',
@@ -22,6 +30,14 @@ PARAPHRASES = {
         'grade 11 clusters',
         'is there ict',
         'list of shs programs',
+        'what programs are available this school year',
+        'where can i see the subjects for a strand',
+        'paano pumili ng shs program',
+        'anong strand ang inooffer ng school',
+        'available ba ang program na ito',
+        'show me the senior high programs',
+        'saan makikita ang subjects ng program',
+        'what are the current school offerings',
     ),
     'login': (
         'cannot sign in',
@@ -29,6 +45,14 @@ PARAPHRASES = {
         'teacher email login',
         'how to enter the portal',
         'sign in page',
+        'how do students log in',
+        'how do teachers sign in',
+        'how can i reset my password',
+        'i forgot my password',
+        'paano mag login sa portal',
+        'nakalimutan ko ang password ko',
+        'hindi ako makapasok sa account',
+        'i did not receive the reset code',
     ),
     'approval': (
         'why am i still pending',
@@ -36,6 +60,21 @@ PARAPHRASES = {
         'my registration is waiting',
         'account not approved yet',
         'rejected application',
+        'how long does account review take',
+        'why is student approval pending',
+        'my application needs admin review',
+        'bakit hindi pa naaapprove ang account',
+        'sino ang nag aapprove ng registration',
+        'what do i do after rejection',
+        'check my student application status',
+        'my account is waiting for approval',
+        'admin has not approved my account',
+        'my student account was rejected',
+        'how long does school approval take',
+        'bakit pending ang account ko',
+        'hindi pa approved ang registration ko',
+        'nareject ang application ko',
+        'who reviews student registrations',
     ),
     'grades': (
         'when will i see my report card',
@@ -43,6 +82,14 @@ PARAPHRASES = {
         'who approves grades',
         'i cannot see my scores',
         'adviser show card',
+        'why is my report card hidden',
+        'a subject grade is missing',
+        'how do i report an incorrect score',
+        'kailan lalabas ang grades ko',
+        'bakit hindi ko makita ang report card',
+        'sino ang nag aapprove ng grades',
+        'one of my subjects has no grade',
+        'my report card is still locked',
     ),
     'contact': (
         'school phone number',
@@ -50,6 +97,14 @@ PARAPHRASES = {
         'where is the campus',
         'email the registrar',
         'how to reach dampol nhs',
+        'where is the school contact page',
+        'what is the school address',
+        'where can i find official school links',
+        'paano kontakin ang paaralan',
+        'saan makikita ang address ng school',
+        'school office contact details',
+        'where can i check office hours',
+        'official facebook link please',
     ),
     'events': (
         'upcoming school events',
@@ -57,8 +112,21 @@ PARAPHRASES = {
         'dashboard events',
         'campus calendar',
         'when is the next event',
+        'where can i read school announcements',
+        'did the school event schedule change',
+        'where do i find activity dates',
+        'ano ang susunod na school event',
+        'saan makikita ang announcements',
+        'is the activity postponed',
+        'latest school news and notices',
+        'where can parents see upcoming activities',
     ),
 }
+
+FAQ_STOP_WORDS = frozenset(
+    'a an and are ba can do does for from how i in is it ko mga ng of on or sa the to what when '
+    'where which who why with you your my ang ano paano po pa ba'.split()
+)
 
 FALLBACK = (
     'I can help with registration, programs, login, account approval, grades, events, and contact information.'
@@ -194,6 +262,34 @@ def answers_for(topic):
         if live:
             rows.insert(0, live)
     return rows
+
+
+def matching_faq_answer(question, topic):
+    """Choose the active FAQ whose question and keywords best match the visitor's wording."""
+    question_terms = {
+        token
+        for token in tokenize(question)
+        if ' ' not in token and token not in FAQ_STOP_WORDS
+    }
+    if not question_terms:
+        return None
+
+    best_entry = None
+    best_score = (0, 0.0)
+    entries = FaqEntry.objects.filter(is_active=True, topic__iexact=topic).order_by('sort_order', 'pk')
+    for entry in entries:
+        faq_terms = {
+            token
+            for text in (entry.question, *entry.keyword_list())
+            for token in tokenize(text)
+            if ' ' not in token and token not in FAQ_STOP_WORDS
+        }
+        overlap = question_terms & faq_terms
+        score = (len(overlap), len(overlap) / len(question_terms))
+        if score > best_score:
+            best_entry = entry
+            best_score = score
+    return best_entry.answer if best_entry else None
 
 
 def school_pack(topic):

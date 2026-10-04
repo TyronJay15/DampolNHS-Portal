@@ -12,8 +12,9 @@ from apps.grading.progress import duty_queue_rows
 from apps.grading.transitions import transition_grades
 from apps.audit.catalog import GRADES
 from apps.notifications.services import advisers_for_section, notify
+from apps.people.scope import head_grade_scope, require_grade_in_scope, scope_by_grade
 from apps.school.labels import section_label
-from apps.school.models import Term
+from apps.school.models import Section, Term
 
 
 def _teacher_tree(rows):
@@ -68,6 +69,10 @@ class GradeQueueView(APIView):
     def get(self, request):
         term = get_object_or_404(Term.objects.select_related('school_year'), pk=request.query_params.get('term'))
         rows = duty_queue_rows(term)
+        scope = head_grade_scope(request.user)
+        if scope is not None:
+            allowed = set(Section.objects.filter(grade_level__in=scope).values_list('id', flat=True))
+            rows = [row for row in rows if row.get('section_id') in allowed]
         return Response(
             {
                 'term': {'id': term.id, 'label': term.label, 'school_year': term.school_year.label},
@@ -115,6 +120,7 @@ def _approve_pending(*, term, user, section_id=None, subject_id=None, teacher_id
         'section__program',
         'section__school_year',
     )
+    pending_qs = scope_by_grade(user, pending_qs, 'section__grade_level')
     if section_id:
         pending_qs = pending_qs.filter(section_id=section_id)
     if subject_id:
@@ -198,6 +204,8 @@ class ReturnGradesView(APIView):
         term = get_object_or_404(Term, pk=request.data.get('term'))
         section_id = request.data.get('section')
         subject_id = request.data.get('subject')
+        section = get_object_or_404(Section, pk=section_id)
+        require_grade_in_scope(request.user, section.grade_level)
         shown = Grade.objects.filter(
             term=term,
             section_id=section_id,

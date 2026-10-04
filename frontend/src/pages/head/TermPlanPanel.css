@@ -1,0 +1,293 @@
+/* Head Teacher term plan: program tabs over a compact subject × term grid. */
+
+.tplan {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.tplan-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+}
+
+.tplan-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.tplan-head p {
+  margin: 0.3rem 0 0;
+  color: var(--dash-muted);
+  font-size: 0.88rem;
+}
+
+.tplan-year,
+.tplan-tools label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--dash-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.tplan-year select,
+.tplan-tools select {
+  min-height: 2.4rem;
+  padding: 0 0.65rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 10px;
+  background: var(--dash-field);
+  color: var(--dash-ink);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+/* Bulk tools: they only change the draft, which is reviewed and saved like any other edit. */
+.tplan-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+}
+
+/* Save bar stays in view while scrolling a long subject list. */
+.tplan-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin: 0 -1.35rem -1.25rem;
+  padding: 0.75rem 1.35rem;
+  border-top: 1px solid var(--dash-line);
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+  background: var(--dash-panel);
+}
+
+.tplan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tplan-actions span {
+  color: var(--dash-gold-ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.tplan-programs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tplan-program {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 999px;
+  background: var(--dash-panel);
+  color: var(--dash-ink);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tplan-program small {
+  color: var(--dash-muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.tplan-program:hover {
+  background: var(--dash-hover);
+}
+
+.tplan-program.is-active {
+  border-color: var(--dash-mark);
+  background: var(--dash-mark);
+  color: var(--dash-on-mark);
+}
+
+.tplan-program.is-active small {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* Unsaved changes in that program. */
+.tplan-program i {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--dash-panel);
+  border-radius: 50%;
+  background: var(--dash-gold);
+}
+
+.tplan-table caption {
+  padding: 0 0 0.5rem;
+  text-align: left;
+  color: var(--dash-muted);
+  font-size: 0.82rem;
+}
+
+.tplan-table th,
+.tplan-table td {
+  padding: 0.55rem 0.8rem;
+}
+
+.tplan-table .tplan-term {
+  width: 5.5rem;
+  text-align: center;
+}
+
+.tplan-short {
+  display: none;
+}
+
+.tplan-table .tplan-subject {
+  font-weight: 600;
+  white-space: normal;
+}
+
+.tplan-table td.tplan-kind {
+  color: var(--dash-muted);
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+
+.tplan-table tr.is-changed td {
+  background: var(--dash-gold-soft);
+}
+
+.tplan-check {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1.5px solid var(--dash-line);
+  border-radius: 9px;
+  background: var(--dash-field);
+  color: var(--dash-on-mark);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tplan-check input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.tplan-check.is-on {
+  border-color: var(--dash-mark);
+  background: var(--dash-mark);
+}
+
+.tplan-check:has(input:focus-visible) {
+  outline: 2px solid var(--dash-gold);
+  outline-offset: 2px;
+}
+
+.tplan-check:has(input:disabled) {
+  cursor: default;
+}
+
+/* Grades exist here but the term is unticked: they are kept, so flag it. */
+.tplan-check.is-orphan {
+  border-style: dashed;
+  border-color: var(--dash-gold-ink);
+}
+
+.tplan-check em,
+.tplan-legend em {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dash-gold);
+}
+
+.tplan-check em {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  border: 2px solid var(--dash-panel);
+  width: 10px;
+  height: 10px;
+}
+
+.tplan-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--dash-muted);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 600px) {
+  .tplan-actions,
+  .tplan-year,
+  .tplan-tools label {
+    width: 100%;
+  }
+
+  .tplan-actions span {
+    width: 100%;
+  }
+
+  .tplan-actions .btn {
+    flex: 1;
+  }
+
+  .tplan-table th,
+  .tplan-table td {
+    padding: 0.5rem 0.45rem;
+  }
+
+  .tplan-table .tplan-term {
+    width: 2.4rem;
+    padding-inline: 0.2rem;
+  }
+
+  .tplan-table .tplan-subject {
+    font-size: 0.88rem;
+  }
+
+  .tplan-check {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .tplan-long {
+    display: none;
+  }
+
+  .tplan-short {
+    display: inline;
+  }
+
+  .tplan-table .tplan-kind {
+    display: none;
+  }
+}

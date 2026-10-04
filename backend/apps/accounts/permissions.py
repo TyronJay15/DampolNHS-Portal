@@ -45,17 +45,6 @@ class IsStudent(BasePermission):
         )
 
 
-class IsAdminOrHeadTeacher(BasePermission):
-    def has_permission(self, request, view):
-        user = request.user
-        return bool(
-            user
-            and user.is_authenticated
-            and user.can_sign_in
-            and user.role in (user.Role.ADMIN, user.Role.HEAD_TEACHER)
-        )
-
-
 class IsStaffUser(BasePermission):
     """Teachers, head teacher, and administrators."""
 

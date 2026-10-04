@@ -1,17 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useProposal } from '../../components/Access/proposalContext';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import DeskMark from '../../components/DeskMark/DeskMark';
 import LineMark from '../../components/LineMark/LineMark';
 import {
   approveRegistration,
+  approveRegistrationsBulk,
   deactivateAccount,
+  fetchRegistrationEmails,
   fetchRegistrations,
   reactivateAccount,
   rejectRegistration,
   removeAccount,
+  resendRegistrationEmails,
   restoreRejectedToPending,
+  setStudentGender,
 } from '../../services/adminService';
+import { GENDER_OPTIONS, genderLabel } from '../../utils/gender';
 import AccountListToolbar from './AccountListToolbar';
 import AccountResultCard from './AccountResultCard';
+import EmailDelivery, { EmailChip } from './EmailDelivery';
 import './AdminAccountsPage.css';
 
 const FILTERS = [
@@ -51,6 +59,7 @@ function matchesSearch(row, query) {
     row.first_name,
     row.last_name,
     row.lrn,
+    genderLabel(row.gender),
     row.email,
     row.program_code,
     row.contact_number,
@@ -62,7 +71,48 @@ function matchesSearch(row, query) {
   return hay.includes(query);
 }
 
+function fullName(row) {
+  return `${row.first_name} ${row.last_name}`;
+}
+
+// While emails are queued, the strip and the chips refresh this often.
+const POLL_MS = 8000;
+
+const ONE_EMAIL = {
+  sent: 'The email was sent.',
+  queued: 'The email is queued and goes out in the background.',
+  waiting: "The email waits for tomorrow's allowance.",
+  failed: 'The email could not be sent. Use Resend failed in Email delivery.',
+};
+
+// One sentence about a batch's emails, from the bulk response's {state: count}.
+function batchEmailNote(states) {
+  const parts = [
+    states.sent ? `${states.sent} sent` : '',
+    states.queued ? `${states.queued} queued` : '',
+    states.waiting ? `${states.waiting} waiting for tomorrow's allowance` : '',
+    states.failed ? `${states.failed} failed` : '',
+  ].filter(Boolean);
+  if (!parts.length) return '';
+  const follow = states.queued || states.waiting ? ' Follow them in Email delivery above.' : '';
+  const fix = states.failed ? ' Check the reason on each student, then use Resend failed.' : '';
+  return `Emails: ${parts.join(', ')}.${follow}${fix}`;
+}
+
+// Background sending only: warn when new emails will not all fit in what is left of today's allowance.
+function allowanceWarning(summary, count) {
+  if (!summary || summary.delivery !== 'background' || !count) return [];
+  const room = Math.max(0, summary.notice_left - summary.queued);
+  if (count <= room) return [];
+  const effect = 'Approval and rejection still take effect at once.';
+  if (!room) {
+    return [`Today's email allowance is used up, so ${count === 1 ? 'this email waits' : 'these emails wait'} until tomorrow. ${effect}`];
+  }
+  return [`${room} of these emails can go out today and ${count - room} will wait until tomorrow. ${effect}`];
+}
+
 export default function AdminAccountsPage() {
+  const confirm = useConfirm();
   const [status, setStatus] = useState('pending');
   const [counts, setCounts] = useState({ pending: 0, approved: 0, archived: 0, rejected: 0 });
   const [rows, setRows] = useState([]);
@@ -75,18 +125,23 @@ export default function AdminAccountsPage() {
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
   const [busyId, setBusyId] = useState(null);
-  const [rejecting, setRejecting] = useState(null);
-  const [archiving, setArchiving] = useState(null);
-  const [removing, setRemoving] = useState(null);
-  const [reason, setReason] = useState('');
+  // Email delivery summary, Admin only: stays null in proposal mode.
+  const [emails, setEmails] = useState(null);
+  // Set when a Head Teacher tagged to review registrations opens this page: actions become requests.
+  const proposal = useProposal();
+  const isProposal = Boolean(proposal);
 
   async function load(nextStatus = status) {
     setLoading(true);
     setError('');
     try {
-      const data = await fetchRegistrations(nextStatus);
+      const [data, summary] = await Promise.all([
+        fetchRegistrations(nextStatus),
+        isProposal ? null : fetchRegistrationEmails(),
+      ]);
       setCounts(data.counts || { pending: 0, approved: 0, archived: 0, rejected: 0 });
       setRows(data.results || []);
+      setEmails(summary);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -94,10 +149,39 @@ export default function AdminAccountsPage() {
     }
   }
 
+  // The latest numbers right before a confirmation, so its allowance warning is current.
+  async function freshEmails() {
+    if (isProposal) return null;
+    try {
+      const summary = await fetchRegistrationEmails();
+      setEmails(summary);
+      return summary;
+    } catch {
+      return emails;
+    }
+  }
+
   useEffect(() => {
     load(status);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
+
+  // While emails are queued, refresh the strip and the chips quietly until they are out.
+  const queuedEmails = emails?.queued || 0;
+  useEffect(() => {
+    if (isProposal || !queuedEmails) return undefined;
+    const timer = setInterval(async () => {
+      try {
+        const [summary, data] = await Promise.all([fetchRegistrationEmails(), fetchRegistrations(status)]);
+        setEmails(summary);
+        setCounts(data.counts || { pending: 0, approved: 0, archived: 0, rejected: 0 });
+        setRows(data.results || []);
+      } catch {
+        // The next tick tries again.
+      }
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [isProposal, queuedEmails, status]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -117,7 +201,40 @@ export default function AdminAccountsPage() {
     });
   }, [grade, login, program, query, rows, sort]);
 
+  // Proposal mode: the decision is sent to the Admin for approval instead of being applied.
+  async function proposeReview(rows, decision) {
+    const approving = decision === 'approve';
+    const sent = await proposal.propose(
+      (note) => ({ decision, registrations: rows.map((row) => row.id), reason: approving ? '' : note }),
+      {
+        title: approving
+          ? `Propose approving ${rows.length === 1 ? fullName(rows[0]) : `${rows.length} students`}?`
+          : `Propose rejecting ${fullName(rows[0])}?`,
+        facts: [
+          { label: 'Students', value: rows.length },
+          { label: 'Decision', value: approving ? 'Approve' : 'Reject' },
+        ],
+        noteLabel: approving ? undefined : 'Reason for rejecting (seen by the Admin and the student)',
+      },
+    );
+    if (!sent) return;
+    setResult({
+      title: 'Sent for approval',
+      facts: [{ label: 'Request', value: sent.summary }],
+      next: 'The Admin decides. Follow it under My access.',
+    });
+  }
+
   async function handleApprove(row) {
+    if (proposal) return proposeReview([row], 'approve');
+    const mailbox = await freshEmails();
+    const answer = await confirm({
+      title: `Approve ${fullName(row)}?`,
+      body: `${row.grade_level_enrollment} · ${row.program_code || '—'}. They can sign in right away and receive an approval email and a notification. The Head Teacher then places them in a section.`,
+      confirmLabel: 'Approve student',
+      warning: allowanceWarning(mailbox, 1),
+    });
+    if (!answer) return;
     setBusyId(row.id);
     setResult(null);
     setError('');
@@ -130,10 +247,57 @@ export default function AdminAccountsPage() {
           { label: 'LRN', value: row.lrn },
           { label: 'Program', value: `${row.grade_level_enrollment} · ${row.program_code || '—'}` },
         ],
-        next:
-          saved.email_sent === false
-            ? 'They can sign in now, but the approval email did not send. Check SMTP and ask them to use their registered password.'
-            : 'They can sign in now with that LRN and the password they registered. An approval email was sent.',
+        next: `They can sign in now with that LRN and the password they registered. ${ONE_EMAIL[saved.email_status] || ''}`,
+      });
+      await load(status);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleApproveAll() {
+    if (proposal) return proposeReview(visible, 'approve');
+    // Exactly the students listed on screen are sent, so nobody who registers meanwhile is approved unseen.
+    const batch = visible;
+    const byGrade = batch.reduce(
+      (tally, row) => ({ ...tally, [row.grade_level_enrollment]: (tally[row.grade_level_enrollment] || 0) + 1 }),
+      {},
+    );
+    const left = counts.pending - batch.length;
+    const mailbox = await freshEmails();
+    const facts = Object.entries(byGrade).map(([label, value]) => ({ label, value }));
+    if (mailbox?.delivery === 'background') {
+      facts.push({ label: 'Emails used today', value: `${mailbox.used_today} of ${mailbox.notice_limit}` });
+    }
+    const answer = await confirm({
+      title: `Approve ${batch.length} student${batch.length === 1 ? '' : 's'}?`,
+      body: 'They can sign in right away, and each student receives an approval email and a notification. The Head Teacher then places them in sections.',
+      confirmLabel: `Approve ${batch.length}`,
+      facts,
+      warning: [
+        ...(left > 0
+          ? [`Only the ${batch.length} listed students are approved. ${left} other pending registration${left === 1 ? ' is' : 's are'} not included.`]
+          : []),
+        ...allowanceWarning(mailbox, batch.length),
+      ],
+    });
+    if (!answer) return;
+    setBusyId('all');
+    setResult(null);
+    setError('');
+    try {
+      const done = await approveRegistrationsBulk(batch.map((row) => row.id));
+      const outcome = [{ label: 'Approved', value: done.approved.length }];
+      if (done.skipped.length) outcome.push({ label: 'Already reviewed', value: done.skipped.length });
+      if (done.failed.length) outcome.push({ label: 'Could not approve', value: done.failed.length });
+      const stillPending = Math.max(0, counts.pending - done.approved.length - done.skipped.length);
+      if (stillPending) outcome.push({ label: 'Still pending', value: stillPending });
+      setResult({
+        title: 'Students approved',
+        facts: outcome,
+        next: `They can sign in now with the password they registered. ${batchEmailNote(done.emails || {})}`,
       });
       await load(status);
     } catch (err) {
@@ -144,10 +308,16 @@ export default function AdminAccountsPage() {
   }
 
   async function handleArchive(row) {
+    const answer = await confirm({
+      title: `Archive ${fullName(row)}?`,
+      body: 'Sign-in turns off and they leave Head Teacher and Teacher lists. You can restore them later. Grades stay.',
+      confirmLabel: 'Archive account',
+      tone: 'warning',
+    });
+    if (!answer) return;
     setBusyId(row.id);
     setResult(null);
     setError('');
-    setArchiving(null);
     try {
       await deactivateAccount(row.user_id);
       setResult({
@@ -172,10 +342,16 @@ export default function AdminAccountsPage() {
   }
 
   async function handleRemove(row) {
+    const answer = await confirm({
+      title: `Delete ${fullName(row)}?`,
+      body: 'This clears the login name and email. Grades stay in the system. It cannot be undone.',
+      confirmLabel: 'Delete permanently',
+      tone: 'danger',
+    });
+    if (!answer) return;
     setBusyId(row.id);
     setResult(null);
     setError('');
-    setRemoving(null);
     try {
       await removeAccount(row.user_id);
       setResult({
@@ -195,6 +371,15 @@ export default function AdminAccountsPage() {
   }
 
   async function handleReactivate(row) {
+    // Resending a password email to someone who was never activated is routine and needs no question.
+    if (row.account_status !== 'pending_activation') {
+      const answer = await confirm({
+        title: `Reactivate ${fullName(row)}?`,
+        body: 'Their account is restored. They may be asked to set a new password, and they appear in the Head Teacher and Teacher lists again.',
+        confirmLabel: 'Reactivate',
+      });
+      if (!answer) return;
+    }
     setBusyId(row.id);
     setResult(null);
     setError('');
@@ -218,7 +403,37 @@ export default function AdminAccountsPage() {
     }
   }
 
+  // The admin's correction of a student's gender, e.g. before a DepEd report. Logged in the audit trail.
+  async function handleGender(row, gender) {
+    const answer = await confirm({
+      title: `Set ${fullName(row)}'s gender to ${genderLabel(gender)}?`,
+      body: 'This updates the school record used for reports. The student can still change it from My Profile, and every change is logged.',
+      confirmLabel: 'Update gender',
+      facts: [
+        { label: 'Current', value: genderLabel(row.gender) },
+        { label: 'New', value: genderLabel(gender) },
+      ],
+    });
+    if (!answer) return;
+    setBusyId(row.id);
+    setError('');
+    try {
+      const saved = await setStudentGender(row.user_id, gender);
+      setRows((items) => items.map((item) => (item.id === row.id ? { ...item, gender: saved.gender } : item)));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function handleRestorePending(row) {
+    const answer = await confirm({
+      title: `Restore ${fullName(row)} to pending?`,
+      body: 'The registration returns to Pending so you can approve or reject it again. They still cannot sign in until it is approved.',
+      confirmLabel: 'Restore to pending',
+    });
+    if (!answer) return;
     setBusyId(row.id);
     setResult(null);
     setError('');
@@ -241,28 +456,62 @@ export default function AdminAccountsPage() {
     }
   }
 
-  async function handleReject(event) {
-    event.preventDefault();
-    if (!rejecting) return;
-    setBusyId(rejecting.id);
+  async function handleReject(row) {
+    if (proposal) return proposeReview([row], 'reject');
+    const mailbox = await freshEmails();
+    const answer = await confirm({
+      title: `Reject ${fullName(row)}?`,
+      body: 'The student will not be able to sign in. Give a reason the school can keep on record.',
+      confirmLabel: 'Reject registration',
+      tone: 'danger',
+      note: { label: 'Reason', required: true, placeholder: 'Why is this registration rejected?' },
+      warning: allowanceWarning(mailbox, 1),
+    });
+    if (!answer) return;
+    setBusyId(row.id);
     setResult(null);
     setError('');
     try {
-      const saved = await rejectRegistration(rejecting.id, reason);
+      const saved = await rejectRegistration(row.id, answer.note);
       setResult({
         title: 'Registration rejected',
         facts: [
-          { label: 'Name', value: `${rejecting.first_name} ${rejecting.last_name}` },
-          { label: 'LRN', value: rejecting.lrn },
-          { label: 'Reason', value: reason },
+          { label: 'Name', value: fullName(row) },
+          { label: 'LRN', value: row.lrn },
+          { label: 'Reason', value: answer.note },
         ],
-        next:
-          saved.email_sent === false
-            ? 'They cannot sign in. The rejection email did not send — tell them in person as well.'
-            : 'They cannot sign in. A rejection email was sent.',
+        next: `They cannot sign in. ${ONE_EMAIL[saved.email_status] || ''}`,
       });
-      setRejecting(null);
-      setReason('');
+      await load(status);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleResend() {
+    const failed = emails?.failed || 0;
+    const answer = await confirm({
+      title: `Resend ${failed} failed email${failed === 1 ? '' : 's'}?`,
+      body: 'They are queued again with fresh attempts. An address the mail server refused will fail again, so check the reason on each student first.',
+      confirmLabel: 'Resend',
+      warning: allowanceWarning(emails, failed),
+    });
+    if (!answer) return;
+    setBusyId('resend');
+    setResult(null);
+    setError('');
+    try {
+      const done = await resendRegistrationEmails();
+      setResult({
+        title: 'Emails queued again',
+        facts: [{ label: 'Resent', value: done.resent }],
+        next:
+          done.delivery === 'inline'
+            ? 'They were sent again. The chip on each student shows the result.'
+            : 'They go out in the background. Email delivery updates by itself.',
+      });
       await load(status);
     } catch (err) {
       setError(err.message);
@@ -276,7 +525,7 @@ export default function AdminAccountsPage() {
       {result ? <AccountResultCard {...result} onClose={() => setResult(null)} /> : null}
       {error ? <p className="alert alert-error">{error}</p> : null}
 
-      <div className="acct-stats">
+      <div className="acct-stats" hidden={Boolean(proposal)}>
         {FILTERS.map((tab) => (
           <button
             key={tab.value}
@@ -301,6 +550,8 @@ export default function AdminAccountsPage() {
           </button>
         ))}
       </div>
+
+      {isProposal ? null : <EmailDelivery summary={emails} busy={busyId === 'resend'} onResend={handleResend} />}
 
       <AccountListToolbar
         query={query}
@@ -341,7 +592,7 @@ export default function AdminAccountsPage() {
             ))}
           </select>
         </label>
-        <label className="acct-search">
+        <label className="acct-search" hidden={Boolean(proposal)}>
           <span className="desk-line">
             <LineMark name="account" size={14} />
             Login
@@ -354,6 +605,19 @@ export default function AdminAccountsPage() {
           </select>
         </label>
       </AccountListToolbar>
+
+      {status === 'pending' && visible.length > 0 ? (
+        <div className="acct-bulk">
+          <p>
+            <strong>{visible.length}</strong> pending student{visible.length === 1 ? '' : 's'} listed
+          </p>
+          <button className="acct-btn acct-btn-ok" type="button" disabled={busyId !== null} onClick={handleApproveAll}>
+            {busyId === 'all'
+              ? 'Approving…'
+              : `${proposal ? 'Propose approving all' : 'Approve all'} (${visible.length})`}
+          </button>
+        </div>
+      ) : null}
 
       {loading ? <p className="admin-empty">Loading accounts…</p> : null}
       {!loading && visible.length === 0 ? (
@@ -376,7 +640,9 @@ export default function AdminAccountsPage() {
                   {row.grade_level_enrollment} · {row.program_code || '—'}
                 </p>
               </div>
-              <em className={`acct-chip${row.account_status === 'suspended' || row.account_status === 'archived' ? ' is-off' : row.account_status === 'pending_activation' ? ' is-wait' : ' is-on'}`}>
+              <em
+                className={`acct-chip${row.account_status === 'suspended' || row.account_status === 'archived' ? ' is-off' : row.account_status === 'pending_activation' ? ' is-wait' : ' is-on'}`}
+              >
                 {loginLabel(row.account_status)}
               </em>
             </header>
@@ -388,6 +654,32 @@ export default function AdminAccountsPage() {
                   LRN
                 </dt>
                 <dd>{row.lrn || '—'}</dd>
+              </div>
+              <div>
+                <dt className="desk-line">
+                  <LineMark name="user" size={14} />
+                  Gender
+                </dt>
+                <dd>
+                  {proposal ? (
+                    genderLabel(row.gender)
+                  ) : (
+                    <select
+                      className="acct-inline-select"
+                      aria-label={`Gender of ${fullName(row)}`}
+                      value={row.gender || ''}
+                      disabled={busyId !== null}
+                      onChange={(event) => handleGender(row, event.target.value)}
+                    >
+                      {row.gender ? null : <option value="">Not set</option>}
+                      {GENDER_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </dd>
               </div>
               <div>
                 <dt className="desk-line">
@@ -437,7 +729,13 @@ export default function AdminAccountsPage() {
               <p className="acct-reason">Reason: {row.rejection_reason}</p>
             ) : null}
             {row.status !== 'pending' ? (
-              <p className="acct-reviewed">Reviewed {formatWhen(row.reviewed_at)}</p>
+              <div className="acct-review-line">
+                <p className="acct-reviewed">Reviewed {formatWhen(row.reviewed_at)}</p>
+                <EmailChip delivery={row.email_delivery} />
+              </div>
+            ) : null}
+            {row.email_delivery?.state === 'failed' && row.email_delivery.error ? (
+              <p className="acct-reason">Email failed: {row.email_delivery.error}</p>
             ) : null}
 
             <div className="acct-actions">
@@ -449,18 +747,15 @@ export default function AdminAccountsPage() {
                     disabled={busyId === row.id}
                     onClick={() => handleApprove(row)}
                   >
-                    {busyId === row.id ? 'Working…' : 'Approve'}
+                    {busyId === row.id ? 'Working…' : proposal ? 'Propose approve' : 'Approve'}
                   </button>
                   <button
                     className="acct-btn acct-btn-no"
                     type="button"
                     disabled={busyId === row.id}
-                    onClick={() => {
-                      setRejecting(row);
-                      setReason('');
-                    }}
+                    onClick={() => handleReject(row)}
                   >
-                    Reject
+                    {proposal ? 'Propose reject' : 'Reject'}
                   </button>
                 </>
               ) : null}
@@ -469,7 +764,7 @@ export default function AdminAccountsPage() {
                   className="acct-btn acct-btn-no"
                   type="button"
                   disabled={busyId === row.id}
-                  onClick={() => setArchiving(row)}
+                  onClick={() => handleArchive(row)}
                 >
                   Archive
                 </button>
@@ -498,7 +793,7 @@ export default function AdminAccountsPage() {
                     className="acct-btn acct-btn-no"
                     type="button"
                     disabled={busyId === row.id}
-                    onClick={() => setRemoving(row)}
+                    onClick={() => handleRemove(row)}
                   >
                     Delete
                   </button>
@@ -518,83 +813,6 @@ export default function AdminAccountsPage() {
           </article>
         ))}
       </div>
-
-      {archiving ? (
-        <div className="admin-modal-backdrop">
-          <div className="card admin-modal">
-            <h2 className="desk-line">
-              <LineMark name="user" />
-              Archive {archiving.first_name} {archiving.last_name}?
-            </h2>
-            <p>Sign-in turns off and they leave Head Teacher and Teacher lists. Restore later if needed. Grades stay.</p>
-            <div className="acct-actions">
-              <button
-                className="acct-btn acct-btn-no"
-                type="button"
-                disabled={busyId === archiving.id}
-                onClick={() => handleArchive(archiving)}
-              >
-                Archive account
-              </button>
-              <button className="acct-btn" type="button" onClick={() => setArchiving(null)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {removing ? (
-        <div className="admin-modal-backdrop">
-          <div className="card admin-modal">
-            <h2 className="desk-line">
-              <LineMark name="user" />
-              Delete {removing.first_name} {removing.last_name}?
-            </h2>
-            <p>This clears the login name and email. Grades stay in the system. It cannot be undone.</p>
-            <div className="acct-actions">
-              <button
-                className="acct-btn acct-btn-no"
-                type="button"
-                disabled={busyId === removing.id}
-                onClick={() => handleRemove(removing)}
-              >
-                Delete permanently
-              </button>
-              <button className="acct-btn" type="button" onClick={() => setRemoving(null)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {rejecting ? (
-        <div className="admin-modal-backdrop">
-          <form className="card admin-modal" onSubmit={handleReject}>
-            <h2 className="desk-line">
-              <LineMark name="user" />
-              Reject {rejecting.first_name} {rejecting.last_name}?
-            </h2>
-            <p>The student will not be able to sign in. Give a reason the school can keep on record.</p>
-            <label className="form-field">
-              <span className="desk-line">
-                <LineMark name="cms" size={14} />
-                Reason
-              </span>
-              <textarea value={reason} onChange={(event) => setReason(event.target.value)} required rows={4} />
-            </label>
-            <div className="acct-actions">
-              <button className="acct-btn acct-btn-no" type="submit" disabled={busyId === rejecting.id}>
-                Confirm reject
-              </button>
-              <button className="acct-btn" type="button" onClick={() => setRejecting(null)}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
     </div>
   );
 }

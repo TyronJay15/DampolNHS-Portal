@@ -4,17 +4,25 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.access.permissions import filter_levels, reading_levels, role_or_tagged
+from apps.accounts.models import User
 from apps.accounts.permissions import IsAdmin
 from apps.audit import services as audit
 from apps.school.models import Curriculum, Program, SkillDomain, Subject
+from apps.school.programs import update_program
 from apps.school.serializers import AdminProgramSerializer, SubjectSerializer
 
 
 class AdminProgramListView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    """Admins manage every program; a head teacher tagged to edit programs reads those in their levels."""
+
+    permission_classes = [IsAuthenticated, role_or_tagged(User.Role.ADMIN, 'edit_programs')]
 
     def get(self, request):
-        programs = Program.objects.all().prefetch_related('program_subjects__subject')
+        programs = filter_levels(
+            Program.objects.all().prefetch_related('program_subjects__subject'),
+            reading_levels(request.user, 'edit_programs'),
+        )
         subjects = Subject.objects.filter(is_active=True).select_related('skill_domain')
         return Response(
             {
@@ -44,17 +52,7 @@ class AdminProgramDetailView(APIView):
 
     def patch(self, request, pk):
         program = get_object_or_404(Program, pk=pk)
-        serializer = AdminProgramSerializer(program, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        audit.record(
-            user=request.user,
-            action='program_updated',
-            summary=f'Updated program {program.code}',
-            target_type='Program',
-            target_id=program.id,
-        )
-        return Response(serializer.data)
+        return Response(update_program(program, request.data, request.user))
 
 
 class AdminSubjectCreateView(APIView):

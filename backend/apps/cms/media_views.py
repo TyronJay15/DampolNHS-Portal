@@ -1,5 +1,4 @@
 from pathlib import Path
-from urllib.parse import urlparse
 from uuid import uuid4
 
 from django.conf import settings
@@ -9,25 +8,25 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.permissions import IsAdmin
+from apps.access.permissions import role_or_tagged
+from apps.accounts.models import User
+from apps.cms.media import uploaded_name
+from apps.cms.services import is_in_use
 
 ALLOWED = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 MAX_BYTES = 5 * 1024 * 1024
 
 
-def uploaded_name(url):
-    path = urlparse(str(url or '')).path.replace('\\', '/')
-    prefix = settings.MEDIA_URL.rstrip('/') + '/'
-    if not path.startswith(prefix):
-        return ''
-    name = path[len(prefix) :].lstrip('/')
-    if not name.startswith('cms/') or '..' in name.split('/'):
-        return ''
-    return name
+# People tagged to prepare website pages or news can upload photos for their proposals; a photo only
+# appears on the site once the Admin approves. They can only delete photos the live site does not use.
+PHOTO_ACTIVITIES = ('edit_website_pages', 'post_news')
 
 
 class CmsMediaView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [
+        IsAuthenticated,
+        role_or_tagged(User.Role.ADMIN, *PHOTO_ACTIVITIES, tagged_methods=('POST', 'DELETE')),
+    ]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
@@ -44,9 +43,12 @@ class CmsMediaView(APIView):
         return Response({'url': url}, status=201)
 
     def delete(self, request):
-        name = uploaded_name(request.data.get('url') or request.query_params.get('url'))
+        url = request.data.get('url') or request.query_params.get('url')
+        name = uploaded_name(url)
         if not name:
             return Response({'detail': 'Only uploaded CMS photos can be deleted.'}, status=400)
+        if request.user.role != User.Role.ADMIN and is_in_use(url):
+            return Response({'detail': 'That photo is on the live website; only the Admin can remove it.'}, status=403)
         if default_storage.exists(name):
             default_storage.delete(name)
         return Response({'ok': True})

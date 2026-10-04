@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import LineMark from '../../../components/LineMark/LineMark';
 import Loading from '../../../components/Loading/Loading';
 import FieldLabel from './FieldLabel';
-import { fetchCms, saveCmsDocument } from '../../../services/cmsService';
+import { fetchCms } from '../../../services/cmsService';
 import { DEFAULT_CMS } from '../../../utils/cmsDefaults';
 import CmsPhotoField from './CmsPhotoField';
 import './AdminCms.css';
+import { useCmsPublish } from './useCmsPublish';
 
 const BRAND = [
   ['brandName', 'Brand name'],
@@ -19,8 +20,18 @@ const LINKS = [
   ['facebookLabel', 'Facebook label'],
 ];
 
+const PAGE = {
+  document: 'footer',
+  name: 'footer',
+  saved: 'Footer saved.',
+  publishBody: 'The footer shown on every public page updates as soon as you confirm.',
+};
+
 export default function AdminCmsFooterPage() {
+  const { publish, proposing } = useCmsPublish(PAGE);
   const [form, setForm] = useState(null);
+  // The page as loaded, so a tagged editor's proposal carries only what changed.
+  const [loaded, setLoaded] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -28,7 +39,11 @@ export default function AdminCmsFooterPage() {
 
   useEffect(() => {
     fetchCms()
-      .then((data) => setForm({ ...defaults, ...(data.footer || {}) }))
+      .then((data) => {
+        const next = { ...defaults, ...(data.footer || {}) };
+        setForm(next);
+        setLoaded(next);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -36,9 +51,10 @@ export default function AdminCmsFooterPage() {
   async function handleSave(event) {
     event.preventDefault();
     setError('');
+    setMessage('');
     try {
-      await saveCmsDocument('footer', form);
-      setMessage('Footer saved.');
+      const done = await publish(form, loaded);
+      if (done) setMessage(done);
     } catch (err) {
       setError(err.message);
     }
@@ -139,7 +155,7 @@ export default function AdminCmsFooterPage() {
 
       <div className="cms-save">
         <button className="btn" type="submit">
-          Save footer
+          {proposing ? 'Submit for approval' : 'Save footer'}
         </button>
       </div>
     </form>

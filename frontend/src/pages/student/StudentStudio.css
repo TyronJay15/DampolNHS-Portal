@@ -21,70 +21,9 @@
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-}
-
-.student-shortcuts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.student-shortcuts a,
-.student-filter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  min-height: 58px;
-  padding: 0.85rem 1rem;
-  border-radius: 16px;
-  background: var(--dash-panel);
-  border: 1px solid var(--dash-line);
-  box-shadow: var(--dash-shadow);
-  color: var(--dash-green-dark);
-  font-weight: 700;
-  text-decoration: none;
-  animation: dash-rise 0.4s ease both;
-  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-}
-
-.student-filter {
-  cursor: pointer;
-  font: inherit;
-  width: 100%;
-}
-
-.student-shortcuts a:hover,
-.student-filter:hover,
-.student-filter.is-active {
-  transform: translateY(-3px);
-  background: var(--dash-hover);
-  box-shadow: 0 14px 32px rgba(22, 53, 35, 0.08);
-}
-
-.student-filter.is-active {
-  background: var(--dash-mark);
-  color: var(--dash-on-mark);
-}
-
-.student-shortcuts em,
-.student-tile h2 em,
-.student-note-when em {
-  font-style: normal;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--dash-gold-ink);
-  background: var(--dash-gold-soft);
-  border-radius: 999px;
-  padding: 0.18rem 0.5rem;
-}
-
-.student-stats,
-.student-bento,
+}.student-stats,
 .student-profile-grid,
-.student-grade-layout,
-.student-note-list {
+.student-grade-layout {
   display: grid;
   gap: 20px;
 }
@@ -97,10 +36,6 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-.student-bento {
-  grid-template-columns: 1.2fr 0.9fr 0.9fr;
-}
-
 .student-profile-grid {
   grid-template-columns: 1.1fr 0.9fr;
 }
@@ -108,27 +43,12 @@
 .student-grade-layout {
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
   align-items: stretch;
-}
-
-.student-note-list {
-  grid-template-columns: 1fr 1fr;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.student-tile,
-.student-panel,
-.student-rec,
-.student-note {
+}.student-panel,
+.student-rec {
   padding: 1.15rem 1.2rem;
   animation: dash-rise 0.45s ease both;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-
-.student-tile:hover,
-.student-rec:hover,
-.student-note:hover {
+}.student-rec:hover {
   transform: translateY(-2px);
   background: var(--dash-hover);
   box-shadow: 0 14px 32px rgba(22, 53, 35, 0.08);
@@ -170,12 +90,8 @@
   line-height: 1.15;
   color: var(--dash-green-dark);
   overflow-wrap: anywhere;
-}
-
-.student-tile h2,
-.student-panel h2,
-.student-rec-head h2,
-.student-note h2 {
+}.student-panel h2,
+.student-rec-head h2 {
   display: flex;
   align-items: center;
   gap: 0.55rem;
@@ -196,26 +112,15 @@
   font-weight: 700;
   color: var(--dash-green-dark);
   overflow-wrap: anywhere;
-}
-
-.student-empty,
+}.student-empty,
 .student-rec-lede,
 .student-rec-hint,
 .student-rec-note,
 .student-home-notes span,
-.student-note p,
 .student-rec-list span {
   margin: 0;
   color: var(--dash-muted);
   line-height: 1.5;
-}
-
-.student-empty-card {
-  min-height: 280px;
-  display: grid;
-  place-items: center;
-  text-align: center;
-  padding: 2rem 1.4rem;
 }
 
 .student-home-notes {
@@ -229,10 +134,7 @@
 .student-home-notes li {
   padding-left: 0.7rem;
   border-left: 3px solid var(--dash-line);
-}
-
-.student-home-notes li.is-unread,
-.student-note.is-unread {
+}.student-home-notes li.is-unread {
   border-left-color: var(--dash-gold);
 }
 
@@ -342,6 +244,41 @@
   font-size: 0.82rem;
 }
 
+/* Not scheduled in that term by the term plan. */
+.student-grade-off {
+  color: var(--dash-line);
+}
+
+/* Report card views: one tab per scheduled term, then the whole year. */
+.student-term-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.2rem 0 0.6rem;
+}
+
+.student-term-tabs button {
+  padding: 0.45rem 0.95rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 999px;
+  background: var(--dash-panel);
+  color: var(--dash-ink);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.student-term-tabs button:hover {
+  background: var(--dash-hover);
+}
+
+.student-term-tabs button.is-active {
+  border-color: var(--dash-mark);
+  background: var(--dash-mark);
+  color: var(--dash-on-mark);
+}
+
 .student-rec {
   min-height: 420px;
   display: grid;
@@ -439,77 +376,17 @@
 .student-rec-list span {
   margin-top: 0.2rem;
   font-size: 0.88rem;
-}
-
-.student-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
-}
-
-.student-filters {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  min-width: min(360px, 100%);
-}
-
-.student-note {
-  display: block;
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-  border-left: 4px solid transparent;
-}
-
-.student-note.is-unread {
-  border-left-width: 4px;
-}
-
-.student-note-when {
-  margin: 0 0 0.4rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  font-size: 0.8rem;
-  color: var(--dash-muted);
-}
-
-.student-note-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.12rem 0.45rem;
-  border-radius: 999px;
-  background: var(--dash-field);
-  color: var(--dash-muted);
-  font-style: normal;
-  font-size: 0.72rem;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-@media (max-width: 1100px) {
-  .student-bento,
-  .student-grade-layout,
-  .student-stats {
+}@media (max-width: 1100px) {.student-grade-layout,
+.student-stats,
+.student-stats.is-grades {
     grid-template-columns: 1fr 1fr;
   }
-}
-
-@media (max-width: 800px) {
-  .student-shortcuts,
-  .student-bento,
-  .student-profile-grid,
-  .student-grade-layout,
-  .student-note-list,
-  .student-facts,
-  .student-form,
-  .student-stats,
-  .student-filters {
+}@media (max-width: 800px) {.student-profile-grid,
+.student-grade-layout,
+.student-facts,
+.student-form,
+.student-stats,
+.student-stats.is-grades {
     grid-template-columns: 1fr;
   }
 }

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import LineMark from '../../../components/LineMark/LineMark';
 import Loading from '../../../components/Loading/Loading';
-import { fetchCms, saveCmsDocument } from '../../../services/cmsService';
+import { fetchCms } from '../../../services/cmsService';
 import { DEFAULT_CMS } from '../../../utils/cmsDefaults';
 import './AdminCms.css';
+import { useCmsPublish } from './useCmsPublish';
 
 const GROUPS = [
   {
@@ -60,15 +61,29 @@ function Field({ form, setForm, name, label, long }) {
   );
 }
 
+const PAGE = {
+  document: 'about',
+  name: 'About page',
+  saved: 'About page saved.',
+  publishBody: 'The About page on the public website updates as soon as you confirm.',
+};
+
 export default function AdminCmsAboutPage() {
+  const { publish, proposing } = useCmsPublish(PAGE);
   const [form, setForm] = useState(null);
+  // The page as loaded, so a tagged editor's proposal carries only what changed.
+  const [loaded, setLoaded] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchCms()
-      .then((data) => setForm({ ...DEFAULT_CMS.about, ...(data.about || {}) }))
+      .then((data) => {
+        const next = { ...DEFAULT_CMS.about, ...(data.about || {}) };
+        setForm(next);
+        setLoaded(next);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -76,9 +91,10 @@ export default function AdminCmsAboutPage() {
   async function handleSave(event) {
     event.preventDefault();
     setError('');
+    setMessage('');
     try {
-      await saveCmsDocument('about', form);
-      setMessage('About page saved.');
+      const done = await publish(form, loaded);
+      if (done) setMessage(done);
     } catch (err) {
       setError(err.message);
     }
@@ -106,7 +122,7 @@ export default function AdminCmsAboutPage() {
       </div>
       <div className="cms-save">
         <button className="btn" type="submit">
-          Save about
+          {proposing ? 'Submit for approval' : 'Save about'}
         </button>
       </div>
     </form>

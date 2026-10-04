@@ -9,12 +9,14 @@ from .models import (
     Section,
     SkillDomain,
     Subject,
+    SubjectTermPlan,
     Term,
 )
 
 admin.site.register(SchoolYear)
 admin.site.register(Term)
 admin.site.register(ProgramSubject)
+admin.site.register(SubjectTermPlan)
 admin.site.register(Section)
 
 

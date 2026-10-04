@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react';
 import Loading from '../../components/Loading/Loading';
 import LineMark from '../../components/LineMark/LineMark';
+import MoreMenu from '../../components/MoreMenu/MoreMenu';
 import PageHead from '../../components/PageHead/PageHead';
 import { fetchStudentMe, updateStudentMe } from '../../services/studentService';
 import { firstApiError } from '../../utils/authRules';
+import { GENDER_OPTIONS, genderLabel } from '../../utils/gender';
 import './StudentStudio.css';
 
 function kindLabel(kind) {
   return kind ? kind.replaceAll('_', ' ') : '—';
+}
+
+function termsLabel(terms) {
+  if (!terms?.length || terms.length === 3) return 'All terms';
+  return `Term ${terms.join(' & ')}`;
 }
 
 function formatBirthdate(value) {
@@ -24,6 +31,7 @@ function initials(me) {
 function contactForm(me) {
   return {
     contact_number: me?.contact_number || '',
+    gender: me?.gender || '',
     address: me?.address || '',
     guardian_name: me?.guardian_name || '',
     guardian_contact: me?.guardian_contact || '',
@@ -61,7 +69,7 @@ export default function StudentProfilePage() {
       const profile = await updateStudentMe(form);
       setMe(profile);
       setForm(contactForm(profile));
-      setSaved('Contact details saved. Admin and your adviser can see the update.');
+      setSaved('Details saved. Admin and your adviser can see the update.');
     } catch (err) {
       setError(firstApiError(err));
     } finally {
@@ -74,8 +82,9 @@ export default function StudentProfilePage() {
   return (
     <div className="desk student-studio">
       <PageHead kicker="Enrollment record" title="My Profile" icon="user">
-        <p>Identity stays with the school. You can update contact and guardian details anytime.</p>
+        <p>Identity stays with the school. You can update your contact details, gender and guardian anytime.</p>
       </PageHead>
+      <MoreMenu items={[{ to: '/print/grades', label: 'Print grades' }]} />
       {error ? <p className="alert alert-error">{error}</p> : null}
       {saved ? <p className="alert alert-info">{saved}</p> : null}
 
@@ -127,7 +136,7 @@ export default function StudentProfilePage() {
                 <LineMark name="user" size={14} />
                 Gender
               </dt>
-              <dd>{me?.gender || '—'}</dd>
+              <dd>{genderLabel(me?.gender)}</dd>
             </div>
             <div>
               <dt className="desk-line">
@@ -184,7 +193,7 @@ export default function StudentProfilePage() {
       <section className="card student-panel">
         <h2>
           <LineMark name="phone" />
-          Contact for school
+          Details you can update
         </h2>
         <p className="student-empty">Admin and your adviser see these values. Subject teachers keep the encode list to name and LRN.</p>
         <form className="student-form" onSubmit={save}>
@@ -235,7 +244,21 @@ export default function StudentProfilePage() {
               placeholder="House, barangay, municipality"
             />
           </label>
-          <label className="form-field is-wide">
+          <label className="form-field">
+            <span className="desk-line">
+              <LineMark name="user" size={14} />
+              Gender
+            </span>
+            <select required value={form.gender} onChange={(event) => update('gender', event.target.value)}>
+              <option value="">Select gender</option>
+              {GENDER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
             <span className="desk-line">
               <LineMark name="guardian" size={14} />
               Guardian name
@@ -248,7 +271,7 @@ export default function StudentProfilePage() {
           </label>
           <div className="student-form-actions">
             <button className="btn" type="submit" disabled={busy}>
-              {busy ? 'Saving…' : 'Save contact details'}
+              {busy ? 'Saving…' : 'Save details'}
             </button>
           </div>
         </form>
@@ -279,7 +302,7 @@ export default function StudentProfilePage() {
                       </span>
                     </td>
                     <td>{kindLabel(row.kind)}</td>
-                    <td>{row.term ? `Term ${row.term}` : 'All terms'}</td>
+                    <td>{termsLabel(row.terms)}</td>
                   </tr>
                 ))}
               </tbody>

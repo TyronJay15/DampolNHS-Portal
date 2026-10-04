@@ -135,6 +135,7 @@ def reactivate_account(actor, user):
             'email': user.email,
             'account_status': user.account_status,
             'activation_sent': False,
+            'activation_emailed': False,
         }
 
     notify(
@@ -145,8 +146,7 @@ def reactivate_account(actor, user):
         level='success',
         category=ACCOUNTS,
     )
-    code = issue_code(user, 'activate')
-    activation_email(user, code)
+    emailed = activation_email(user, issue_code(user, 'activate'))
     user.set_unusable_password()
     user.account_status = User.AccountStatus.PENDING_ACTIVATION
     user.approval_note = ''
@@ -164,6 +164,7 @@ def reactivate_account(actor, user):
         'email': user.email,
         'account_status': user.account_status,
         'activation_sent': True,
+        'activation_emailed': emailed,
     }
 
 

@@ -1,0 +1,52 @@
+/* Quiet "⋯" menu for occasional actions. */
+
+.more-menu {
+  position: relative;
+  width: max-content;
+  margin: -0.5rem 0 0.75rem auto;
+}
+
+.more-menu summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.1rem 0.6rem;
+  border-radius: 8px;
+  font-size: 1.25rem;
+  line-height: 1.4;
+  color: var(--dash-muted);
+}
+
+.more-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.more-menu summary:hover,
+.more-menu[open] summary {
+  background: var(--dash-field);
+  color: var(--dash-ink);
+}
+
+.more-menu-list {
+  position: absolute;
+  right: 0;
+  z-index: 5;
+  min-width: 10rem;
+  padding: 0.35rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 10px;
+  background: var(--dash-surface, var(--dash-field));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+
+.more-menu-list a {
+  display: block;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  color: var(--dash-ink);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.more-menu-list a:hover {
+  background: var(--dash-hover);
+}

@@ -32,16 +32,12 @@
   flex-direction: column;
   width: 100%;
   padding: 0;
-  overflow: visible;
-  z-index: 1;
   border-top: 4px solid var(--lp-green-600);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .program-card:hover,
-.program-card:focus-within,
-.program-card.is-open {
-  z-index: 5;
+.program-card:focus-within {
   transform: translateY(-4px);
   border-color: var(--lp-green-600);
   box-shadow: 0 16px 36px rgba(45, 80, 22, 0.16);
@@ -140,49 +136,20 @@
   transition: transform 0.2s ease;
 }
 
+.program-card:hover .program-more,
+.program-card-hit:focus-visible .program-more {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .program-card:hover .program-more .school-icon svg {
   transform: translateX(4px);
 }
 
-.program-popout {
-  display: none;
-  position: absolute;
-  left: 50%;
-  top: calc(100% - 8px);
-  width: min(420px, calc(100vw - 48px));
-  transform: translateX(-50%) translateY(12px);
-  background: #fff;
-  border: 1px solid rgba(45, 80, 22, 0.12);
-  border-radius: 16px;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
-  padding: 1rem 1.1rem 1.15rem;
-  z-index: 6;
-}
-
-.program-card:hover .program-popout,
-.program-card:focus-within .program-popout,
-.program-card.is-open .program-popout {
-  display: block;
-}
-
-.program-popout p {
-  margin: 0 0 0.85rem;
-  line-height: 1.45;
-}
-
-.program-popout h3 {
-  margin: 0 0 0.35rem;
-  font-size: 0.92rem;
-  color: var(--lp-green-900);
-}
-
-.program-popout ul {
-  margin: 0 0 0.85rem;
-  padding-left: 1.1rem;
-}
-
-.program-popout .btn {
-  width: 100%;
+.program-card-hit:focus-visible {
+  outline: 3px solid var(--lp-green-600);
+  outline-offset: -3px;
+  border-radius: inherit;
 }
 
 @media (min-width: 1024px) {
@@ -213,12 +180,240 @@
   .program-grid > li {
     grid-column: auto;
   }
+}
 
-  .program-popout {
-    position: static;
-    width: auto;
-    transform: none;
-    margin: 0 0.85rem 0.95rem;
-    box-shadow: none;
+/* Program details pop-up card. */
+.pd {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(11, 27, 18, 0.55);
+  backdrop-filter: blur(3px);
+  animation: pd-fade 0.18s ease;
+}
+
+.pd-panel {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: min(46rem, 100%);
+  max-height: min(42rem, calc(100vh - 2.5rem));
+  overflow: hidden;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.28);
+  animation: pd-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pd-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 1rem;
+  padding: 1.4rem 1.5rem 1.15rem;
+  border-top: 5px solid var(--lp-green-600);
+  background: linear-gradient(180deg, #f3f8f4 0%, #fff 100%);
+}
+
+.pd-mark .school-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #e8f1eb;
+  color: var(--lp-green-900);
+}
+
+.pd-mark .school-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.pd-title h2 {
+  margin: 0;
+  color: var(--lp-green-900);
+  font-size: 1.7rem;
+  line-height: 1.1;
+}
+
+.pd-title p {
+  margin: 0.25rem 0 0;
+  color: var(--lp-green-600);
+  font-weight: 600;
+}
+
+.pd-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pd-badges li {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: #eef4f0;
+  color: var(--lp-green-900);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.pd-close {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #4b5a50;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pd-close:hover,
+.pd-close:focus-visible {
+  background: #eef4f0;
+  color: var(--lp-green-900);
+}
+
+.pd-close:focus-visible {
+  outline: 2px solid var(--lp-green-600);
+  outline-offset: 2px;
+}
+
+.pd-body {
+  overflow-y: auto;
+  padding: 0.4rem 1.5rem 1.4rem;
+}
+
+.pd-description {
+  margin: 0 0 1.2rem;
+  color: #3c4a40;
+  line-height: 1.65;
+}
+
+.pd-columns {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 1.5rem;
+}
+
+.pd-columns h3 {
+  margin: 0 0 0.6rem;
+  color: var(--lp-green-900);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pd-group + .pd-group {
+  margin-top: 0.8rem;
+}
+
+.pd-group h4 {
+  margin: 0 0 0.3rem;
+  color: var(--lp-green-600);
+  font-size: 0.86rem;
+}
+
+.pd-columns ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #333;
+  line-height: 1.55;
+}
+
+.pd-columns .pd-pathways {
+  padding: 0.85rem 1rem 0.85rem 2rem;
+  border-radius: 14px;
+  background: #f4f8f5;
+}
+
+.pd-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 0.95rem 1.5rem;
+  border-top: 1px solid #e3ebe5;
+  background: #fbfdfb;
+}
+
+.pd-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pd-actions .school-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes pd-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pd-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+/* Phones: a bottom sheet with stacked columns and full-width actions. */
+@media (max-width: 639px) {
+  .pd {
+    align-items: end;
+    padding: 0;
+  }
+
+  .pd-panel {
+    max-height: 90vh;
+    border-radius: 20px 20px 0 0;
+  }
+
+  .pd-head {
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem;
+    padding: 1.1rem 1rem 0.9rem;
+  }
+
+  .pd-mark {
+    display: none;
+  }
+
+  .pd-body {
+    padding: 0.3rem 1rem 1.1rem;
+  }
+
+  .pd-columns {
+    grid-template-columns: 1fr;
+    gap: 1.1rem;
+  }
+
+  .pd-actions {
+    padding: 0.8rem 1rem;
+  }
+
+  .pd-actions > * {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd,
+  .pd-panel {
+    animation: none;
   }
 }

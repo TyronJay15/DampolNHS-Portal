@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import PasswordRules from '../../components/auth/PasswordRules';
+import ResendCodeButton from '../../components/auth/ResendCodeButton';
+import { nextResendAt } from '../../components/auth/resendTime';
+import StepTrail from '../../components/auth/StepTrail';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import LineMark from '../../components/LineMark/LineMark';
+import MoreMenu from '../../components/MoreMenu/MoreMenu';
 import PageHead from '../../components/PageHead/PageHead';
 import PasswordInput from '../../components/Input/PasswordInput';
 import { useAuth } from '../../context/AuthContext';
@@ -9,15 +14,29 @@ import { checkPassword, checkPasswordMatch, firstApiError } from '../../utils/au
 import '../../styles/studio.css';
 import './ChangePasswordPage.css';
 
+// Printable exports, reached from the quiet "⋯" menu. The server decides what each role may see.
+const PRINT_ITEMS = {
+  student: [{ to: '/print/grades', label: 'Print grades' }],
+  teacher: [{ to: '/print/records', label: 'Print my grade records' }],
+  head_teacher: [{ to: '/print/records', label: 'Print my grade records' }],
+};
+
+const STEPS = [
+  { id: 'send', label: 'Current password' },
+  { id: 'verify', label: 'Verify code' },
+  { id: 'password', label: 'New password' },
+];
+
 const ROLE_LABEL = {
   student: 'Student',
   teacher: 'Teacher',
   head_teacher: 'Head teacher',
-  admin: 'Admin',
+  admin: 'Admission',
 };
 
 export default function ChangePasswordPage() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [step, setStep] = useState('send');
   const [currentPassword, setCurrentPassword] = useState('');
   const [code, setCode] = useState('');
@@ -28,6 +47,7 @@ export default function ChangePasswordPage() {
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [resendAt, setResendAt] = useState(0);
 
   async function handleSendCode() {
     setError('');
@@ -38,9 +58,10 @@ export default function ChangePasswordPage() {
     }
     setSending(true);
     try {
-      await requestPasswordOtp({ current_password: currentPassword });
+      const data = await requestPasswordOtp({ current_password: currentPassword });
+      setResendAt(nextResendAt(data));
       setStep('verify');
-      setMessage('A 6-digit code was sent. Enter it to continue. It expires in 10 minutes.');
+      setMessage('A 6-digit code was sent to your email. It expires in 10 minutes.');
     } catch (err) {
       setError(firstApiError(err));
     } finally {
@@ -90,7 +111,12 @@ export default function ChangePasswordPage() {
       setConfirmPassword('');
       setCode('');
       setStep('send');
-      setMessage('Password updated.');
+      await confirm({
+        title: 'Password changed',
+        body: 'Your new password is saved. Use it the next time you sign in on any device.',
+        confirmLabel: 'Done',
+        cancelLabel: null,
+      });
     } catch (err) {
       setError(firstApiError(err));
     } finally {
@@ -107,6 +133,7 @@ export default function ChangePasswordPage() {
           {user?.email ? <span className="studio-chip">{user.email}</span> : null}
         </div>
       </PageHead>
+      <MoreMenu items={PRINT_ITEMS[user?.role] || []} />
       {message ? <p className="alert alert-info">{message}</p> : null}
       {error ? <p className="alert alert-error">{error}</p> : null}
 
@@ -139,11 +166,7 @@ export default function ChangePasswordPage() {
             <LineMark name="account" />
             Password
           </h2>
-          <ol className="account-steps">
-            <li className={step === 'send' ? 'is-active' : 'is-done'}>Current password</li>
-            <li className={step === 'verify' ? 'is-active' : step === 'password' ? 'is-done' : ''}>Verify code</li>
-            <li className={step === 'password' ? 'is-active' : ''}>New password</li>
-          </ol>
+          <StepTrail steps={STEPS} current={step} className="account-steps" />
 
           {step === 'send' ? (
             <form
@@ -191,9 +214,7 @@ export default function ChangePasswordPage() {
                 />
               </label>
               <div className="account-password-foot">
-                <button className="btn btn-secondary" type="button" onClick={handleSendCode} disabled={sending}>
-                  {sending ? 'Sending…' : 'Resend code'}
-                </button>
+                <ResendCodeButton availableAt={resendAt} onResend={handleSendCode} busy={sending} />
                 <button className="btn" type="submit" disabled={verifying}>
                   {verifying ? 'Verifying…' : 'Verify code'}
                 </button>

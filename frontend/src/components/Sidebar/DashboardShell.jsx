@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../ConfirmDialog/useConfirm';
+import { beginSignOut, finishSignOut, isSigningOut } from '../PostLoginLoader/signOutStore';
 import { useCms } from '../../hooks/useCms';
 import { useTheme } from '../../hooks/useTheme';
 import { fileUrl } from '../../services/api';
@@ -23,13 +25,31 @@ export default function DashboardShell({
   const { theme, toggle } = useTheme();
   const cms = useCms();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const logo = cms?.footer?.logo || '';
   const brand = initials || title.slice(0, 2).toUpperCase();
 
   async function signOut() {
-    await logout();
-    navigate('/login');
+    if (isSigningOut()) return;
+    const answer = await confirm({
+      title: 'Log out?',
+      body: 'You will need to sign in again to continue.',
+      confirmLabel: 'Log out',
+      cancelLabel: 'Stay signed in',
+      icon: 'logout',
+    });
+    if (!answer || isSigningOut()) return;
+    // The overlay goes up first, and signing out starts at the same moment. Tokens and the signed-in user are
+    // cleared as soon as it settles; the overlay only fades out afterwards, over the login page.
+    beginSignOut();
+    let confirmed = false;
+    try {
+      confirmed = await logout();
+    } finally {
+      finishSignOut({ offline: !confirmed });
+    }
+    navigate('/login', { replace: true });
   }
 
   return (

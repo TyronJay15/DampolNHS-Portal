@@ -13,12 +13,13 @@ from rest_framework.test import APIClient
 from apps.accounts.models import StudentProfile, User
 from apps.chatbot.admin import FaqEntryAdmin
 from apps.chatbot.models import FaqEntry
+from apps.chatbot.seeds import seed_faqs
 from apps.grading.models import Grade
 from apps.grading.recommend import RecommendationContext, recommend_payload
 from apps.ml.features import load_schema, to_model_space, transform
 from apps.ml.forecast import FEATURE_SCHEMA, attach_attractiveness, snapshot_year, train_forecast
 from apps.ml.forecast import is_stale as forecast_is_stale
-from apps.ml.intent import answers_for, classify_question, train_intent
+from apps.ml.intent import answers_for, classify_question, matching_faq_answer, train_intent
 from apps.ml.intent import is_stale as intent_is_stale
 from apps.ml.knn_model import (
     BELOW_MINIMUM,
@@ -708,6 +709,29 @@ class IntentModelTests(TestCase):
         topic, confidence = classify_question('How do I register?')
         self.assertEqual(topic, 'registration')
         self.assertGreater(confidence, 0.4)
+
+    def test_seed_faqs_is_idempotent(self):
+        created = seed_faqs()
+        self.assertGreaterEqual(created, 30)
+        self.assertEqual(seed_faqs(), 0)
+
+    def test_matching_faq_returns_the_relevant_answer(self):
+        FaqEntry.objects.create(
+            topic='login',
+            keywords='forgot password, reset password, change password',
+            question='How do I reset a forgotten password?',
+            answer='Use the password reset flow.',
+        )
+        FaqEntry.objects.create(
+            topic='login',
+            keywords='sign in, login, lrn',
+            question='How do I log in?',
+            answer='Students use their LRN to sign in.',
+        )
+        self.assertEqual(
+            matching_faq_answer('Where can I reset my password?', 'login'),
+            'Use the password reset flow.',
+        )
 
     def test_chatbot_uses_trained_topic(self):
         train_intent()

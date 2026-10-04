@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import LineMark from '../../../components/LineMark/LineMark';
 import Loading from '../../../components/Loading/Loading';
 import FieldLabel from './FieldLabel';
-import { fetchCms, saveCmsDocument } from '../../../services/cmsService';
+import { fetchCms } from '../../../services/cmsService';
 import { DEFAULT_CMS } from '../../../utils/cmsDefaults';
 import './AdminCms.css';
+import { useCmsPublish } from './useCmsPublish';
 
 const GROUPS = [
   {
@@ -28,15 +29,29 @@ const GROUPS = [
   },
 ];
 
+const PAGE = {
+  document: 'contact',
+  name: 'Contact page',
+  saved: 'Contact page saved.',
+  publishBody: 'The Contact page on the public website updates as soon as you confirm.',
+};
+
 export default function AdminCmsContactPage() {
+  const { publish, proposing } = useCmsPublish(PAGE);
   const [form, setForm] = useState(null);
+  // The page as loaded, so a tagged editor's proposal carries only what changed.
+  const [loaded, setLoaded] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchCms()
-      .then((data) => setForm({ ...DEFAULT_CMS.contact, ...(data.contact || {}) }))
+      .then((data) => {
+        const next = { ...DEFAULT_CMS.contact, ...(data.contact || {}) };
+        setForm(next);
+        setLoaded(next);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -44,9 +59,10 @@ export default function AdminCmsContactPage() {
   async function handleSave(event) {
     event.preventDefault();
     setError('');
+    setMessage('');
     try {
-      await saveCmsDocument('contact', form);
-      setMessage('Contact page saved.');
+      const done = await publish(form, loaded);
+      if (done) setMessage(done);
     } catch (err) {
       setError(err.message);
     }
@@ -85,7 +101,7 @@ export default function AdminCmsContactPage() {
       </div>
       <div className="cms-save">
         <button className="btn" type="submit">
-          Save contact
+          {proposing ? 'Submit for approval' : 'Save contact'}
         </button>
       </div>
     </form>

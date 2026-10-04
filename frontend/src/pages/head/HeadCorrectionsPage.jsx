@@ -1,21 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useProposal } from '../../components/Access/proposalContext';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
-import { fetchCorrections, reviewCorrection } from '../../services/adminService';
+import { fetchCorrections, fetchCorrectionsToReview, reviewCorrection } from '../../services/adminService';
 import { when } from '../../utils/when';
 
 export default function HeadCorrectionsPage() {
   const [tab, setTab] = useState('pending');
   const [rows, setRows] = useState([]);
   const [openTeachers, setOpenTeachers] = useState({});
-  const [note, setNote] = useState('');
+  const confirm = useConfirm();
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  // Set when a teacher tagged to review corrections opens this page: decisions become requests.
+  const proposal = useProposal();
 
   async function load(nextTab = tab) {
+    if (proposal) {
+      setRows((await fetchCorrectionsToReview()) || []);
+      return;
+    }
     const data = await fetchCorrections(nextTab === 'record' ? 'record' : 'pending');
     setRows(data || []);
   }
@@ -49,14 +57,48 @@ export default function HeadCorrectionsPage() {
     }
   }
 
+  async function proposeDecision(row, status) {
+    const approving = status === 'approved';
+    setError('');
+    setMessage('');
+    try {
+      const sent = await proposal.propose((note) => ({ correction: row.id, decision: status, note }), {
+        title: `Propose ${approving ? 'approving' : 'declining'} ${row.student}'s correction?`,
+        facts: [
+          { label: 'Current score', value: row.current_score },
+          { label: 'Proposed score', value: row.proposed_score },
+        ],
+        noteLabel: approving ? undefined : 'Reason (sent to the Head Teacher and the teacher)',
+      });
+      if (sent) setMessage('Sent to the Head Teacher for approval. Follow it under My access.');
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function decide(row, status) {
+    if (proposal) return proposeDecision(row, status);
+    const approving = status === 'approved';
+    const answer = await confirm({
+      title: approving ? 'Approve this correction?' : 'Decline this correction?',
+      body: approving
+        ? `${row.student}'s ${row.subject} grade changes to the proposed score. The teacher is notified.`
+        : `${row.student}'s ${row.subject} grade stays as it is. The teacher is notified.`,
+      confirmLabel: approving ? 'Approve correction' : 'Decline correction',
+      tone: approving ? 'standard' : 'warning',
+      facts: [
+        { label: 'Current score', value: row.current_score },
+        { label: 'Proposed score', value: row.proposed_score },
+      ],
+      note: approving ? undefined : { label: 'Note to the teacher', placeholder: 'Why is it declined?' },
+    });
+    if (!answer) return;
     setBusyId(row.id);
     setError('');
     setMessage('');
     try {
-      await reviewCorrection(row.id, { status, note });
+      await reviewCorrection(row.id, { status, note: answer.note || '' });
       await load('pending');
-      setNote('');
       setMessage(`${status === 'approved' ? 'Approved' : 'Declined'} correction for ${row.student}. Teacher is notified.`);
     } catch (err) {
       setError(err.message);
@@ -75,7 +117,7 @@ export default function HeadCorrectionsPage() {
       {message ? <p className="alert alert-info">{message}</p> : null}
       {error ? <p className="alert alert-error">{error}</p> : null}
 
-      <div className="studio-filters">
+      <div className="studio-filters" hidden={Boolean(proposal)}>
         <button type="button" className={`studio-filter${tab === 'pending' ? ' is-active' : ''}`} onClick={() => switchTab('pending')}>Pending</button>
         <button type="button" className={`studio-filter${tab === 'record' ? ' is-active' : ''}`} onClick={() => switchTab('record')}>Record</button>
       </div>
@@ -115,12 +157,9 @@ export default function HeadCorrectionsPage() {
                           {row.approve_blocked ? <p className="alert alert-error">{row.approve_block_reason}</p> : null}
                         </div>
                         {tab === 'pending' ? (
-                          <div className="studio-stack">
-                            <input className="studio-textfield" type="text" placeholder="Decline note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
-                            <div className="studio-actions">
-                              <button className="btn" type="button" disabled={busyId === row.id || row.approve_blocked} onClick={() => decide(row, 'approved')}>Approve</button>
-                              <button className="btn btn-secondary" type="button" disabled={busyId === row.id} onClick={() => decide(row, 'rejected')}>Decline</button>
-                            </div>
+                          <div className="studio-actions">
+                            <button className="btn" type="button" disabled={busyId === row.id || row.approve_blocked} onClick={() => decide(row, 'approved')}>{proposal ? 'Propose approve' : 'Approve'}</button>
+                            <button className="btn btn-secondary" type="button" disabled={busyId === row.id} onClick={() => decide(row, 'rejected')}>{proposal ? 'Propose decline' : 'Decline'}</button>
                           </div>
                         ) : null}
                       </article>

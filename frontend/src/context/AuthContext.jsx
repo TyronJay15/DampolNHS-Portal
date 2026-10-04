@@ -41,8 +41,9 @@ export function AuthProvider({ children }) {
         return nextUser;
       },
       async logout() {
-        await logoutRequest();
+        const confirmed = await logoutRequest();
         setUser(null);
+        return confirmed;
       },
     }),
     [user, loading]

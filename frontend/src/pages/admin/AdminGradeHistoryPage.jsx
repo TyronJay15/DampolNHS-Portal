@@ -24,6 +24,8 @@ export default function AdminGradeHistoryPage() {
   const [terms, setTerms] = useState([]);
   const [yearId, setYearId] = useState('');
   const [termId, setTermId] = useState('');
+  // The change log can also span the whole year; the class report is always one term.
+  const [logTermId, setLogTermId] = useState('');
   const [query, setQuery] = useState('');
   const [report, setReport] = useState({ year: null, term: null, sections: [] });
   const [log, setLog] = useState([]);
@@ -32,10 +34,9 @@ export default function AdminGradeHistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([fetchSchoolYears(), fetchGradeHistory()])
-      .then(([yearRows, historyRows]) => {
+    fetchSchoolYears()
+      .then((yearRows) => {
         setYears(yearRows);
-        setLog(historyRows);
         const current = yearRows.find((row) => row.is_current) || yearRows[0];
         setYearId(current ? String(current.id) : '');
       })
@@ -52,6 +53,7 @@ export default function AdminGradeHistoryPage() {
         setTerms(termRows);
         const current = termRows.find((row) => row.is_current) || termRows[0];
         setTermId(current ? String(current.id) : '');
+        setLogTermId('');
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -77,6 +79,21 @@ export default function AdminGradeHistoryPage() {
       cancelled = true;
     };
   }, [yearId, termId]);
+
+  useEffect(() => {
+    if (!yearId) return undefined;
+    let cancelled = false;
+    fetchGradeHistory({ school_year: yearId, term: logTermId })
+      .then((rows) => {
+        if (!cancelled) setLog(rows);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [yearId, logTermId]);
 
   const sections = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -104,7 +121,10 @@ export default function AdminGradeHistoryPage() {
   return (
     <div className="desk studio">
       <PageHead kicker="Records" title="Grade history" icon="history">
-        <p>Class report is the live snapshot for a year and term. The change log is the immutable score trail.</p>
+        <p>
+          Class report is the live snapshot for a year and term, listing only the subjects scheduled in that term. The
+          change log is the immutable score trail.
+        </p>
         <div className="studio-hero-meta">
           <span className="studio-chip">{report.year?.label || 'No year'}</span>
           <span className="studio-chip">{report.term?.label || 'No term'}</span>
@@ -122,36 +142,36 @@ export default function AdminGradeHistoryPage() {
       </div>
 
       <div className="studio-toolbar">
-        {tab === 'report' ? (
-          <>
-            <label className="studio-search">
-              <span className="desk-line">
-                <LineMark name="year" size={14} />
-                School year
-              </span>
-              <select value={yearId} onChange={(event) => setYearId(event.target.value)}>
-                {years.map((year) => (
-                  <option key={year.id} value={year.id}>
-                    {year.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="studio-search">
-              <span className="desk-line">
-                <LineMark name="year" size={14} />
-                Term
-              </span>
-              <select value={termId} onChange={(event) => setTermId(event.target.value)}>
-                {terms.map((term) => (
-                  <option key={term.id} value={term.id}>
-                    {term.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </>
-        ) : null}
+        <label className="studio-search">
+          <span className="desk-line">
+            <LineMark name="year" size={14} />
+            School year
+          </span>
+          <select value={yearId} onChange={(event) => setYearId(event.target.value)}>
+            {years.map((year) => (
+              <option key={year.id} value={year.id}>
+                {year.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="studio-search">
+          <span className="desk-line">
+            <LineMark name="year" size={14} />
+            Term
+          </span>
+          <select
+            value={tab === 'report' ? termId : logTermId}
+            onChange={(event) => (tab === 'report' ? setTermId : setLogTermId)(event.target.value)}
+          >
+            {tab === 'log' ? <option value="">All terms</option> : null}
+            {terms.map((term) => (
+              <option key={term.id} value={term.id}>
+                {term.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="studio-search">
           <span className="desk-line">
             <LineMark name="search" size={14} />
@@ -239,7 +259,7 @@ export default function AdminGradeHistoryPage() {
           })
         )
       ) : logRows.length === 0 ? (
-        <p className="card studio-panel studio-empty">No grade changes recorded yet.</p>
+        <p className="card studio-panel studio-empty">No grade changes recorded for that year and term.</p>
       ) : (
         <div className="card studio-table-wrap">
           <table className="studio-table">

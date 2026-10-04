@@ -18,12 +18,6 @@
   box-shadow: var(--dash-shadow-strong);
 }
 
-.admin-bento {
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 20px;
-}
-
 .admin-tile {
   padding: 1.2rem 1.25rem;
   animation: dash-rise 0.45s ease both;
@@ -38,10 +32,6 @@
 .admin-tile h2 {
   margin: 0 0 0.8rem;
   font-size: 1.05rem;
-}
-
-.admin-tile-wide {
-  min-width: 0;
 }
 
 .admin-forecast-lead,
@@ -176,12 +166,8 @@
   .admin-home .admin-desk-stats {
     grid-template-columns: 1fr 1fr;
   }
-}
-
-@media (max-width: 900px) {
-  .admin-bento,
-  .forecast-page-grid,
-  .admin-home .admin-desk-stats {
+}@media (max-width: 900px) {.forecast-page-grid,
+.admin-home .admin-desk-stats {
     grid-template-columns: 1fr;
   }
 }

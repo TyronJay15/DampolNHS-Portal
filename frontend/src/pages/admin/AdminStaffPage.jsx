@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
 import {
@@ -12,7 +13,15 @@ import {
 import { firstApiError } from '../../utils/authRules';
 import AccountListToolbar from './AccountListToolbar';
 import AccountResultCard from './AccountResultCard';
+import { ActivationFacts, ActivationStrip } from './StaffActivation';
 import './AdminAccountsPage.css';
+
+// What happened to an activation email, for the result card.
+function codeNext(emailed, then) {
+  return emailed
+    ? `The 6-digit activation code was emailed. ${then}`
+    : 'The code email did not go out. Use Resend, or check the mail settings. The reason shows on their card.';
+}
 
 const EMPTY = {
   first_name: '',
@@ -42,6 +51,7 @@ function initials(row) {
 }
 
 export default function AdminStaffPage() {
+  const confirm = useConfirm();
   const [rows, setRows] = useState([]);
   const [form, setForm] = useState(EMPTY);
   const [query, setQuery] = useState('');
@@ -52,8 +62,6 @@ export default function AdminStaffPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [archiving, setArchiving] = useState(null);
-  const [removing, setRemoving] = useState(null);
   const hasHeadTeacher = rows.some((row) => row.role === 'head_teacher' && !ARCHIVED.has(row.account_status));
 
   async function load() {
@@ -86,9 +94,15 @@ export default function AdminStaffPage() {
   }
 
   async function handleArchive(row) {
+    const answer = await confirm({
+      title: `Archive ${row.name}?`,
+      body: 'Sign-in turns off and they leave Head Teacher lists. You can restore them later.',
+      confirmLabel: 'Archive account',
+      tone: 'warning',
+    });
+    if (!answer) return;
     setError('');
     setResult(null);
-    setArchiving(null);
     setSaving(true);
     try {
       await deactivateAccount(row.id);
@@ -110,9 +124,15 @@ export default function AdminStaffPage() {
   }
 
   async function handleRemove(row) {
+    const answer = await confirm({
+      title: `Delete ${row.name}?`,
+      body: 'This clears the login name and email. Assignments stay. It cannot be undone.',
+      confirmLabel: 'Delete permanently',
+      tone: 'danger',
+    });
+    if (!answer) return;
     setError('');
     setResult(null);
-    setRemoving(null);
     setSaving(true);
     try {
       await removeAccount(row.id);
@@ -133,6 +153,12 @@ export default function AdminStaffPage() {
   }
 
   async function handleReactivate(row) {
+    const answer = await confirm({
+      title: `Reactivate ${row.name}?`,
+      body: 'Their account is restored and they appear in the Head Teacher lists again. They may need to set a new password.',
+      confirmLabel: 'Reactivate',
+    });
+    if (!answer) return;
     setError('');
     setResult(null);
     setSaving(true);
@@ -145,7 +171,7 @@ export default function AdminStaffPage() {
           { label: 'Email', value: row.email },
         ],
         next: saved.activation_sent
-          ? 'Copy the activation code from the Django terminal, then open /activate and set a new password.'
+          ? codeNext(saved.activation_emailed, 'They open /activate and set a new password.')
           : 'They can sign in again with their existing password.',
       });
       await load();
@@ -161,15 +187,16 @@ export default function AdminStaffPage() {
     setResult(null);
     setSaving(true);
     try {
-      await resendStaffActivation(row.id);
+      const sent = await resendStaffActivation(row.id);
       setResult({
-        title: 'Activation email sent again',
+        title: sent.activation_emailed ? 'Activation email sent again' : 'Activation email did not go out',
         facts: [
           { label: 'Name', value: row.name },
           { label: 'Email', value: row.email },
         ],
-        next: 'Copy the activation code from the Django terminal, then open /activate.',
+        next: codeNext(sent.activation_emailed, 'They open /activate and set a password.'),
       });
+      await load();
     } catch (err) {
       setError(firstApiError(err));
     } finally {
@@ -192,7 +219,7 @@ export default function AdminStaffPage() {
           { label: 'Email', value: saved.email },
           { label: 'Role', value: ROLE_LABEL[saved.role] || saved.role },
         ],
-        next: 'Copy the 6-digit activation code from the Django terminal, then open /activate and set a password.',
+        next: codeNext(saved.activation_emailed, 'They open /activate and set a password.'),
       });
       await load();
     } catch (err) {
@@ -209,6 +236,8 @@ export default function AdminStaffPage() {
       {result ? <AccountResultCard {...result} onClose={() => setResult(null)} /> : null}
       {error ? <p className="alert alert-error">{error}</p> : null}
 
+      <ActivationStrip rows={rows} />
+
       <div className="acct-staff">
         <form className="card acct-card acct-create" onSubmit={handleCreate}>
           <h2 className="desk-line">
@@ -216,7 +245,8 @@ export default function AdminStaffPage() {
             New staff login
           </h2>
           <p className="admin-meta">
-            No password here. The 6-digit activation code prints in the Django terminal until school DNS is ready.
+            No password here. A 6-digit activation code is emailed to them. In local development it also prints in the
+            Django terminal.
           </p>
           <label className="form-field">
             <span className="desk-line">
@@ -312,6 +342,7 @@ export default function AdminStaffPage() {
                     </em>
                   </header>
                   <p className="acct-role">{ROLE_LABEL[row.role] || row.role}</p>
+                  <ActivationFacts activation={row.activation} status={row.account_status} />
                   <div className="acct-actions">
                     {row.account_status === 'pending_activation' ? (
                       <button className="acct-btn" type="button" disabled={saving} onClick={() => handleResend(row)}>
@@ -319,7 +350,7 @@ export default function AdminStaffPage() {
                       </button>
                     ) : null}
                     {row.account_status === 'active' ? (
-                      <button className="acct-btn acct-btn-no" type="button" disabled={saving} onClick={() => setArchiving(row)}>
+                      <button className="acct-btn acct-btn-no" type="button" disabled={saving} onClick={() => handleArchive(row)}>
                         Archive
                       </button>
                     ) : null}
@@ -328,7 +359,7 @@ export default function AdminStaffPage() {
                         <button className="acct-btn acct-btn-ok" type="button" disabled={saving} onClick={() => handleReactivate(row)}>
                           Reactivate
                         </button>
-                        <button className="acct-btn acct-btn-no" type="button" disabled={saving} onClick={() => setRemoving(row)}>
+                        <button className="acct-btn acct-btn-no" type="button" disabled={saving} onClick={() => handleRemove(row)}>
                           Delete
                         </button>
                       </>
@@ -340,46 +371,6 @@ export default function AdminStaffPage() {
           )}
         </div>
       </div>
-
-      {archiving ? (
-        <div className="admin-modal-backdrop">
-          <div className="card admin-modal">
-            <h2 className="desk-line">
-              <LineMark name="staff" />
-              Archive {archiving.name}?
-            </h2>
-            <p>Sign-in turns off and they leave Head Teacher lists. Restore later if needed.</p>
-            <div className="acct-actions">
-              <button className="acct-btn acct-btn-no" type="button" disabled={saving} onClick={() => handleArchive(archiving)}>
-                Archive account
-              </button>
-              <button className="acct-btn" type="button" onClick={() => setArchiving(null)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {removing ? (
-        <div className="admin-modal-backdrop">
-          <div className="card admin-modal">
-            <h2 className="desk-line">
-              <LineMark name="staff" />
-              Delete {removing.name}?
-            </h2>
-            <p>This clears the login name and email. Assignments stay. It cannot be undone.</p>
-            <div className="acct-actions">
-              <button className="acct-btn acct-btn-no" type="button" disabled={saving} onClick={() => handleRemove(removing)}>
-                Delete permanently
-              </button>
-              <button className="acct-btn" type="button" onClick={() => setRemoving(null)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

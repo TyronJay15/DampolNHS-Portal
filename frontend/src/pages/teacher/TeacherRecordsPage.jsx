@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { groupByProgramSection, openAllGroups } from './groupTeacherDuties';
 import { useTeacherDuties } from './useTeacherDuties';
 import { progressChipClass } from '../../utils/gradeStatus';
+import { dutyTermNote } from './dutyTerms';
 
 function EncodeChips({ row }) {
   const current = row.progress?.current;
@@ -134,7 +135,7 @@ export default function TeacherRecordsPage() {
                                         </h3>
                                         <p>
                                           {row.grade_level} · {row.school_year}
-                                          {row.progress?.current?.term ? ` · ${row.progress.current.term}` : ''}
+                                          {` · ${dutyTermNote(row)}`}
                                         </p>
                                         <EncodeChips row={row} />
                                       </div>

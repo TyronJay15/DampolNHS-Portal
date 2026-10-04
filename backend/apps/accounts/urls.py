@@ -12,8 +12,6 @@ from .views import (
     MeView,
     PasswordCodeVerifyView,
     PasswordOtpView,
-    PublicChangePasswordView,
-    PublicPasswordOtpView,
 )
 
 urlpatterns = [
@@ -25,8 +23,6 @@ urlpatterns = [
     path('change-password/otp/', PasswordOtpView.as_view(), name='auth-change-password-otp'),
     path('change-password/verify/', PasswordCodeVerifyView.as_view(), name='auth-change-password-verify'),
     path('change-password/', ChangePasswordView.as_view(), name='auth-change-password'),
-    path('change-password-public/otp/', PublicPasswordOtpView.as_view(), name='auth-change-password-public-otp'),
-    path('change-password-public/', PublicChangePasswordView.as_view(), name='auth-change-password-public'),
     path('forgot-password/otp/', ForgotPasswordOtpView.as_view(), name='auth-forgot-password-otp'),
     path('forgot-password/verify/', ForgotPasswordVerifyView.as_view(), name='auth-forgot-password-verify'),
     path('forgot-password/', ForgotPasswordView.as_view(), name='auth-forgot-password'),

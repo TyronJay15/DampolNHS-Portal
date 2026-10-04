@@ -1,3 +1,15 @@
+import ConfirmFrame from '../ConfirmDialog/ConfirmFrame';
+import Icon from '../Icon/Icon';
+
+const COUNTS = [
+  ['students', 'Student records'],
+  ['duties', 'Teacher duties'],
+  ['grades', 'Grade records'],
+  ['sections', 'Sections'],
+];
+
+// Permanent delete with a typed confirmation, and a reason when grade history is also removed.
+// It is built on the shared ConfirmFrame so it looks and behaves like every other confirmation.
 export default function ConfirmDeleteModal({
   title,
   summary,
@@ -13,48 +25,61 @@ export default function ConfirmDeleteModal({
   onSubmit,
   busy,
 }) {
+  const facts = COUNTS.filter(([key]) => summary?.[key] != null).map(([key, label]) => ({ label, value: summary[key] }));
   return (
-    <div className="studio-modal-backdrop">
-      <div className="card studio-panel studio-modal studio-modal-wide">
-        <h2>{title}</h2>
-        {summary ? (
-          <ul className="studio-summary-list">
-            {summary.students != null ? <li>{summary.students} student enrollment record(s)</li> : null}
-            {summary.duties != null ? <li>{summary.duties} teacher assignment(s)</li> : null}
-            {summary.grades != null ? <li>{summary.grades} grade record(s)</li> : null}
-            {summary.sections != null ? <li>{summary.sections} section(s)</li> : null}
-          </ul>
-        ) : null}
-        {gradesProtected && !hardMode ? (
-          <>
-            <p className="alert alert-error">Grade records are protected on normal delete.</p>
-            <button className="btn btn-secondary" type="button" onClick={onHardMode}>
-              Hard delete anyway
-            </button>
-          </>
-        ) : null}
-        {gradesProtected && hardMode ? (
-          <p className="alert alert-error">Hard delete removes grade history permanently for teachers and students.</p>
-        ) : null}
-        <label className="form-field is-wide">
-          <span>{confirmHint}</span>
-          <input value={confirmValue} onChange={(event) => onConfirmValue(event.target.value)} />
-        </label>
-        {(hardMode || gradesProtected) && (
-          <label className="form-field is-wide">
-            <span>Reason</span>
-            <input value={reason} onChange={(event) => onReason(event.target.value)} placeholder="Required for hard delete" />
-          </label>
-        )}
-        <div className="studio-actions">
-          <button className="btn btn-secondary" type="button" onClick={onCancel} disabled={busy}>
+    <ConfirmFrame
+      title={title}
+      tone="danger"
+      wide
+      onDismiss={busy ? undefined : onCancel}
+      actions={
+        <>
+          <button type="button" className="cfm-btn is-cancel" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
-          <button className="btn btn-danger" type="button" onClick={onSubmit} disabled={busy}>
+          {gradesProtected && !hardMode ? (
+            <button type="button" className="cfm-btn is-cancel" onClick={onHardMode} disabled={busy}>
+              Hard delete anyway
+            </button>
+          ) : null}
+          <button type="button" className="cfm-btn is-confirm" onClick={onSubmit} disabled={busy}>
             {busy ? 'Deleting…' : hardMode ? 'Hard delete permanently' : 'Delete permanently'}
           </button>
+        </>
+      }
+    >
+      {facts.length ? (
+        <dl className="cfm-facts">
+          {facts.map((fact) => (
+            <div key={fact.label}>
+              <dd>{fact.value}</dd>
+              <dt>{fact.label}</dt>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+
+      {gradesProtected ? (
+        <div className="cfm-warning is-danger" role="note">
+          <Icon name="alert" size={16} />
+          <p>
+            {hardMode
+              ? 'Hard delete removes grade history permanently for teachers and students.'
+              : 'Grade records are protected on normal delete.'}
+          </p>
         </div>
-      </div>
-    </div>
+      ) : null}
+
+      <label className="cfm-field">
+        <span>{confirmHint}</span>
+        <input data-autofocus value={confirmValue} onChange={(event) => onConfirmValue(event.target.value)} />
+      </label>
+      {hardMode || gradesProtected ? (
+        <label className="cfm-field">
+          <span>Reason</span>
+          <input value={reason} onChange={(event) => onReason(event.target.value)} placeholder="Required for hard delete" />
+        </label>
+      ) : null}
+    </ConfirmFrame>
   );
 }

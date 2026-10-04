@@ -9,7 +9,7 @@ from apps.people.models import Registration, StudentSection, TeacherAssignment
 from apps.people.serializers import StudentProfileUpdateSerializer
 from apps.school.labels import section_label
 from apps.school.models import SchoolYear
-from apps.school.offerings import subject_payloads_for_program
+from apps.school.term_plan import scheduled_subject_payloads
 
 
 def student_me_payload(user):
@@ -80,7 +80,7 @@ def student_me_payload(user):
         'program': registration.program.code if registration else '',
         'school_year': school_year,
         'section': section_payload,
-        'subjects': subject_payloads_for_program(program),
+        'subjects': scheduled_subject_payloads(program, assignment.school_year if assignment else current_year),
     }
 
 
@@ -102,20 +102,24 @@ class StudentMeView(APIView):
         serializer.is_valid(raise_exception=True)
 
         changed = []
+        details = {}
         for field, value in serializer.validated_data.items():
-            if getattr(profile, field) != value:
+            previous = getattr(profile, field)
+            if previous != value:
                 setattr(profile, field, value)
                 changed.append(field)
+                if field == 'gender':
+                    details['gender'] = {'from': previous, 'to': value}
 
         if changed:
             profile.save(update_fields=[*changed, 'updated_at'])
             audit.record(
                 user=request.user,
                 action='student_profile_updated',
-                summary=f'Updated contact details ({", ".join(changed)})',
+                summary=f'Updated profile details ({", ".join(changed)})',
                 target_type='StudentProfile',
                 target_id=profile.id,
-                details={'changed': changed},
+                details={'changed': changed, **details},
             )
 
         return Response(student_me_payload(request.user))

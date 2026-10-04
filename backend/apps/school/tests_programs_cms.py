@@ -59,8 +59,8 @@ class ProgramCmsTests(TestCase):
             f'/api/admin/programs/{self.ash.id}/',
             {
                 'subjects': [
-                    {'subject_id': comm.id, 'kind': 'core', 'term': 1},
-                    {'subject_id': bio.id, 'kind': 'specialized', 'term': 2},
+                    {'subject_id': comm.id, 'kind': 'core', 'terms': [1]},
+                    {'subject_id': bio.id, 'kind': 'specialized', 'terms': [2, 3]},
                 ]
             },
             format='json',
@@ -70,6 +70,7 @@ class ProgramCmsTests(TestCase):
             ProgramSubject.objects.filter(program=self.ash).values_list('subject__code', flat=True)
         )
         self.assertEqual(codes, {'eff-comm', 'bio-1'})
+        self.assertEqual(ProgramSubject.objects.get(program=self.ash, subject=bio).terms, [2, 3])
         names = [row['name'] for row in response.data['subjects']]
         self.assertIn(comm.name, names)
         self.assertIn(bio.name, names)
@@ -107,7 +108,7 @@ class ProgramCmsTests(TestCase):
                 'grade_level': 'Grade 11',
                 'track': 'Academic Cluster',
                 'summary': 'Added from CMS.',
-                'subjects': [{'subject_id': created.data['id'], 'kind': 'core', 'term': 1}],
+                'subjects': [{'subject_id': created.data['id'], 'kind': 'core', 'terms': [1]}],
             },
             format='json',
         )

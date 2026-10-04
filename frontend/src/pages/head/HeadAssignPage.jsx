@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useProposal } from '../../components/Access/proposalContext';
 import AdvancedToolBanner from '../../components/AdvancedToolBanner/AdvancedToolBanner';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
@@ -14,6 +16,9 @@ import {
 import { sectionLabel } from '../../utils/sectionLabel';
 
 export default function HeadAssignPage() {
+  const confirm = useConfirm();
+  // Set when a teacher tagged to prepare assignments opens this page: new duties become requests.
+  const proposal = useProposal();
   const [view, setView] = useState('section');
   const [assignments, setAssignments] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -83,8 +88,34 @@ export default function HeadAssignPage() {
   const takenSubjects = new Set(sectionDuties.filter((row) => row.subject_id).map((row) => String(row.subject_id)));
   const openSubjects = subjects.filter((row) => !takenSubjects.has(String(row.id)));
 
+  async function proposeDuty(payload) {
+    const person = teachers.find((row) => String(row.id) === String(payload.teacher));
+    const subject = subjects.find((row) => String(row.id) === String(payload.subject));
+    try {
+      const sent = await proposal.propose(payload, {
+        title: `Propose ${person?.name || 'this teacher'} as ${payload.type === 'adviser' ? 'adviser' : subject?.name || 'subject teacher'}?`,
+        facts: [{ label: 'Section', value: sectionLabel(section) }],
+      });
+      if (!sent) return;
+      setForm((current) => ({ ...current, subject: '' }));
+      setMessage('Sent to the Head Teacher for approval. Follow it under My access.');
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function handleCreate(event) {
     event.preventDefault();
+    if (proposal) {
+      setError('');
+      setMessage('');
+      return proposeDuty({
+        teacher: Number(view === 'teacher' ? teacherId : form.teacher),
+        section: Number(sectionId),
+        subject: form.type === 'adviser' ? null : Number(form.subject) || null,
+        type: form.type,
+      });
+    }
     setBusy('create');
     setError('');
     setMessage('');
@@ -110,6 +141,14 @@ export default function HeadAssignPage() {
   }
 
   async function endDuty(row) {
+    const role = row.type === 'adviser' ? 'adviser' : row.subject;
+    const answer = await confirm({
+      title: `End ${row.teacher}'s duty?`,
+      body: `${row.teacher} will no longer be the ${role}${row.section ? ` for ${row.section}` : ''} and loses access to that class. The duty moves to the Archive, where it can be restored.`,
+      confirmLabel: 'End duty',
+      tone: 'warning',
+    });
+    if (!answer) return;
     setBusy(`del-${row.id}`);
     setError('');
     try {
@@ -135,7 +174,7 @@ export default function HeadAssignPage() {
           <span className="studio-chip">{assignments.length} live duties</span>
         </div>
       </PageHead>
-      <AdvancedToolBanner />
+      {proposal ? null : <AdvancedToolBanner />}
       {message ? <p className="alert alert-info">{message}</p> : null}
       {error ? <p className="alert alert-error">{error}</p> : null}
 
@@ -218,7 +257,7 @@ export default function HeadAssignPage() {
                         <td>{subj.name}</td>
                         <td>{duty ? duty.teacher : '—'}</td>
                         <td>
-                          {duty ? (
+                          {duty && !proposal ? (
                             <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => endDuty(duty)}>End</button>
                           ) : null}
                         </td>
@@ -288,7 +327,7 @@ export default function HeadAssignPage() {
             )}
             <div className="studio-form-actions">
               <button className="btn" type="submit" disabled={Boolean(busy) || !sectionId || teachers.length === 0}>
-                {busy === 'create' ? 'Saving…' : 'Assign'}
+                {busy === 'create' ? 'Saving…' : proposal ? 'Submit for approval' : 'Assign'}
               </button>
             </div>
           </form>
@@ -312,9 +351,11 @@ export default function HeadAssignPage() {
                         <td>{row.type === 'adviser' ? 'Adviser' : row.subject}</td>
                         <td>{row.section}</td>
                         <td>
-                          <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => endDuty(row)}>
-                            {busy === `del-${row.id}` ? 'Ending…' : 'End duty'}
-                          </button>
+                          {proposal ? null : (
+                            <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => endDuty(row)}>
+                              {busy === `del-${row.id}` ? 'Ending…' : 'End duty'}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

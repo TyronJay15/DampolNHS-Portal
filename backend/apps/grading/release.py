@@ -1,11 +1,9 @@
-from django.utils import timezone
-
 from apps.audit import services as audit
-from apps.grading.advisory import assigned_subject_ids
-from apps.grading.history import ADVISER
-from apps.grading.models import Grade, PtpaAttendance
-from apps.grading.transitions import transition_grades
 from apps.audit.catalog import GRADES
+from apps.grading.advisory import assigned_subject_ids, counted_subject_ids, term_subject_ids
+from apps.grading.history import ADVISER
+from apps.grading.models import Grade
+from apps.grading.transitions import transition_grades
 from apps.notifications.services import notify
 from apps.people.models import StudentSection
 
@@ -42,15 +40,14 @@ def student_term_grades(section, term, student, statuses=None):
 
 
 def student_is_ready(section, term, student):
-    """True when every assigned subject is approved or already shown."""
-    subject_ids = assigned_subject_ids(section)
+    """True when every subject scheduled this term (and any already graded) is approved or shown."""
+    rows = student_term_grades(section, term, student)
+    subject_ids = counted_subject_ids(term_subject_ids(section, term), rows)
     if not subject_ids:
         return False
-    grades = {row.subject_id: row for row in student_term_grades(section, term, student)}
-    if len(grades) != len(subject_ids):
-        return False
+    grades = {row.subject_id: row for row in rows}
     allowed = {Grade.Status.APPROVED, Grade.Status.RELEASED}
-    return all(grades[subject_id].status in allowed for subject_id in subject_ids)
+    return all(subject_id in grades and grades[subject_id].status in allowed for subject_id in subject_ids)
 
 
 def student_can_show(section, term, student):
@@ -80,14 +77,9 @@ def show_student_card(*, section, term, student, user):
         reason='Adviser showed report card' if complete else 'Adviser showed partial report card',
         duty=ADVISER,
     )
-    assigned = len(assigned_subject_ids(section))
-    released = Grade.objects.filter(
-        term=term,
-        section=section,
-        student=student,
-        status=Grade.Status.RELEASED,
-        subject_id__in=assigned_subject_ids(section),
-    ).count()
+    shown_rows = student_term_grades(section, term, student, statuses=[Grade.Status.RELEASED])
+    assigned = len(counted_subject_ids(term_subject_ids(section, term), shown_rows))
+    released = len(shown_rows)
     audit.record(
         user=user,
         action='grades_shown',
@@ -108,13 +100,13 @@ def show_student_card(*, section, term, student, user):
     return moved
 
 
-def hide_student_card(*, section, term, student, user, reason='Adviser hid report card'):
+def hide_student_card(*, section, term, student, user):
     grades = student_term_grades(section, term, student, statuses=[Grade.Status.RELEASED])
     moved = transition_grades(
         grades=grades,
         to_status=Grade.Status.APPROVED,
         user=user,
-        reason=reason,
+        reason='Adviser hid report card',
         duty=ADVISER,
     )
     if not moved:
@@ -136,70 +128,21 @@ def hide_student_card(*, section, term, student, user, reason='Adviser hid repor
     return moved
 
 
-def set_ptpa(*, section, term, student, attended, user):
-    PtpaAttendance.objects.update_or_create(
-        student=student,
-        term=term,
-        defaults={
-            'section': section,
-            'attended': attended,
-            'marked_by': user,
-            'marked_at': timezone.now(),
-        },
-    )
-    hidden = 0
-    if not attended:
-        hidden = hide_student_card(
+def _roster_students(section):
+    return [
+        row.student
+        for row in StudentSection.objects.filter(
             section=section,
-            term=term,
-            student=student,
-            user=user,
-            reason='Parent missed PTPA',
-        )
-    audit.record(
-        user=user,
-        action='ptpa_marked',
-        summary=f'Marked PTPA {"attended" if attended else "absent"} for {student.user.get_full_name()}',
-        target_type='StudentProfile',
-        target_id=student.id,
-        details={'term': term.id, 'section': section.id, 'attended': attended, 'hidden': hidden},
-    )
-    return hidden
-
-
-def _students_on_roster(section, student_ids):
-    if student_ids is None:
-        return [
-            row.student
-            for row in StudentSection.objects.filter(
-                section=section,
-                school_year=section.school_year,
-                is_active=True,
-            ).select_related('student', 'student__user')
-        ]
-    if not isinstance(student_ids, (list, tuple)) or not student_ids:
-        raise ReleaseError('Choose at least one student.')
-    students = []
-    for student_id in student_ids:
-        placement = roster_entry(section, student_id)
-        if placement is None:
-            raise ReleaseError('That student is not in this advisory section.', status=404)
-        students.append(placement.student)
-    return students
-
-
-def set_ptpa_bulk(*, section, term, student_ids, attended, user):
-    students = _students_on_roster(section, student_ids)
-    hidden = 0
-    for student in students:
-        hidden += set_ptpa(section=section, term=term, student=student, attended=attended, user=user)
-    return {'marked': len(students), 'hidden': hidden, 'attended': attended}
+            school_year=section.school_year,
+            is_active=True,
+        ).select_related('student', 'student__user')
+    ]
 
 
 def show_ready_cards(*, section, term, user):
     shown = 0
     skipped = 0
-    for student in _students_on_roster(section, None):
+    for student in _roster_students(section):
         pending = student_term_grades(section, term, student, statuses=[Grade.Status.APPROVED])
         if not pending:
             skipped += 1

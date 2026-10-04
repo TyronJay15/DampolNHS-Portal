@@ -159,7 +159,8 @@ class CorrectionRequest(models.Model):
 
 
 class PtpaAttendance(models.Model):
-    """Parent attendance for one student in one term. Show is blocked until True."""
+    """Retired: parent attendance per term. Nothing reads or writes it; the table is dropped in the
+    database clean-up, after which this model is removed with a migration."""
 
     student = models.ForeignKey(
         'accounts.StudentProfile',

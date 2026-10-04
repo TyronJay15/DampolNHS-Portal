@@ -10,7 +10,7 @@ from apps.accounts.models import StudentProfile, User
 from apps.cms.models import SiteContent
 from apps.notifications.models import Notification
 from apps.people.models import Registration, StudentSection, TeacherAssignment
-from apps.people.views_school import TRANSFER_TITLE
+from apps.people.placement import TRANSFER_TITLE
 from apps.school.models import Program, ProgramSubject, SchoolYear, Section, SkillDomain, Subject, Term
 
 
@@ -29,7 +29,7 @@ class AdminSchoolCmsTests(TestCase):
             program=self.program,
             subject=self.subject,
             kind=ProgramSubject.Kind.SPECIALIZED,
-            term=1,
+            terms=[1],
         )
         self.admin = User.objects.create_user(
             email='admin@dampol1nhs.edu.ph',

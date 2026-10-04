@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
 import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
@@ -18,6 +19,7 @@ import {
 } from '../../services/adminService';
 import { isCapacityError, programChangeNote } from '../../utils/placement';
 import { sectionLabel } from '../../utils/sectionLabel';
+import { genderLabel } from '../../utils/gender';
 
 const STEPS = [
   { id: 'section', label: 'Section' },
@@ -33,6 +35,7 @@ export default function HeadSectionWorkspacePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const step = searchParams.get('step') || 'section';
 
+  const confirm = useConfirm();
   const [detail, setDetail] = useState(null);
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -40,8 +43,6 @@ export default function HeadSectionWorkspacePage() {
   const [studentQuery, setStudentQuery] = useState('');
   const [adviserId, setAdviserId] = useState('');
   const [teacherPick, setTeacherPick] = useState({ subject: '', teacher: '' });
-  const [confirm, setConfirm] = useState(null);
-  const [reason, setReason] = useState('');
   const [capacity, setCapacity] = useState('40');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -113,69 +114,116 @@ export default function HeadSectionWorkspacePage() {
     }
   }
 
-  async function assignStudents(force = false) {
+  const reasonNote = { label: 'Reason', placeholder: 'Why is this change being made?' };
+
+  // Asked again when the server reports the section is full; returns the reason, or null if declined.
+  async function confirmOverCapacity(body, reason) {
+    const answer = await confirm({
+      title: 'Section is over capacity',
+      body,
+      confirmLabel: 'Proceed anyway',
+      tone: 'warning',
+      note: { label: 'Reason', placeholder: 'Why exceed capacity?', required: true, initial: reason },
+    });
+    return answer ? answer.note : null;
+  }
+
+  async function assignStudents() {
     if (chosen.length === 0) return;
-    setBusy('students');
-    setError('');
-    try {
-      const result = await savePlacementsBulk({
-        section: Number(sectionId),
-        students: chosen.map((row) => row.student_id),
-        override_capacity: force,
-        reason,
-      });
-      setSelected({});
-      setReason('');
-      setConfirm(null);
-      await reload();
-      const failedNote = result.failed?.length ? ` ${result.failed.length} could not be placed.` : '';
-      setMessage(`Placed ${result.placed} student(s).${failedNote}`);
-    } catch (err) {
-      if (isCapacityError(err)) {
-        setConfirm({ type: 'capacity', count: chosen.length });
-      } else {
-        setError(err.message);
+    const answer = await confirm({
+      title: `Assign ${chosen.length} student${chosen.length === 1 ? '' : 's'}?`,
+      body: `They are placed in ${sectionLabel(section)} and appear on its roster.`,
+      confirmLabel: 'Assign students',
+      facts: [
+        { label: 'Selected', value: chosen.length },
+        { label: 'On roster now', value: roster.length },
+      ],
+      note: reasonNote,
+    });
+    if (!answer) return;
+    let reason = answer.note;
+    let force = false;
+    for (;;) {
+      setBusy('students');
+      setError('');
+      try {
+        const result = await savePlacementsBulk({
+          section: Number(sectionId),
+          students: chosen.map((row) => row.student_id),
+          override_capacity: force,
+          reason,
+        });
+        setSelected({});
+        await reload();
+        const failedNote = result.failed?.length ? ` ${result.failed.length} could not be placed.` : '';
+        setMessage(`Placed ${result.placed} student(s).${failedNote}`);
+        return;
+      } catch (err) {
+        if (force || !isCapacityError(err)) {
+          setError(err.message);
+          return;
+        }
+        setBusy('');
+        reason = await confirmOverCapacity('These students exceed the section capacity. Proceed anyway?', reason);
+        if (reason === null) return;
+        force = true;
+      } finally {
+        setBusy('');
       }
-    } finally {
-      setBusy('');
     }
   }
 
-  async function transferStudent(row, force = false) {
-    setBusy(`move-${row.student_id}`);
-    setError('');
-    try {
-      await savePlacement({
-        student: row.student_id,
-        section: Number(sectionId),
-        transfer: true,
-        override_capacity: force,
-        reason,
-      });
-      setConfirm(null);
-      setReason('');
-      await reload();
-      setMessage(`Transferred ${row.name}.`);
-    } catch (err) {
-      if (isCapacityError(err)) {
-        setConfirm({ type: 'capacity', student: row });
-      } else {
-        setError(err.message);
+  async function transferStudent(row) {
+    const note = programChangeNote(row, section);
+    const answer = await confirm({
+      title: `Transfer ${row.name}?`,
+      body: `Move from ${row.section} to ${sectionLabel(section)}.`,
+      confirmLabel: 'Transfer',
+      warning: note || undefined,
+      note: reasonNote,
+    });
+    if (!answer) return;
+    let reason = answer.note;
+    let force = false;
+    for (;;) {
+      setBusy(`move-${row.student_id}`);
+      setError('');
+      try {
+        await savePlacement({
+          student: row.student_id,
+          section: Number(sectionId),
+          transfer: true,
+          override_capacity: force,
+          reason,
+        });
+        await reload();
+        setMessage(`Transferred ${row.name}.`);
+        return;
+      } catch (err) {
+        if (force || !isCapacityError(err)) {
+          setError(err.message);
+          return;
+        }
+        setBusy('');
+        reason = await confirmOverCapacity(`Moving ${row.name} exceeds the section capacity. Proceed anyway?`, reason);
+        if (reason === null) return;
+        force = true;
+      } finally {
+        setBusy('');
       }
-    } finally {
-      setBusy('');
     }
   }
 
   async function assignAdviser() {
     if (!adviserId) return;
-    setConfirm({
-      type: 'adviser',
-      teacher: teachers.find((row) => String(row.id) === adviserId),
+    const teacher = teachers.find((row) => String(row.id) === adviserId);
+    const answer = await confirm({
+      title: `Assign ${teacher?.name} as adviser?`,
+      body: `They become the adviser of ${sectionLabel(section)}.`,
+      confirmLabel: 'Assign adviser',
+      note: reasonNote,
     });
-  }
-
-  async function confirmAdviser() {
+    if (!answer) return;
     setBusy('adviser');
     setError('');
     try {
@@ -183,10 +231,8 @@ export default function HeadSectionWorkspacePage() {
         section: Number(sectionId),
         teacher: Number(adviserId),
         type: 'adviser',
-        reason,
+        reason: answer.note,
       });
-      setConfirm(null);
-      setReason('');
       await reload();
       setMessage('Adviser assigned.');
     } catch (err) {
@@ -199,14 +245,14 @@ export default function HeadSectionWorkspacePage() {
   async function assignSubject() {
     if (!teacherPick.subject || !teacherPick.teacher) return;
     const subjectRow = progress?.subject_rows?.find((row) => String(row.subject_id) === String(teacherPick.subject));
-    setConfirm({
-      type: 'subject',
-      subject: subjectRow,
-      teacher: teachers.find((row) => String(row.id) === teacherPick.teacher),
+    const teacher = teachers.find((row) => String(row.id) === teacherPick.teacher);
+    const answer = await confirm({
+      title: `Assign ${teacher?.name} to ${subjectRow?.subject}?`,
+      body: `They teach this subject in ${sectionLabel(section)}.`,
+      confirmLabel: 'Assign teacher',
+      note: reasonNote,
     });
-  }
-
-  async function confirmSubject() {
+    if (!answer) return;
     setBusy('subject');
     setError('');
     try {
@@ -215,11 +261,9 @@ export default function HeadSectionWorkspacePage() {
         teacher: Number(teacherPick.teacher),
         subject: Number(teacherPick.subject),
         type: 'subject_teacher',
-        reason,
+        reason: answer.note,
       });
       setTeacherPick({ subject: '', teacher: '' });
-      setConfirm(null);
-      setReason('');
       await reload();
       setMessage('Subject teacher assigned.');
     } catch (err) {
@@ -252,15 +296,31 @@ export default function HeadSectionWorkspacePage() {
   }
 
   async function activate(force = false) {
+    const blocked = detail?.activation?.blocked || [];
+    const answer = await confirm(
+      force
+        ? {
+            title: 'Activate with incomplete setup?',
+            body: `${sectionLabel(section)} goes live now. Teachers can be assigned and grading can start; finish the checklist later.`,
+            confirmLabel: 'Activate anyway',
+            tone: 'warning',
+            warning: blocked.length ? blocked : undefined,
+            note: { ...reasonNote, required: true },
+          }
+        : {
+            title: `Activate ${sectionLabel(section)}?`,
+            body: 'The section goes live. Its identity is locked and teachers can start grading.',
+            confirmLabel: 'Activate section',
+          },
+    );
+    if (!answer) return;
     setBusy('activate');
     setError('');
     try {
       await activateSection(sectionId, {
         allow_incomplete: force,
-        reason: force ? reason : '',
+        reason: force ? answer.note : '',
       });
-      setConfirm(null);
-      setReason('');
       await reload();
       setMessage(force ? 'Section activated with incomplete setup. You can finish assignments later.' : 'Section is now active.');
       goStep('review');
@@ -272,6 +332,13 @@ export default function HeadSectionWorkspacePage() {
   }
 
   async function archive() {
+    const answer = await confirm({
+      title: `Archive ${sectionLabel(section)}?`,
+      body: 'The section leaves live use. History and grades are preserved and you can restore it from the Archive.',
+      confirmLabel: 'Archive section',
+      tone: 'warning',
+    });
+    if (!answer) return;
     setBusy('archive');
     setError('');
     try {
@@ -304,7 +371,7 @@ export default function HeadSectionWorkspacePage() {
       <div className="studio-actions studio-toolbar-actions">
         <Link to="/head/sections">Back to section management</Link>
         {!section.archived ? (
-          <button className="btn btn-secondary" type="button" disabled={busy === 'archive'} onClick={() => setConfirm({ type: 'archive' })}>
+          <button className="btn btn-secondary" type="button" disabled={busy === 'archive'} onClick={archive}>
             Archive section
           </button>
         ) : null}
@@ -355,7 +422,7 @@ export default function HeadSectionWorkspacePage() {
             <input value={studentQuery} onChange={(event) => setStudentQuery(event.target.value)} placeholder="Name or LRN" />
           </label>
           <div className="studio-table-actions studio-actions">
-            <button className="btn" type="button" disabled={!chosen.length || Boolean(busy)} onClick={() => assignStudents(false)}>
+            <button className="btn" type="button" disabled={!chosen.length || Boolean(busy)} onClick={assignStudents}>
               Assign selected ({chosen.length})
             </button>
           </div>
@@ -383,7 +450,10 @@ export default function HeadSectionWorkspacePage() {
                       />
                     )}
                   </td>
-                  <td>{row.name}</td>
+                  <td>
+                    {row.name}
+                    {row.gender ? <p className="studio-table-sub">{genderLabel(row.gender)}</p> : null}
+                  </td>
                   <td>{row.lrn}</td>
                   <td>{row.program_code || '—'}</td>
                   <td>
@@ -392,7 +462,7 @@ export default function HeadSectionWorkspacePage() {
                         className="btn btn-secondary"
                         type="button"
                         disabled={Boolean(busy)}
-                        onClick={() => setConfirm({ type: 'transfer', student: row })}
+                        onClick={() => transferStudent(row)}
                       >
                         Transfer from {row.section}
                       </button>
@@ -417,7 +487,10 @@ export default function HeadSectionWorkspacePage() {
                 <tbody>
                   {roster.map((row) => (
                     <tr key={row.student_id}>
-                      <td>{row.name}</td>
+                      <td>
+                        {row.name}
+                        {row.gender ? <p className="studio-table-sub">{genderLabel(row.gender)}</p> : null}
+                      </td>
                       <td>{row.lrn}</td>
                     </tr>
                   ))}
@@ -554,92 +627,19 @@ export default function HeadSectionWorkspacePage() {
                     className="btn btn-secondary"
                     type="button"
                     disabled={busy === 'activate'}
-                    onClick={() => setConfirm({ type: 'activate_incomplete' })}
+                    onClick={() => activate(true)}
                   >
                     Activate anyway
                   </button>
                 ) : null}
               </>
             ) : (
-              <button className="btn btn-secondary" type="button" disabled={busy === 'archive'} onClick={() => setConfirm({ type: 'archive' })}>
+              <button className="btn btn-secondary" type="button" disabled={busy === 'archive'} onClick={archive}>
                 Archive section
               </button>
             )}
           </div>
         </section>
-      ) : null}
-
-      {confirm ? (
-        <div className="studio-modal-backdrop">
-          <div className="card studio-panel studio-modal">
-            <h2>Confirm change</h2>
-            {confirm.type === 'transfer' ? (
-              <p>
-                Move <strong>{confirm.student.name}</strong> from <strong>{confirm.student.section}</strong> to{' '}
-                <strong>{sectionLabel(section)}</strong>?
-              </p>
-            ) : null}
-            {confirm.type === 'transfer' && programChangeNote(confirm.student, section) ? (
-              <p className="alert alert-info">{programChangeNote(confirm.student, section)}</p>
-            ) : null}
-            {confirm.type === 'capacity' ? (
-              <p>This assignment exceeds section capacity. Confirm to proceed anyway.</p>
-            ) : null}
-            {confirm.type === 'adviser' ? (
-              <p>
-                Assign <strong>{confirm.teacher?.name}</strong> as adviser for <strong>{sectionLabel(section)}</strong>?
-              </p>
-            ) : null}
-            {confirm.type === 'subject' ? (
-              <p>
-                Assign <strong>{confirm.teacher?.name}</strong> to <strong>{confirm.subject?.subject}</strong>?
-              </p>
-            ) : null}
-            {confirm.type === 'archive' ? (
-              <p>Archive <strong>{sectionLabel(section)}</strong>? History and grades will be preserved.</p>
-            ) : null}
-            {confirm.type === 'activate_incomplete' ? (
-              <>
-                <p>
-                  Activate <strong>{sectionLabel(section)}</strong> even though setup is incomplete? Teachers can be
-                  assigned and grading can start; finish the checklist later.
-                </p>
-                {(detail?.activation?.blocked || []).length ? (
-                  <ul>
-                    {detail.activation.blocked.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </>
-            ) : null}
-            <label className="form-field is-wide">
-              <span>Reason (optional)</span>
-              <input value={reason} onChange={(event) => setReason(event.target.value)} />
-            </label>
-            <div className="studio-actions">
-              <button className="btn btn-secondary" type="button" onClick={() => setConfirm(null)}>
-                Cancel
-              </button>
-              <button
-                className="btn"
-                type="button"
-                onClick={() => {
-                  if (confirm.type === 'transfer') transferStudent(confirm.student, false);
-                  else if (confirm.type === 'capacity') {
-                    if (confirm.student) transferStudent(confirm.student, true);
-                    else assignStudents(true);
-                  } else if (confirm.type === 'adviser') confirmAdviser();
-                  else if (confirm.type === 'subject') confirmSubject();
-                  else if (confirm.type === 'archive') archive();
-                  else if (confirm.type === 'activate_incomplete') activate(true);
-                }}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
       ) : null}
     </div>
   );

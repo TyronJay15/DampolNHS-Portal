@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import DeskMark from '../../components/DeskMark/DeskMark';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal/ConfirmDeleteModal';
+import { useConfirm } from '../../components/ConfirmDialog/useConfirm';
+import DeskMark from '../../components/DeskMark/DeskMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
 import {
@@ -22,10 +23,10 @@ const TABS = [
 ];
 
 export default function HeadArchivePage() {
+  const confirm = useConfirm();
   const [tab, setTab] = useState('years');
   const [rows, setRows] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [dutyDeleteTarget, setDutyDeleteTarget] = useState(null);
   const [hardMode, setHardMode] = useState(false);
   const [confirmValue, setConfirmValue] = useState('');
   const [reason, setReason] = useState('');
@@ -96,14 +97,19 @@ export default function HeadArchivePage() {
     }
   }
 
-  async function submitDutyDelete() {
-    if (!dutyDeleteTarget) return;
+  async function deleteDuty(row) {
+    const answer = await confirm({
+      title: 'Delete duty permanently?',
+      body: `Remove ${row.teacher} · ${row.type === 'adviser' ? 'Adviser' : row.subject} · ${row.section}. Grade records stay; this only removes the archived duty row.`,
+      confirmLabel: 'Delete permanently',
+      tone: 'danger',
+    });
+    if (!answer) return;
     setBusy('duty-delete');
     setError('');
     try {
-      await purgeDuty(dutyDeleteTarget.id);
+      await purgeDuty(row.id);
       setMessage('Duty deleted permanently.');
-      setDutyDeleteTarget(null);
       await load(tab);
     } catch (err) {
       setError(err.message);
@@ -113,6 +119,14 @@ export default function HeadArchivePage() {
   }
 
   async function restore(row) {
+    if (tab === 'years') {
+      const answer = await confirm({
+        title: `Restore ${row.label}?`,
+        body: 'The year returns to live use with its sections and duties where slots are free.',
+        confirmLabel: 'Restore year',
+      });
+      if (!answer) return;
+    }
     setBusy(String(row.id));
     setError('');
     setMessage('');
@@ -182,40 +196,18 @@ export default function HeadArchivePage() {
               <button className="btn" type="button" disabled={Boolean(busy)} onClick={() => restore(row)}>
                 {busy === String(row.id) ? 'Restoring…' : 'Restore'}
               </button>
-              {tab === 'duties' ? (
-                <button className="btn btn-danger" type="button" disabled={Boolean(busy)} onClick={() => setDutyDeleteTarget(row)}>
-                  Delete permanently
-                </button>
-              ) : (
-                <button className="btn btn-danger" type="button" disabled={Boolean(busy)} onClick={() => openDelete(row)}>
-                  Delete permanently
-                </button>
-              )}
+              <button
+                className="btn btn-danger"
+                type="button"
+                disabled={Boolean(busy)}
+                onClick={() => (tab === 'duties' ? deleteDuty(row) : openDelete(row))}
+              >
+                Delete permanently
+              </button>
             </div>
           </article>
         ))}
       </div>
-
-      {dutyDeleteTarget ? (
-        <div className="studio-modal-backdrop">
-          <div className="card studio-panel studio-modal">
-            <h2>Delete duty permanently?</h2>
-            <p>
-              Remove <strong>{dutyDeleteTarget.teacher}</strong> ·{' '}
-              {dutyDeleteTarget.type === 'adviser' ? 'Adviser' : dutyDeleteTarget.subject} · {dutyDeleteTarget.section}?
-              Grade records stay; this only removes the archived duty row.
-            </p>
-            <div className="studio-actions">
-              <button className="btn btn-secondary" type="button" onClick={() => setDutyDeleteTarget(null)}>
-                Cancel
-              </button>
-              <button className="btn btn-danger" type="button" disabled={busy === 'duty-delete'} onClick={submitDutyDelete}>
-                {busy === 'duty-delete' ? 'Deleting…' : 'Delete permanently'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {deleteTarget ? (
         <ConfirmDeleteModal
