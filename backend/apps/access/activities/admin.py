@@ -18,6 +18,8 @@ from apps.access.activities.base import (
     require_level,
     short,
 )
+from apps.accounts.models import User
+from apps.cms.links import require_safe_links
 from apps.cms.models import Announcement, SiteContent
 from apps.cms.serializers import AnnouncementSerializer
 from apps.cms.services import (
@@ -28,6 +30,8 @@ from apps.cms.services import (
     save_new_announcement,
     upload_urls,
 )
+from apps.guidance.catalog import IMPORTANCE_LABELS, _rating_fingerprint, _stored_fingerprint, clean_ratings, rating_round, save_ratings
+from apps.ml.models import CollegeProgram
 from apps.people.models import Registration
 from apps.people.registrations import AlreadyReviewed, approve_registration, reject_registration
 from apps.school.models import Program, Subject
@@ -181,6 +185,7 @@ class EditWebsitePages(Activity):
             raise ValidationError({'detail': 'There is nothing to change.'})
         if len(json.dumps(changes)) > MAX_PAGE_CHANGE:
             raise ValidationError({'detail': 'These changes are too large for one request.'})
+        require_safe_links(changes)
         live = live_document(document)
         before = _snapshot(payload, lambda: {key: live.get(key) for key in changes})
         return {'document': document, 'changes': changes, 'before': before}
@@ -283,3 +288,63 @@ class PostNews(Activity):
 
     def discard(self, payload):
         delete_unused_uploads(upload_urls(payload.get('fields')) - upload_urls(payload.get('before')))
+
+
+class RateProgramProfiles(Activity):
+    """Expert validation of college program profiles. Ratings are inputs; the Admin later applies the median."""
+
+    key = 'rate_programs'
+    label = 'Rate college program profiles'
+    description = (
+        'Rate how important each skill area is for a college program, relative to a typical Grade 12 graduate. '
+        'The Admin applies the median of several experts as the validated profile.'
+    )
+    owner_role = ADMIN
+    holder_roles = (HEAD_TEACHER, TEACHER)
+    work_slug = 'program-ratings'
+
+    def scope_options(self, owner):
+        return []
+
+    def clean(self, payload, tag, proposer):
+        program = CollegeProgram.objects.filter(code=str(payload.get('program') or '')).first()
+        if program is None:
+            raise ValidationError({'detail': 'Choose a college program.'})
+        round_number = payload.get('round') if isinstance(payload.get('round'), int) else rating_round(program)
+        ratings = clean_ratings(payload.get('ratings'))
+        if _stored_fingerprint(program, proposer, round_number) == _rating_fingerprint(ratings):
+            raise ValidationError(
+                {'detail': 'These ratings were already recorded. Change the relative importance if experts still disagree.'}
+            )
+        return {
+            'program': program.code,
+            'round': round_number,
+            'rater': proposer.pk,
+            'ratings': ratings,
+        }
+
+    def describe(self, cleaned):
+        program = CollegeProgram.objects.filter(code=cleaned['program']).first()
+        name = program.name if program else cleaned['program']
+        count = len(cleaned['ratings'])
+        return short(f'Rate {name}: {count} skill area{"s" if count != 1 else ""}')
+
+    def diff(self, cleaned):
+        rows = []
+        for row in cleaned['ratings']:
+            after = IMPORTANCE_LABELS.get(row.get('importance'), row['level'])
+            rows.append(change(humanize(row['domain']), None, after))
+        return rows
+
+    def execute(self, cleaned, owner):
+        program = CollegeProgram.objects.filter(code=cleaned['program']).first()
+        if program is None:
+            raise ActivityFailed('This college program no longer exists.')
+        if rating_round(program) != cleaned['round']:
+            raise ActivityFailed('The profile was validated again after these ratings were prepared. Rate it again.')
+        rater = User.objects.filter(pk=cleaned['rater']).first()
+        if rater is None:
+            raise ActivityFailed('The rater no longer has an account.')
+        save_ratings(program, rater, cleaned['ratings'])
+        return {'program': program.code, 'round': cleaned['round']}
+

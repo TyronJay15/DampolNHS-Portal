@@ -1,0 +1,46 @@
+# Serves the built portal (dist/) on Railway with the browser security headers of the security plan (W5).
+# Railpack uses a Caddyfile found in the service root for static sites; confirm on staging that these headers
+# arrive (curl -I https://<frontend address>/) before going live.
+#
+# Railway variable on the frontend service:
+#   API_ORIGIN   the API's https:// address without a path, e.g. https://api.example.edu.ph
+#
+# Content-Security-Policy: only this site's own scripts, plus Google reCAPTCHA (its script and its frame).
+# style-src keeps 'unsafe-inline' only because the reCAPTCHA widget writes inline styles; the portal's own code
+# does not need it. img-src allows data: for the authenticator QR code and the API for uploaded photos.
+{
+	admin off
+	persist_config off
+	auto_https off
+	log {
+		format json
+	}
+	servers {
+		trusted_proxies static private_ranges 100.0.0.0/8
+	}
+}
+
+:{$PORT:80} {
+	root * dist
+	encode gzip
+
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; frame-src https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; connect-src 'self' {$API_ORIGIN}; img-src 'self' data: {$API_ORIGIN}; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		-Server
+	}
+
+	# Built files have content hashes in their names, so they can be cached for a long time; index.html cannot.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	header /index.html Cache-Control "no-cache"
+
+	# The portal is a single-page app: unknown paths load index.html and the app shows the right screen.
+	try_files {path} /index.html
+	file_server
+}

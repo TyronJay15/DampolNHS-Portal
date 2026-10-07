@@ -6,7 +6,7 @@ import PageHead from '../../components/PageHead/PageHead';
 import YearChip from '../../components/YearChip';
 import { useAuth } from '../../context/AuthContext';
 import { fetchStudentGrades } from '../../services/studentService';
-import RecommendationPanel from './RecommendationPanel';
+import GuidanceSummaryCard from './guidance/GuidanceSummaryCard';
 import './StudentStudio.css';
 
 function scoreMap(grades) {
@@ -176,7 +176,6 @@ export default function StudentGradesPage() {
     term_averages: [],
     overall_average: null,
     school_year: '',
-    recommendation: null,
     partial: false,
     coverage_note: '',
   });
@@ -197,7 +196,6 @@ export default function StudentGradesPage() {
           term_averages: data.term_averages || [],
           overall_average: data.overall_average || null,
           school_year: data.school_year || '',
-          recommendation: data.recommendation || null,
           partial: Boolean(data.partial),
           coverage_note: data.coverage_note || '',
         });
@@ -221,7 +219,6 @@ export default function StudentGradesPage() {
   const hasGrid = card.subjects.length > 0 && card.terms.length > 0;
   const term = card.terms.find((row) => row.number === view);
   const shownScores = card.grades.filter((row) => row.score != null && row.score !== '').length;
-  const rec = card.recommendation;
 
   return (
     <div className="desk student-studio">
@@ -233,7 +230,7 @@ export default function StudentGradesPage() {
       </PageHead>
       {card.partial && card.coverage_note ? <p className="alert alert-info">{card.coverage_note}</p> : null}
 
-      <div className="student-stats is-grades">
+      <div className="student-stats">
         <article className="card student-stat">
           <span className="desk-stat-top">
             <DeskMark name="year" size={16} />
@@ -261,13 +258,6 @@ export default function StudentGradesPage() {
             General average
           </span>
           <strong>{card.overall_average?.average || '—'}</strong>
-        </article>
-        <article className="card student-stat">
-          <span className="desk-stat-top">
-            <DeskMark name="forecast" size={16} />
-            College match
-          </span>
-          <strong>{rec?.ready ? 'Ready' : rec ? 'Waiting' : 'Reserved'}</strong>
         </article>
       </div>
 
@@ -320,7 +310,7 @@ export default function StudentGradesPage() {
           ) : null}
         </section>
 
-        <RecommendationPanel rec={rec} />
+        <GuidanceSummaryCard />
       </div>
     </div>
   );

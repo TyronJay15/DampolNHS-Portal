@@ -1,30 +1,7 @@
-import { apiRequest, clearTokens, setTokens } from './api';
+import { apiRequest } from './api';
 
-export async function login({ identifier, password, recaptcha_token }) {
-  const data = await apiRequest('/auth/login/', {
-    method: 'POST',
-    body: { identifier, password, recaptcha_token },
-  });
-  setTokens({ access: data.access, refresh: data.refresh });
-  return data.user;
-}
-
-// Revokes the refresh token on the server, then always clears both tokens here. Returns false only when the
-// server could not be told, so the screen can say the sign-out happened on this device only.
-export async function logout() {
-  const refresh = localStorage.getItem('refreshToken');
-  let confirmed = true;
-  try {
-    if (refresh) {
-      await apiRequest('/auth/logout/', { method: 'POST', auth: true, body: { refresh } });
-    }
-  } catch {
-    // Local sign-out still proceeds.
-    confirmed = false;
-  }
-  clearTokens();
-  return confirmed;
-}
+// Signing in, out and the sign-in session itself live in session.js; these are the account requests.
+export { confirmMfaEnrollment, restore, signIn, signOut, startMfaEnrollment, verifyMfa } from './session';
 
 export async function fetchMe() {
   return apiRequest('/auth/me/', { auth: true });
@@ -91,4 +68,25 @@ export function homePathForRole(role) {
   if (role === 'head_teacher') return '/head';
   if (role === 'teacher') return '/teacher';
   return '/student';
+}
+
+// Authenticator app while signed in (Admin and Head Teacher). Changes need the password, and a code once set up.
+export function fetchMfaStatus() {
+  return apiRequest('/auth/mfa/', { auth: true });
+}
+
+export function startMfaSetup(password) {
+  return apiRequest('/auth/mfa/enroll/', { method: 'POST', auth: true, body: { password } });
+}
+
+export function confirmMfaSetup(code) {
+  return apiRequest('/auth/mfa/enroll/confirm/', { method: 'POST', auth: true, body: { code } });
+}
+
+export function renewRecoveryCodes({ password, code }) {
+  return apiRequest('/auth/mfa/recovery-codes/', { method: 'POST', auth: true, body: { password, code } });
+}
+
+export function turnOffMfa({ password, code }) {
+  return apiRequest('/auth/mfa/disable/', { method: 'POST', auth: true, body: { password, code } });
 }

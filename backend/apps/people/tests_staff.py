@@ -58,7 +58,7 @@ class StaffAccountTests(APITestCase):
             format='json',
         )
         self.assertEqual(login.status_code, 401)
-        self.assertEqual(login.data.get('code'), 'account_needs_activation')
+        self.assertEqual(login.data.get('detail'), 'Invalid credentials.')
 
     def test_admin_can_create_several_head_teachers(self):
         self._admin()

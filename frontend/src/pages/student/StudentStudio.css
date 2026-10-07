@@ -32,10 +32,6 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.student-stats.is-grades {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
 .student-profile-grid {
   grid-template-columns: 1.1fr 0.9fr;
 }
@@ -43,15 +39,12 @@
 .student-grade-layout {
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
   align-items: stretch;
-}.student-panel,
-.student-rec {
+}
+
+.student-panel {
   padding: 1.15rem 1.2rem;
   animation: dash-rise 0.45s ease both;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}.student-rec:hover {
-  transform: translateY(-2px);
-  background: var(--dash-hover);
-  box-shadow: 0 14px 32px rgba(22, 53, 35, 0.08);
 }
 
 .student-grade-table tbody tr:hover,
@@ -72,7 +65,6 @@
 }
 
 .student-stat > span:not(.desk-stat-top),
-.student-rec-head p,
 .student-facts dt,
 .student-form label > span:not(.desk-line) {
   display: block;
@@ -90,8 +82,9 @@
   line-height: 1.15;
   color: var(--dash-green-dark);
   overflow-wrap: anywhere;
-}.student-panel h2,
-.student-rec-head h2 {
+}
+
+.student-panel h2 {
   display: flex;
   align-items: center;
   gap: 0.55rem;
@@ -112,12 +105,10 @@
   font-weight: 700;
   color: var(--dash-green-dark);
   overflow-wrap: anywhere;
-}.student-empty,
-.student-rec-lede,
-.student-rec-hint,
-.student-rec-note,
-.student-home-notes span,
-.student-rec-list span {
+}
+
+.student-empty,
+.student-home-notes span {
   margin: 0;
   color: var(--dash-muted);
   line-height: 1.5;
@@ -279,114 +270,19 @@
   color: var(--dash-on-mark);
 }
 
-.student-rec {
-  min-height: 420px;
-  display: grid;
-  align-content: start;
-  gap: 0.85rem;
-}
-
-.student-rec.is-compact {
-  min-height: 280px;
-}
-
-.student-rec.is-ready {
-  background: var(--dash-panel);
-}
-
-.student-rec-head h2 {
-  margin-bottom: 0.4rem;
-}
-
-.student-rec-skills {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
-  gap: 8px;
-}
-
-.student-rec-skills li {
-  padding: 0.55rem 0.65rem;
-  border-radius: 12px;
-  background: var(--dash-field);
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.student-rec-skills li:hover,
-.student-rec-list li:hover {
-  background: var(--dash-hover);
-  transform: translateY(-2px);
-}
-
-.student-rec-skills span {
-  display: block;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--dash-muted);
-}
-
-.student-rec-skills strong {
-  color: var(--dash-green-dark);
-}
-
-.student-rec-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-
-.student-rec-list li {
-  display: grid;
-  grid-template-columns: 32px 1fr;
-  gap: 0.7rem;
-  align-items: start;
-  padding: 0.7rem 0.75rem;
-  border-radius: 14px;
-  background: var(--dash-field);
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.student-rec-list li.is-wait {
-  opacity: 0.72;
-}
-
-.student-rec-list em {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  background: var(--dash-mark);
-  color: var(--dash-on-mark);
-  font-style: normal;
-  font-weight: 800;
-}
-
-.student-rec-list strong,
-.student-rec-list span {
-  display: block;
-}
-
-.student-rec-list span {
-  margin-top: 0.2rem;
-  font-size: 0.88rem;
-}@media (max-width: 1100px) {.student-grade-layout,
-.student-stats,
-.student-stats.is-grades {
+@media (max-width: 1100px) {
+  .student-grade-layout,
+  .student-stats {
     grid-template-columns: 1fr 1fr;
   }
-}@media (max-width: 800px) {.student-profile-grid,
-.student-grade-layout,
-.student-facts,
-.student-form,
-.student-stats,
-.student-stats.is-grades {
+}
+
+@media (max-width: 800px) {
+  .student-profile-grid,
+  .student-grade-layout,
+  .student-facts,
+  .student-form,
+  .student-stats {
     grid-template-columns: 1fr;
   }
 }

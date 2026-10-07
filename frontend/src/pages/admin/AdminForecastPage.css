@@ -1,0 +1,269 @@
+/* Admin › Planning › Grade 11 forecast. Order: model status, headline numbers, two rows of paired panels,
+   then how it was computed. Panels pair up on wide screens and stack on narrow ones. */
+.fc-page {
+  display: grid;
+  gap: 18px;
+}
+
+.fc-demo,
+.fc-locked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  background: var(--dash-field);
+  color: var(--dash-ink);
+  font-size: 0.9rem;
+}
+
+/* 1. Model status: state, the three year slots, then when it was trained and Retrain. */
+.fc-status {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.6fr) minmax(200px, 1fr);
+  gap: 1rem 1.4rem;
+  align-items: center;
+  padding: 1rem 1.15rem;
+}
+
+.fc-status-main {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: start;
+}
+
+.fc-kicker,
+.fc-tile-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dash-muted);
+}
+
+.fc-status-main strong {
+  font-size: 1.1rem;
+  color: var(--dash-green-dark);
+}
+
+.fc-slots {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.fc-slot-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.fc-slot {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px dashed var(--dash-line);
+  border-radius: 10px;
+  font-size: 0.8rem;
+  color: var(--dash-muted);
+}
+
+.fc-slot b {
+  color: var(--dash-ink);
+  font-size: 0.85rem;
+}
+
+.fc-slot.is-done {
+  border-style: solid;
+  border-color: var(--dash-green);
+  background: var(--dash-hover);
+}
+
+.fc-slots small,
+.fc-status-side p {
+  margin: 0;
+  color: var(--dash-muted);
+  font-size: 0.85rem;
+}
+
+.fc-status-side {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+
+.fc-status-side .fc-warn {
+  color: var(--dash-gold-ink);
+  font-weight: 600;
+}
+
+/* 2. Headline numbers. */
+.fc-tiles {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fc-tile {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+  justify-items: start;
+  padding: 0.9rem 1rem;
+}
+
+.fc-tile strong {
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+  line-height: 1.1;
+  color: var(--dash-green-dark);
+}
+
+.fc-tile small {
+  color: var(--dash-muted);
+  font-size: 0.78rem;
+}
+
+/* 3 to 6. Paired panels. */
+.fc-duo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.fc-panel {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem 1.15rem;
+  min-width: 0;
+}
+
+.fc-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.fc-panel-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.fc-numbers td:not(:first-child),
+.fc-numbers th:not(:first-child) {
+  font-variant-numeric: tabular-nums;
+}
+
+.fc-note {
+  display: block;
+  color: var(--dash-muted);
+  font-size: 0.75rem;
+}
+
+.fc-note-line {
+  margin: 0;
+  color: var(--dash-muted);
+  font-size: 0.82rem;
+}
+
+.fc-retention {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  background: var(--dash-field);
+}
+
+.fc-retention label {
+  font-weight: 700;
+  color: var(--dash-ink);
+}
+
+.fc-retention input {
+  width: 84px;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 8px;
+  background: var(--dash-panel);
+  color: var(--dash-ink);
+  font: inherit;
+}
+
+.fc-retention small {
+  flex-basis: 100%;
+  color: var(--dash-muted);
+}
+
+.fc-warnings {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--dash-gold-ink);
+  font-size: 0.85rem;
+}
+
+/* 7. KDD stages. */
+.fc-kdd {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+  counter-reset: kdd;
+}
+
+.fc-kdd li {
+  counter-increment: kdd;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 10px;
+  font-size: 0.84rem;
+  color: var(--dash-muted);
+}
+
+.fc-kdd b {
+  color: var(--dash-ink);
+}
+
+.fc-kdd b::before {
+  content: counter(kdd) '. ';
+  color: var(--dash-green);
+}
+
+@media (max-width: 1100px) {
+  .fc-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .fc-status {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fc-slots {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 900px) {
+  .fc-duo,
+  .fc-status,
+  .fc-kdd {
+    grid-template-columns: 1fr;
+  }
+
+  .fc-tiles {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fc-slots {
+    grid-row: auto;
+  }
+}

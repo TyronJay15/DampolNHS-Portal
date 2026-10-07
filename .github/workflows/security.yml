@@ -1,0 +1,77 @@
+# Security quality gate (security plan W14, section 60). Runs on every push and pull request to main.
+# A failing test, a known vulnerable dependency, a lint error or a broken build stops the merge once branch
+# protection requires this check.
+name: Security quality gate
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-password
+          MYSQL_DATABASE: dampol_portal
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci-only-password"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      SECRET_KEY: ci-only-not-a-real-key-ci-only-not-a-real-key-ci-only
+      DB_NAME: dampol_portal
+      DB_USER: root
+      DB_PASSWORD: ci-only-password
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt pip-audit
+      - name: Known vulnerabilities in dependencies
+        run: pip-audit -r requirements.txt
+      - name: Migrations match the models
+        run: python manage.py makemigrations --check --dry-run
+      - name: Tests, including the access matrix, hostile input and session tests
+        run: python manage.py test --noinput
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      VITE_API_BASE_URL: https://api.example.invalid/api
+      VITE_RECAPTCHA_SITE_KEY: ci-only-not-a-real-site-key
+      VITE_RECAPTCHA_SITE_KEY: ci-only-not-a-real-site-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Known vulnerabilities in dependencies
+        run: npm audit --audit-level=moderate
+      - run: npm run lint
+      - run: npm run build
+      - name: No sign-in token is ever written to browser storage
+        run: |
+          if grep -rnE "(localStorage|sessionStorage)\.setItem\([^)]*(oken|access|refresh)" src; then
+            echo "A token must never be stored in localStorage or sessionStorage (security plan W6)." && exit 1
+          fi

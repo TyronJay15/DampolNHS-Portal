@@ -3,9 +3,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdmin
+from apps.accounts.throttles import ScopedThrottle
 from apps.grading.advisory import section_subject_assignments
 from apps.grading.models import Grade, GradeHistory
-from apps.grading.recommend import RecommendationContext, recommend_payload
+from apps.grading.recommend import gated_payload, recommend_payload, recommendation_grades
+from apps.guidance.selectors import assessment_consenting, interest_scores
+from apps.ml.recommender import RecommenderContext
 from apps.people.models import StudentSection, TeacherAssignment
 from apps.school.labels import section_label
 from apps.school.models import SchoolYear, Section, Term
@@ -16,6 +19,8 @@ LOG_LIMIT = 200
 
 class GradeHistoryListView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
+    throttle_classes = [ScopedThrottle]
+    throttle_scope = 'reports'  # heavy queries: repeated calls must not stall the server for everyone
 
     def get(self, request):
         """Latest score changes, optionally narrowed to ?school_year= and ?term=."""
@@ -59,6 +64,8 @@ class GradeHistoryListView(APIView):
 
 class GradeReportView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
+    throttle_classes = [ScopedThrottle]
+    throttle_scope = 'reports'  # heavy queries: repeated calls must not stall the server for everyone
 
     def get(self, request):
         year = None
@@ -89,10 +96,10 @@ class GradeReportView(APIView):
         sections = sections.order_by('grade_level', 'program__code', 'name')
 
         payload = []
-        context = RecommendationContext()
+        context = RecommenderContext()
         plan = TermPlan(year.id)
         for section in sections:
-            program_code = section.program.code if section.program_id else None
+            program = section.program if section.program_id else None
             graded_ids = (
                 set(Grade.objects.filter(section=section, term=term).values_list('subject_id', flat=True))
                 if term
@@ -128,17 +135,12 @@ class GradeReportView(APIView):
                 )
             )
             by_student = {}
-            year_grades = {}
             for grade in grades:
                 by_student.setdefault(grade.student_id, {})[grade.subject_id] = grade
-            if term:
-                released = Grade.objects.filter(
-                    student_id__in=[row.student_id for row in roster],
-                    school_year=year,
-                    status__in=[Grade.Status.APPROVED, Grade.Status.RELEASED],
-                ).select_related('subject')
-                for grade in released:
-                    year_grades.setdefault(grade.student_id, []).append(grade)
+            roster_ids = [row.student_id for row in roster]
+            usable = recommendation_grades(roster_ids, released_only=False) if term else {}
+            interests = interest_scores(roster_ids) if term else {}
+            consented = assessment_consenting(roster_ids) if term else set()
 
             students = []
             shown_count = 0
@@ -162,10 +164,16 @@ class GradeReportView(APIView):
                         'lrn': row.student.lrn,
                         'shown': shown,
                         'scores': scores,
-                        'recommendation': recommend_payload(
-                            year_grades.get(row.student_id, []),
-                            program_code,
-                            context,
+                        'recommendation': (
+                            recommend_payload(
+                                usable.get(row.student_id, []),
+                                context,
+                                program_code=program.code if program else '',
+                                strand_group=program.strand_group if program else '',
+                                interest=interests.get(row.student_id),
+                            )
+                            if row.student_id in consented
+                            else gated_payload()
                         ),
                     }
                 )

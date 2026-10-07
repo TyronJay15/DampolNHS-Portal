@@ -7,7 +7,13 @@ run as the owner. Approving grades, staff accounts and access settings are never
 delete that can be proposed is a news post, and the Admin still approves it.
 """
 
-from apps.access.activities.admin import EditPrograms, EditWebsitePages, PostNews, ReviewRegistrations
+from apps.access.activities.admin import (
+    EditPrograms,
+    EditWebsitePages,
+    PostNews,
+    RateProgramProfiles,
+    ReviewRegistrations,
+)
 from apps.access.activities.base import (
     EXECUTION_ERRORS,
     ActivityFailed,
@@ -23,6 +29,7 @@ ACTIVITIES = {
         EditPrograms(),
         EditWebsitePages(),
         PostNews(),
+        RateProgramProfiles(),
         PreparePlacements(),
         PrepareTermPlan(),
         PrepareAssignments(),

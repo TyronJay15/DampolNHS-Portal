@@ -9,6 +9,8 @@ import {
   reactivateAccount,
   removeAccount,
   resendStaffActivation,
+  resetAuthenticator,
+  signOutEverywhere,
 } from '../../services/adminService';
 import { firstApiError } from '../../utils/authRules';
 import AccountListToolbar from './AccountListToolbar';
@@ -121,6 +123,51 @@ export default function AdminStaffPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function securityAction(row, { title, body, confirmLabel, action, done, next }) {
+    const answer = await confirm({ title, body, confirmLabel, tone: 'warning' });
+    if (!answer) return;
+    setError('');
+    setResult(null);
+    setSaving(true);
+    try {
+      await action(row.id);
+      setResult({
+        title: done,
+        facts: [
+          { label: 'Name', value: row.name },
+          { label: 'Role', value: ROLE_LABEL[row.role] || row.role },
+        ],
+        next,
+      });
+    } catch (err) {
+      setError(firstApiError(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleSignOut(row) {
+    return securityAction(row, {
+      title: `Sign ${row.name} out everywhere?`,
+      body: 'Every browser where they are signed in is signed out now. Use it after a lost phone or a shared password.',
+      confirmLabel: 'Sign out everywhere',
+      action: signOutEverywhere,
+      done: 'Signed out everywhere',
+      next: 'They can sign in again with their password.',
+    });
+  }
+
+  function handleResetMfa(row) {
+    return securityAction(row, {
+      title: `Reset ${row.name}'s authenticator app?`,
+      body: 'Use this only after checking in person that they lost their phone and recovery codes. They are signed out and set up the app again at their next sign-in.',
+      confirmLabel: 'Reset authenticator',
+      action: resetAuthenticator,
+      done: 'Authenticator reset',
+      next: 'They set up the app again at their next sign-in.',
+    });
   }
 
   async function handleRemove(row) {
@@ -350,9 +397,19 @@ export default function AdminStaffPage() {
                       </button>
                     ) : null}
                     {row.account_status === 'active' ? (
-                      <button className="acct-btn acct-btn-no" type="button" disabled={saving} onClick={() => handleArchive(row)}>
-                        Archive
-                      </button>
+                      <>
+                        <button className="acct-btn" type="button" disabled={saving} onClick={() => handleSignOut(row)}>
+                          Sign out everywhere
+                        </button>
+                        {row.role === 'head_teacher' ? (
+                          <button className="acct-btn" type="button" disabled={saving} onClick={() => handleResetMfa(row)}>
+                            Reset authenticator
+                          </button>
+                        ) : null}
+                        <button className="acct-btn acct-btn-no" type="button" disabled={saving} onClick={() => handleArchive(row)}>
+                          Archive
+                        </button>
+                      </>
                     ) : null}
                     {ARCHIVED.has(row.account_status) ? (
                       <>

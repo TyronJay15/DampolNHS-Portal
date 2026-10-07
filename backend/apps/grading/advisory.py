@@ -1,6 +1,8 @@
 from apps.accounts.lifecycle import HIDDEN
 from apps.grading.models import Grade
-from apps.grading.recommend import RecommendationContext, recommend_payload
+from apps.grading.recommend import gated_payload, recommend_payload, recommendation_grades
+from apps.guidance.selectors import assessment_consenting, interest_scores
+from apps.ml.recommender import RecommenderContext
 from apps.people.models import StudentSection, TeacherAssignment
 from apps.school.term_plan import TermPlan
 
@@ -108,14 +110,9 @@ def advisory_snapshot(section, term):
     scheduled_ids = {
         subject_id for subject_id in subject_ids if plan.runs_in(section.program_id, subject_id, term.number)
     }
-    year_grades = list(
-        Grade.objects.filter(student_id__in=roster_ids, school_year=section.school_year)
-        .filter(status__in=[Grade.Status.APPROVED, Grade.Status.RELEASED])
-        .select_related('subject')
-    )
-    grades_by_student = {}
-    for grade in year_grades:
-        grades_by_student.setdefault(grade.student_id, []).append(grade)
+    grades_by_student = recommendation_grades(roster_ids, released_only=False)
+    interests = interest_scores(roster_ids)
+    consented = assessment_consenting(roster_ids)
 
     term_grades = list(Grade.objects.filter(section=section, term=term, subject_id__in=subject_ids))
     term_by_subject = {}
@@ -140,8 +137,8 @@ def advisory_snapshot(section, term):
             }
         )
 
-    program_code = section.program.code if section.program_id else None
-    context = RecommendationContext()
+    program = section.program if section.program_id else None
+    context = RecommenderContext()
     students = []
     for row in roster:
         graded = term_by_student.get(row.student_id, [])
@@ -165,10 +162,16 @@ def advisory_snapshot(section, term):
                 'released': state['released'],
                 'can_show': state['can_show'],
                 'can_hide': state['can_hide'],
-                'recommendation': recommend_payload(
-                    grades_by_student.get(row.student_id, []),
-                    program_code,
-                    context,
+                'recommendation': (
+                    recommend_payload(
+                        grades_by_student[row.student_id],
+                        context,
+                        program_code=program.code if program else '',
+                        strand_group=program.strand_group if program else '',
+                        interest=interests.get(row.student_id),
+                    )
+                    if row.student_id in consented
+                    else gated_payload()
                 ),
             }
         )

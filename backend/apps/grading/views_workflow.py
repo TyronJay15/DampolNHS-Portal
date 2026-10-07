@@ -239,15 +239,15 @@ class ReturnGradesView(APIView):
             reason='Head teacher returned grades',
             duty=HEAD_TEACHER,
         )
-        audit.record(
-            user=request.user,
-            action='grades_returned',
-            summary=f'Returned {moved} hidden grades to draft for {term.label}',
-            target_type='Term',
-            target_id=term.id,
-            details={'still_shown': shown},
-        )
         if moved:
+            audit.record(
+                user=request.user,
+                action='grades_returned',
+                summary=f'Returned {moved} hidden grades to draft for {term.label}',
+                target_type='Term',
+                target_id=term.id,
+                details={'still_shown': shown},
+            )
             notify(
                 {row.teacher for row in grades if row.teacher_id},
                 title=f'{term.label} · grades returned',

@@ -1,0 +1,71 @@
+/* Mini-stat cards: a tinted icon, a small label and the value. Tones come from the dashboard tokens, so
+   light and dark themes both work. A zero keeps the normal ink color, so it never reads as an alert. */
+.mstat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.mstat {
+  --stat: var(--dash-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 8.4rem;
+  height: 3.5rem;
+  padding: 0 0.75rem 0 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--stat) 28%, var(--dash-line));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--stat) 7%, var(--dash-panel));
+}
+
+.mstat.is-blue {
+  --stat: #3b7bbf;
+}
+
+.mstat.is-green {
+  --stat: var(--dash-green);
+}
+
+.mstat.is-gold {
+  --stat: var(--dash-gold);
+}
+
+.mstat.is-purple {
+  --stat: #7a62b8;
+}
+
+.mstat.is-red {
+  --stat: #c0463b;
+}
+
+.mstat-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--stat) 20%, var(--dash-panel));
+  color: var(--stat);
+}
+
+.mstat dt {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--dash-muted);
+}
+
+.mstat dd {
+  margin: 0.1rem 0 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--dash-ink);
+  font-variant-numeric: tabular-nums;
+}

@@ -1,9 +1,17 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenRefreshView
 
+from .views_mfa import (
+    MfaDisableView,
+    MfaEnrollConfirmView,
+    MfaEnrollStartView,
+    MfaRecoveryCodesView,
+    MfaStatusView,
+    MfaVerifyView,
+)
 from .views import (
     ActivateAccountView,
     ChangePasswordView,
+    CsrfTokenView,
     ForgotPasswordOtpView,
     ForgotPasswordVerifyView,
     ForgotPasswordView,
@@ -12,13 +20,21 @@ from .views import (
     MeView,
     PasswordCodeVerifyView,
     PasswordOtpView,
+    RefreshView,
 )
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='auth-login'),
     path('logout/', LogoutView.as_view(), name='auth-logout'),
-    path('refresh/', TokenRefreshView.as_view(), name='auth-refresh'),
+    path('csrf/', CsrfTokenView.as_view(), name='auth-csrf'),
+    path('refresh/', RefreshView.as_view(), name='auth-refresh'),
     path('me/', MeView.as_view(), name='auth-me'),
+    path('mfa/', MfaStatusView.as_view(), name='auth-mfa'),
+    path('mfa/verify/', MfaVerifyView.as_view(), name='auth-mfa-verify'),
+    path('mfa/enroll/', MfaEnrollStartView.as_view(), name='auth-mfa-enroll'),
+    path('mfa/enroll/confirm/', MfaEnrollConfirmView.as_view(), name='auth-mfa-enroll-confirm'),
+    path('mfa/recovery-codes/', MfaRecoveryCodesView.as_view(), name='auth-mfa-recovery-codes'),
+    path('mfa/disable/', MfaDisableView.as_view(), name='auth-mfa-disable'),
     path('activate/', ActivateAccountView.as_view(), name='auth-activate'),
     path('change-password/otp/', PasswordOtpView.as_view(), name='auth-change-password-otp'),
     path('change-password/verify/', PasswordCodeVerifyView.as_view(), name='auth-change-password-verify'),

@@ -1,10 +1,8 @@
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL
-  || (import.meta.env.DEV ? 'http://localhost:8000/api' : '');
-if (!API_BASE) {
-  throw new Error('VITE_API_BASE_URL is missing from the production build.');
-}
-const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
+import { API_BASE, API_ORIGIN, networkError, parseBody, requestError } from './http';
+import { accessToken, refresh, sessionEnded } from './session';
+
+// The server's answers that mean the sign-in itself is over (not just this token).
+const SESSION_GONE = new Set(['session_ended', 'account_unavailable']);
 
 export function fileUrl(path) {
   const value = String(path || '');
@@ -12,61 +10,39 @@ export function fileUrl(path) {
   return `${API_ORIGIN}${value}`;
 }
 
-export function getAccessToken() {
-  return localStorage.getItem('accessToken') || '';
-}
-
-export function setTokens({ access, refresh }) {
-  if (access) localStorage.setItem('accessToken', access);
-  if (refresh) localStorage.setItem('refreshToken', refresh);
-}
-
-export function clearTokens() {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-}
-
-async function parseBody(response) {
-  const text = await response.text();
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { detail: text };
-  }
-}
-
-export async function apiRequest(path, { method = 'GET', body, auth = false } = {}) {
+async function send(path, { method, body, isForm, token }) {
   const headers = { Accept: 'application/json' };
-  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
-  if (body !== undefined && !isForm) {
-    headers['Content-Type'] = 'application/json';
-  }
-  if (auth) {
-    const token = getAccessToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
-
-  let response;
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
+  if (token) headers.Authorization = `Bearer ${token}`;
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    return await fetch(`${API_BASE}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     });
   } catch {
-    const error = new Error('Unable to reach the server. Check that the API is running.');
-    error.isNetworkError = true;
-    throw error;
+    throw networkError();
+  }
+}
+
+export async function apiRequest(path, { method = 'GET', body, auth = false } = {}) {
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
+  let response = await send(path, { method, body, isForm, token: auth ? await accessToken() : '' });
+  let data = await parseBody(response);
+
+  if (auth && response.status === 401) {
+    if (SESSION_GONE.has(data?.code)) {
+      sessionEnded();
+    } else {
+      // The access token expired between the check and the request: renew once and repeat it.
+      const user = await refresh().catch(() => null);
+      if (user) {
+        response = await send(path, { method, body, isForm, token: await accessToken() });
+        data = await parseBody(response);
+      }
+    }
   }
 
-  const data = await parseBody(response);
-  if (!response.ok) {
-    const error = new Error(data?.detail || 'Request failed.');
-    error.status = response.status;
-    error.data = data;
-    error.code = data?.code;
-    throw error;
-  }
+  if (!response.ok) throw requestError(response, data);
   return data;
 }

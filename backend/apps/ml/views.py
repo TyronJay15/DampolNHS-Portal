@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.throttles import ScopedThrottle
 from apps.accounts.permissions import IsAdmin
 from apps.audit import services as audit
 from apps.ml.intent import is_stale, train_intent
@@ -15,6 +16,9 @@ from apps.ml.store import last_run
 
 class AssistantStatsView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
+    throttle_classes = [ScopedThrottle]
+    throttle_scope = 'retrain'
+    throttle_methods = ('POST',)
 
     def post(self, request):
         """Retrain the chatbot topic classifier on demand (admin button)."""

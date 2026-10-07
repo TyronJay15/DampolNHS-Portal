@@ -36,11 +36,12 @@ def phrase_answer(question, topic, pack):
             ],
         }
     ).encode()
+    # The key goes in a header, not the URL, so it cannot end up in proxy or error logs.
     request = Request(
-        f'{ENDPOINT}?key={key}',
+        ENDPOINT,
         data=body,
         method='POST',
-        headers={'Content-Type': 'application/json'},
+        headers={'Content-Type': 'application/json', 'x-goog-api-key': key},
     )
     try:
         with urlopen(request, timeout=8) as response:

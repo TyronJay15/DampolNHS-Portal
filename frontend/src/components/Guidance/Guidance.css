@@ -1,0 +1,1669 @@
+/* College recommendation: shared by the student, adviser and admin screens. Colors come from the
+   dashboard tokens, so light and dark themes both work. */
+
+/* Grid items default to min-width: auto, which lets a wide table stretch the page on phones; keep every
+   block inside the page so tables scroll within their own card instead. */
+.gd-page,
+.gd-page > * {
+  min-width: 0;
+}
+
+/* Keeps visually hidden table labels inside the scrolling card, so they never widen the page. */
+.gd-page .studio-table-wrap {
+  position: relative;
+}
+
+.gd-hero {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.4rem 1.5rem;
+  border-radius: 18px;
+  background: var(--dash-hero);
+  color: var(--dash-on-mark);
+  box-shadow: var(--dash-shadow);
+}
+
+.gd-hero h1,
+.gd-hero h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.3rem, 2.6vw, 1.75rem);
+}
+
+.gd-hero p {
+  margin: 0;
+  max-width: 64ch;
+  line-height: 1.5;
+  color: rgba(244, 231, 176, 0.9);
+}
+
+.gd-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gd-steps li {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.gd-steps li.is-todo {
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.gd-method {
+  justify-self: start;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: var(--dash-on-mark);
+  color: var(--dash-mark);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.gd-notice {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: var(--dash-gold-soft);
+  color: var(--dash-gold-ink);
+  font-weight: 600;
+}
+
+.gd-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+}
+
+.gd-section-head h2,
+.gd-section-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--dash-green-dark);
+}
+
+.gd-section-head p {
+  margin: 0;
+  color: var(--dash-muted);
+  font-size: 0.86rem;
+}
+
+.gd-families {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--dash-muted);
+}
+
+.gd-family-chip {
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-panel);
+  color: var(--dash-green-dark);
+  font-weight: 700;
+}
+
+.gd-family-chip.is-first {
+  background: var(--dash-mark);
+  border-color: var(--dash-mark);
+  color: var(--dash-on-mark);
+}
+
+.gd-primary {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.gd-card {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-panel);
+  box-shadow: var(--dash-shadow);
+}
+
+.gd-card-head {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: center;
+  padding: 1rem 1rem 0.6rem;
+}
+
+.gd-rank {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--dash-mark);
+  color: var(--dash-on-mark);
+  font-weight: 800;
+}
+
+.gd-card h3,
+.gd-card h4 {
+  margin: 0;
+  font-size: 1.02rem;
+  color: var(--dash-green-dark);
+  overflow-wrap: anywhere;
+}
+
+.gd-card-family {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+  color: var(--dash-muted);
+}
+
+.gd-card-label {
+  padding: 0 1rem 0.75rem;
+}
+
+.gd-card-body {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--dash-line);
+  background: var(--dash-field);
+}
+
+.gd-card-body h5 {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dash-muted);
+}
+
+.gd-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid var(--dash-line);
+}
+
+.gd-card-foot .btn {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.82rem;
+}
+
+.gd-explore {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.gd-mini {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-panel);
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.gd-mini:hover,
+.gd-mini:focus-visible {
+  background: var(--dash-hover);
+  transform: translateY(-1px);
+}
+
+.gd-mini strong {
+  color: var(--dash-green-dark);
+}
+
+.gd-mini small {
+  color: var(--dash-muted);
+}
+
+.gd-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-self: start;
+  padding: 0.22rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.gd-label.is-strong {
+  background: var(--dash-mark);
+  color: var(--dash-on-mark);
+}
+
+.gd-label.is-good {
+  background: var(--dash-hover);
+  color: var(--dash-green-dark);
+  border-color: var(--dash-green);
+}
+
+.gd-label.is-possible {
+  background: var(--dash-gold-soft);
+  color: var(--dash-gold-ink);
+}
+
+.gd-label.is-limited {
+  background: var(--dash-field);
+  color: var(--dash-muted);
+  border-color: var(--dash-line);
+  border-style: dashed;
+}
+
+.gd-bar-row {
+  display: grid;
+  grid-template-columns: minmax(84px, 7rem) minmax(0, 1fr) minmax(2.6rem, auto);
+  gap: 0.6rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.gd-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--dash-line);
+  overflow: hidden;
+}
+
+.gd-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--dash-green);
+}
+
+.gd-bar-row b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--dash-ink);
+}
+
+.gd-why {
+  border-radius: 12px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-panel);
+  padding: 0.7rem 1rem;
+}
+
+.gd-why summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--dash-green-dark);
+}
+
+.gd-why ul {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.6rem 0 0.2rem;
+  padding-left: 1.2rem;
+  color: var(--dash-muted);
+  line-height: 1.5;
+}
+
+.gd-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--dash-muted);
+  line-height: 1.5;
+}
+
+.gd-panel {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.15rem 1.25rem;
+}
+
+.gd-panel h2,
+.gd-panel h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--dash-green-dark);
+}
+
+.gd-split {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: start;
+}
+
+.gd-stats {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.gd-stat {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-panel);
+}
+
+.gd-stat strong {
+  font-size: 1.45rem;
+  color: var(--dash-green-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.gd-stat span {
+  font-size: 0.78rem;
+  color: var(--dash-muted);
+}
+
+.gd-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.gd-chart text {
+  fill: var(--dash-muted);
+  font-size: 11px;
+}
+
+.gd-chart text.is-value {
+  fill: var(--dash-ink);
+  font-weight: 700;
+}
+
+.gd-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  font-size: 0.8rem;
+  color: var(--dash-muted);
+}
+
+.gd-legend i {
+  display: inline-block;
+  margin-right: 0.4rem;
+  vertical-align: -1px;
+}
+
+.gd-key-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--dash-green);
+}
+
+.gd-key-diamond {
+  width: 9px;
+  height: 9px;
+  transform: rotate(45deg);
+  border: 2px solid var(--dash-muted);
+}
+
+.gd-key-tick {
+  width: 3px;
+  height: 12px;
+  background: var(--dash-ink);
+}
+
+.gd-facts {
+  display: grid;
+  gap: 0.8rem 1.2rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin: 0;
+}
+
+.gd-facts dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--dash-muted);
+}
+
+.gd-facts dd {
+  margin: 0.25rem 0 0;
+  color: var(--dash-ink);
+  overflow-wrap: anywhere;
+}
+
+.gd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.gd-check {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  line-height: 1.45;
+}
+
+.gd-check input {
+  margin-top: 0.25rem;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--dash-green);
+}
+
+.gd-table td,
+.gd-table th {
+  white-space: normal;
+}
+
+.gd-pill {
+  display: inline-flex;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--dash-field);
+  color: var(--dash-muted);
+  border: 1px solid var(--dash-line);
+  white-space: nowrap;
+}
+
+.gd-pill.is-ok {
+  background: var(--dash-hover);
+  color: var(--dash-green-dark);
+  border-color: var(--dash-green);
+}
+
+.gd-pill.is-warn {
+  background: var(--dash-gold-soft);
+  color: var(--dash-gold-ink);
+  border-color: transparent;
+}
+
+.gd-pill.is-strong {
+  background: var(--dash-mark);
+  color: var(--dash-on-mark);
+  border-color: var(--dash-mark);
+}
+
+@media (max-width: 640px) {
+  .gd-hero {
+    padding: 1.1rem 1.1rem;
+  }
+
+  .gd-bar-row {
+    grid-template-columns: minmax(70px, 5.5rem) minmax(0, 1fr) minmax(2.4rem, auto);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gd-mini {
+    transition: none;
+  }
+}
+
+.gd-card-why {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.8rem 1rem 0.8rem 2rem;
+  border-top: 1px solid var(--dash-line);
+  color: var(--dash-ink);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.gd-interest {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.gd-compare-tray {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-top);
+  box-shadow: var(--dash-shadow-strong);
+  backdrop-filter: blur(8px);
+  font-weight: 700;
+  color: var(--dash-green-dark);
+}
+
+.gd-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The student's College recommendation card: steps, the top programs and the next action, with room to breathe. */
+.gd-summary-card {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+  container-type: inline-size;
+}
+
+.gd-summary-card h2 {
+  margin-bottom: 0;
+}
+
+.gd-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gd-progress li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.7rem 0.25rem 0.35rem;
+  border-radius: 999px;
+  border: 1px dashed var(--dash-line);
+  color: var(--dash-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.gd-progress-mark {
+  display: grid;
+  place-items: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  border: 2px solid var(--dash-line);
+}
+
+.gd-progress li.is-done {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--dash-green) 35%, var(--dash-line));
+  background: color-mix(in srgb, var(--dash-green) 8%, var(--dash-panel));
+  color: var(--dash-green-dark);
+}
+
+.gd-progress li.is-done .gd-progress-mark {
+  border-color: var(--dash-green);
+  background: var(--dash-green);
+  color: #ffffff;
+}
+
+.gd-summary-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gd-summary-list li {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-field);
+}
+
+.gd-summary-rank {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--dash-mark);
+  color: var(--dash-on-mark);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.gd-summary-name {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.gd-summary-name strong {
+  color: var(--dash-green-dark);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.gd-summary-name small {
+  color: var(--dash-muted);
+  font-size: 0.78rem;
+}
+
+.gd-summary-action {
+  justify-self: start;
+}
+
+/* The card sits in narrow columns too, so it adapts to its own width rather than the screen's. */
+@container (max-width: 440px) {
+  .gd-summary-list li {
+    grid-template-columns: 2rem minmax(0, 1fr);
+  }
+
+  .gd-summary-list .gd-label {
+    grid-column: 2;
+  }
+
+  .gd-summary-action {
+    justify-self: stretch;
+  }
+}
+
+.gd-table input,
+.gd-table select {
+  width: 7rem;
+  min-height: 38px;
+  padding: 0.4rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-field);
+  color: var(--dash-ink);
+  font: inherit;
+}
+
+.gd-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gd-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 40px;
+  padding: 0.45rem 0.95rem 0.45rem 0.8rem;
+  border-radius: 12px;
+  background: var(--dash-panel);
+  border: 1px solid var(--dash-line);
+  color: var(--dash-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.gd-tab:hover {
+  background: var(--dash-hover);
+  color: var(--dash-green-dark);
+}
+
+.gd-tab.is-active {
+  background: var(--dash-mark);
+  border-color: var(--dash-mark);
+  color: var(--dash-on-mark);
+}
+
+.gd-form-grid {
+  display: grid;
+  gap: 0 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.gd-form-grid .is-wide {
+  grid-column: 1 / -1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gd-tab {
+    transition: none;
+  }
+}
+
+.gd-table tbody th {
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--dash-ink);
+}
+
+/* Admin settings: grouped values on the left, the version history on the right, a save bar that stays in view. */
+.gd-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+  gap: 16px;
+  align-items: start;
+}
+
+.gd-settings-main {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.gd-group {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  gap: 0.75rem 1.5rem;
+  padding: 1.15rem 1.25rem 0.4rem;
+}
+
+.gd-group-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.gd-group-head h3 {
+  margin: 0.15rem 0 0.3rem;
+  font-size: 1rem;
+  color: var(--dash-green-dark);
+}
+
+.gd-group-head p {
+  margin: 0;
+  color: var(--dash-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.gd-group-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dash-green) 16%, var(--dash-panel));
+  color: var(--dash-green);
+}
+
+.gd-group-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 0 1rem;
+  align-items: start;
+}
+
+.gd-field > span {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--dash-ink);
+}
+
+.gd-field.is-changed input {
+  border-color: var(--dash-gold);
+  background: var(--dash-gold-soft);
+}
+
+.gd-field.is-changed strong {
+  color: var(--dash-gold-ink);
+}
+
+.gd-savebar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem 1.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-top);
+  box-shadow: var(--dash-shadow-strong);
+  backdrop-filter: blur(8px);
+}
+
+.gd-savebar-count {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--dash-muted);
+  white-space: nowrap;
+}
+
+.gd-savebar-count.is-changed {
+  color: var(--dash-gold-ink);
+}
+
+.gd-savebar .form-field {
+  margin: 0;
+}
+
+/* The reason sits on its own full-width row above the count, the approval and the buttons. */
+.gd-savebar-note {
+  grid-column: 1 / -1;
+  order: -1;
+}
+
+.gd-savebar .gd-actions {
+  flex-wrap: nowrap;
+}
+
+.gd-savebar .gd-check {
+  font-size: 0.86rem;
+}
+
+.gd-history {
+  position: sticky;
+  top: 12px;
+}
+
+.gd-timeline {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gd-timeline li {
+  position: relative;
+  display: grid;
+  gap: 0.3rem;
+  padding: 0 0 1rem 1.4rem;
+  border-left: 2px solid var(--dash-line);
+  margin-left: 0.4rem;
+}
+
+.gd-timeline li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+
+.gd-timeline li::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--dash-line);
+  background: var(--dash-panel);
+}
+
+.gd-timeline li.is-active::before {
+  border-color: var(--dash-green);
+  background: var(--dash-green);
+}
+
+.gd-timeline-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.gd-timeline-head strong {
+  color: var(--dash-green-dark);
+}
+
+.gd-timeline small {
+  color: var(--dash-muted);
+  font-size: 0.78rem;
+}
+
+.gd-timeline p {
+  margin: 0;
+  color: var(--dash-ink);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.gd-timeline .btn {
+  justify-self: start;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 1100px) {
+  .gd-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gd-history {
+    position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .gd-group {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gd-savebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gd-savebar .gd-actions {
+    flex-wrap: wrap;
+  }
+}
+
+/* Admin recommender: the stage strip, the readiness checks, records per family and model scores. */
+.gd-pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gd-pipeline li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-panel);
+}
+
+.gd-pipeline li > span:last-child {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.gd-pipeline strong {
+  font-size: 0.88rem;
+  color: var(--dash-ink);
+}
+
+.gd-pipeline small {
+  font-size: 0.76rem;
+  color: var(--dash-muted);
+  line-height: 1.35;
+}
+
+.gd-pipeline-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  border: 2px solid var(--dash-line);
+  color: var(--dash-muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.gd-pipeline li.is-done {
+  border-color: color-mix(in srgb, var(--dash-green) 35%, var(--dash-line));
+  background: color-mix(in srgb, var(--dash-green) 7%, var(--dash-panel));
+}
+
+.gd-pipeline li.is-done .gd-pipeline-mark {
+  border-color: var(--dash-green);
+  background: var(--dash-green);
+  color: #ffffff;
+}
+
+.gd-pipeline li.is-current {
+  border-color: var(--dash-gold);
+  background: color-mix(in srgb, var(--dash-gold) 9%, var(--dash-panel));
+}
+
+.gd-pipeline li.is-current .gd-pipeline-mark {
+  border-color: var(--dash-gold);
+  color: var(--dash-gold-ink);
+}
+
+.gd-ready {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem 1.5rem;
+  align-items: start;
+}
+
+.gd-subhead {
+  margin: 0 0 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--dash-muted);
+}
+
+.gd-checks {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--dash-ink);
+}
+
+.gd-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.gd-checks-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  margin-top: 0.05rem;
+  border-radius: 50%;
+}
+
+.gd-checks .is-ok .gd-checks-mark {
+  background: color-mix(in srgb, var(--dash-green) 18%, var(--dash-panel));
+  color: var(--dash-green);
+}
+
+.gd-checks .is-no .gd-checks-mark {
+  background: color-mix(in srgb, #c0463b 16%, var(--dash-panel));
+  color: #c0463b;
+}
+
+.gd-evidence {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gd-evidence li {
+  display: grid;
+  grid-template-columns: minmax(90px, 9rem) minmax(60px, 1fr) auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.gd-evidence strong {
+  color: var(--dash-ink);
+  overflow-wrap: anywhere;
+}
+
+.gd-evidence-count {
+  color: var(--dash-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.gd-bar i.is-short {
+  background: var(--dash-gold);
+}
+
+.gd-model-scores {
+  display: grid;
+  gap: 0.45rem;
+  max-width: 560px;
+}
+
+@media (max-width: 1000px) {
+  .gd-pipeline {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .gd-ready {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .gd-evidence li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .gd-evidence .gd-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .gd-evidence .gd-pill {
+    justify-self: start;
+  }
+}
+
+/* Admin programs: family filter chips with counts. */
+.gd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 34px;
+  padding: 0.3rem 0.45rem 0.3rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-panel);
+  color: var(--dash-green-dark);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gd-chip span {
+  min-width: 1.6rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--dash-field);
+  color: var(--dash-muted);
+  font-size: 0.76rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.gd-chip:hover {
+  background: var(--dash-hover);
+}
+
+.gd-chip[aria-pressed='true'] {
+  background: var(--dash-mark);
+  border-color: var(--dash-mark);
+  color: var(--dash-on-mark);
+}
+
+.gd-chip[aria-pressed='true'] span {
+  background: color-mix(in srgb, var(--dash-on-mark) 22%, var(--dash-mark));
+  color: var(--dash-on-mark);
+}
+
+/* Admin families: a legend of the six types, then one row per family; one family is edited at a time. */
+.gd-type-letter {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 7px;
+  background: var(--dash-field);
+  color: var(--dash-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.gd-type-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 10px 18px;
+  margin: 0.9rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gd-type-legend li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.gd-type-legend .gd-type-letter {
+  background: var(--dash-mark);
+  color: var(--dash-on-mark);
+}
+
+.gd-type-legend strong {
+  display: block;
+  font-size: 0.88rem;
+  color: var(--dash-ink);
+}
+
+.gd-type-legend small {
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--dash-muted);
+}
+
+.gd-family-list {
+  display: grid;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gd-family-row {
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--dash-line);
+}
+
+.gd-family-row:first-child {
+  border-top: 0;
+}
+
+.gd-family-row-main {
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+}
+
+.gd-family-row-name {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.gd-family-row-name strong {
+  font-size: 0.94rem;
+  color: var(--dash-ink);
+  overflow-wrap: anywhere;
+}
+
+.gd-family-row-name .gd-note {
+  font-size: 0.78rem;
+}
+
+.gd-family-row.is-retired .gd-family-row-name strong {
+  color: var(--dash-muted);
+}
+
+.gd-family-row-main > .gd-pill {
+  justify-self: start;
+}
+
+/* Actions keep the last column even while the badges are hidden for editing. */
+.gd-family-row-actions {
+  grid-column: -2 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.gd-family-row-actions .btn {
+  min-height: 34px;
+  padding: 0.3rem 0.85rem;
+}
+
+.gd-type-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gd-type-badges li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.65rem 0.2rem 0.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-hover);
+  color: var(--dash-green-dark);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.gd-type-badges .gd-type-letter {
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  background: var(--dash-mark);
+  color: var(--dash-on-mark);
+  font-size: 0.7rem;
+}
+
+.gd-family-row.is-editing {
+  margin: 0.4rem -0.75rem;
+  padding: 0.85rem 0.75rem;
+  border: 1px solid var(--dash-green);
+  border-radius: 14px;
+  background: var(--dash-field);
+}
+
+.gd-family-row.is-editing + .gd-family-row {
+  border-top: 0;
+}
+
+.gd-family-editor {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+}
+
+.gd-family-editor-count {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--dash-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.gd-type-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.gd-type {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0.35rem 0.5rem;
+  border-radius: 10px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-panel);
+  color: var(--dash-ink);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.gd-type:hover:not(:disabled) {
+  background: var(--dash-hover);
+}
+
+.gd-type:focus-visible {
+  outline: 2px solid var(--dash-green);
+  outline-offset: 2px;
+}
+
+.gd-type:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.gd-type-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gd-type[aria-pressed='true'] {
+  background: var(--dash-hover);
+  border-color: var(--dash-green);
+  color: var(--dash-green-dark);
+}
+
+.gd-type[aria-pressed='true'] .gd-type-letter {
+  background: var(--dash-mark);
+  color: var(--dash-on-mark);
+}
+
+/* Add-family form: code, name and the button on one row, stacking on narrow screens. */
+.gd-family-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: end;
+  gap: 0 16px;
+}
+
+.gd-family-form .btn {
+  margin-bottom: 0.9rem;
+}
+
+@media (max-width: 1100px) {
+  .gd-type-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .gd-family-row-main {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .gd-family-row-main .gd-type-badges,
+  .gd-family-row-main > .gd-pill {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 760px) {
+  .gd-family-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gd-family-form .btn {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 520px) {
+  .gd-family-row-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gd-family-row-main .gd-type-badges,
+  .gd-family-row-main > .gd-pill {
+    grid-row: auto;
+  }
+
+  .gd-family-row-actions {
+    justify-content: flex-start;
+  }
+
+  .gd-type-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gd-type {
+    transition: none;
+  }
+}
+
+/* Admin assessment: the readiness checklist and the questions grouped by interest type. */
+.gd-readiness {
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  background: var(--dash-field);
+}
+
+.gd-question-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.9rem 1.2rem;
+  margin-top: 0.8rem;
+}
+
+.gd-question-group h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.4rem;
+  font-size: 0.92rem;
+  color: var(--dash-green-dark);
+}
+
+.gd-question-group h4 .gd-note {
+  margin-left: auto;
+}
+
+.gd-type-mark {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--dash-green) 16%, var(--dash-panel));
+  color: var(--dash-green);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.gd-question-group ol {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding-left: 1.8rem;
+  color: var(--dash-ink);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.gd-question-group li::marker {
+  color: var(--dash-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.gd-question-group li.is-changed {
+  color: var(--dash-gold-ink);
+}
+
+.gd-question-group li small {
+  display: block;
+  font-size: 0.76rem;
+}
+
+/* Admin outcomes: the two-person rule and the rows the reader can act on. */
+.gd-rule {
+  margin: 0;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-panel);
+  color: var(--dash-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.gd-rule strong {
+  color: var(--dash-green-dark);
+}
+
+.gd-table tr.gd-row-actionable {
+  background: color-mix(in srgb, var(--dash-gold) 7%, var(--dash-panel));
+}
+
+.gd-count-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gd-count-tabs button em {
+  min-width: 1.6rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  text-align: center;
+  opacity: 1;
+}
+
+.gd-facts a {
+  color: var(--dash-green-dark);
+}
+
+.gd-rate-form {
+  gap: 1.25rem;
+}
+
+.gd-rate-list {
+  display: grid;
+  gap: 1.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gd-rate-item {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 1rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--dash-line);
+}
+
+.gd-rate-item legend {
+  padding: 0;
+  font-weight: 700;
+  color: var(--dash-green-dark);
+}
+
+.gd-rate-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.65rem;
+}
+
+.gd-rate-choices label {
+  position: relative;
+  display: grid;
+  align-content: center;
+  min-height: 3.2rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-panel);
+  color: var(--dash-muted);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+
+.gd-rate-choices label.is-picked {
+  border-color: var(--dash-green);
+  background: var(--dash-hover);
+  color: var(--dash-green-dark);
+  font-weight: 700;
+}
+
+.gd-rate-choices input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ia-question {
+  gap: 1.15rem;
+  padding: 1.4rem 1.4rem 1.5rem;
+}

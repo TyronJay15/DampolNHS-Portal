@@ -87,4 +87,4 @@ class StudentDashboardApiTests(TestCase):
         self.assertEqual(response.data['grades'][0]['term_number'], 1)
         self.assertEqual(response.data['terms'][0]['number'], 1)
         self.assertTrue(any(row['name'] == 'Mathematics' for row in response.data['subjects']))
-        self.assertEqual(response.data['recommendation']['method'], METHOD)
+        self.assertEqual(self.client.get('/api/guidance/me/').data['recommendation']['method'], METHOD)

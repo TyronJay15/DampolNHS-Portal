@@ -1,31 +1,34 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { clearTokens, getAccessToken } from '../services/api';
-import { fetchMe, login as loginRequest, logout as logoutRequest } from '../services/authService';
+import { onSessionEnd, restore, signIn, signOut } from '../services/session';
 
 const AuthContext = createContext(null);
+
+// Shown on the sign-in page when the sign-in ended by itself.
+const END_NOTICES = {
+  idle: 'You were signed out after 30 minutes without activity.',
+  ended: 'Your sign-in ended. Please sign in again.',
+  elsewhere: 'You signed out in another tab.',
+};
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    async function boot() {
-      if (!getAccessToken()) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const me = await fetchMe();
-        if (!cancelled) setUser(me);
-      } catch {
-        clearTokens();
-        if (!cancelled) setUser(null);
-      } finally {
+    onSessionEnd((reason) => {
+      setUser(null);
+      setNotice(END_NOTICES[reason] || '');
+    });
+    // After a page load the sign-in is restored from the HttpOnly cookie, if there is one.
+    restore()
+      .then((restored) => {
+        if (!cancelled) setUser(restored);
+      })
+      .finally(() => {
         if (!cancelled) setLoading(false);
-      }
-    }
-    boot();
+      });
     return () => {
       cancelled = true;
     };
@@ -35,18 +38,28 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       loading,
+      notice,
+      // Returns { user } when signed in, or { step, challenge } when the authenticator app is needed.
       async login(credentials) {
-        const nextUser = await loginRequest(credentials);
+        const result = await signIn(credentials);
+        if (result.user) {
+          setNotice('');
+          setUser(result.user);
+        }
+        return result;
+      },
+      // Called by the sign-in page once the authenticator step finished.
+      completeSignIn(nextUser) {
+        setNotice('');
         setUser(nextUser);
-        return nextUser;
       },
       async logout() {
-        const confirmed = await logoutRequest();
+        const confirmed = await signOut();
         setUser(null);
         return confirmed;
       },
     }),
-    [user, loading]
+    [user, loading, notice]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

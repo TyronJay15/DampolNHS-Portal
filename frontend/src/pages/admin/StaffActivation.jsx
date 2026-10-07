@@ -1,5 +1,5 @@
 import LineMark from '../../components/LineMark/LineMark';
-import StripCounts from './StripCounts';
+import MetricStrip from '../../components/MetricStrip/MetricStrip';
 
 // Archived and removed accounts are not waiting for anything, so the strip leaves them out.
 const COUNTED = new Set(['active', 'pending_activation']);
@@ -36,7 +36,7 @@ export function ActivationStrip({ rows }) {
       : 'Every staff account is activated.';
 
   return (
-    <section className="acct-mail is-compact" aria-label="Staff activation">
+    <section className="acct-mail" aria-label="Staff activation">
       <div className="acct-mail-head">
         <span className="desk-line">
           <LineMark name="mail" size={14} />
@@ -44,13 +44,14 @@ export function ActivationStrip({ rows }) {
         </span>
         <p aria-live="polite">{message}</p>
       </div>
-      <StripCounts
+      <MetricStrip
+        className="acct-mail-counts"
         items={[
-          { key: 'staff', label: 'Staff', value: staff.length },
-          { key: 'activated', label: 'Activated', value: staff.length - waiting, tone: 'is-sent' },
-          { key: 'waiting', label: 'Waiting', value: waiting, tone: 'is-waiting' },
-          { key: 'sent', label: 'Codes sent', value: sent, tone: 'is-queued' },
-          { key: 'failed', label: 'Failed', value: failed, tone: 'is-failed' },
+          { key: 'staff', label: 'Staff', value: staff.length, icon: 'staff', tone: 'blue' },
+          { key: 'activated', label: 'Activated', value: staff.length - waiting, icon: 'check', tone: 'green' },
+          { key: 'waiting', label: 'Waiting', value: waiting, icon: 'history', tone: 'gold' },
+          { key: 'sent', label: 'Codes sent', value: sent, icon: 'mail', tone: 'purple' },
+          { key: 'failed', label: 'Failed', value: failed, icon: 'close', tone: 'red' },
         ]}
       />
     </section>

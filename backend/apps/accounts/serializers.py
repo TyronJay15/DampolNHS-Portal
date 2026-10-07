@@ -5,7 +5,7 @@ from apps.accounts.codes import check_code, consume_code, issue_code, resend_wai
 from apps.accounts.identity import find_portal_user
 from apps.accounts.mail import password_otp_email
 from apps.accounts.models import User
-from apps.accounts.passwords import validate_password_strength
+from apps.accounts.passwords import check_new_password
 from apps.accounts.recaptcha import verify_recaptcha
 
 
@@ -30,16 +30,10 @@ class LoginSerializer(serializers.Serializer):
         password = attrs['password']
         user = find_portal_user(identifier)
 
-        if user is None:
-            raise AuthDenied('Invalid credentials.')
-
-        if user.account_status == User.AccountStatus.PENDING_ACTIVATION:
-            raise AuthDenied(
-                'Activate your account with the code sent to your email.',
-                code='account_needs_activation',
-            )
-
-        if not user.has_usable_password() or not user.check_password(password):
+        # Unknown accounts, accounts not activated yet (they have no password) and wrong passwords all get
+        # the same answer, so the login form cannot be used to find out which emails or LRNs exist.
+        # Account states are only explained after the password is proved.
+        if user is None or not user.has_usable_password() or not user.check_password(password):
             raise AuthDenied('Invalid credentials.')
 
         if user.approval_status == User.ApprovalStatus.PENDING:
@@ -127,17 +121,16 @@ class ActivateAccountSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
 
-    def validate_password(self, value):
-        return validate_password_strength(value)
-
     def validate(self, attrs):
-        user = User.objects.filter(email__iexact=attrs['email'].strip()).first()
-        if user is None:
-            raise serializers.ValidationError({'email': 'No account matches that email.'})
-        if user.account_status == User.AccountStatus.ACTIVE and user.has_usable_password():
-            raise serializers.ValidationError({'email': 'This account is already activated.'})
         if attrs['password'] != attrs['confirm_password']:
             raise serializers.ValidationError({'confirm_password': 'Passwords do not match.'})
+        # One answer for an unknown email, an already activated account and a wrong code, so this form
+        # cannot be used to find out which emails have accounts. An activated account has no live code.
+        # The code is checked before it is used up, so a weak password does not cost the person their code.
+        user = User.objects.filter(email__iexact=attrs['email'].strip()).first()
+        if user is None or not check_code(user, 'activate', attrs['code']):
+            raise serializers.ValidationError({'code': 'That code is invalid or has expired.'})
+        check_new_password(attrs['password'], user)
         if not consume_code(user, 'activate', attrs['code']):
             raise serializers.ValidationError({'code': 'That code is invalid or has expired.'})
         attrs['user'] = user
@@ -176,9 +169,6 @@ class ChangePasswordSerializer(serializers.Serializer):
     new_password = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
 
-    def validate_new_password(self, value):
-        return validate_password_strength(value)
-
     def validate(self, attrs):
         user = self.context['request'].user
         if not user.check_password(attrs['current_password']):
@@ -187,6 +177,7 @@ class ChangePasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError({'confirm_password': 'Passwords do not match.'})
         if attrs['new_password'] == attrs['current_password']:
             raise serializers.ValidationError({'new_password': 'Choose a password that is different from the current one.'})
+        check_new_password(attrs['new_password'], user, field='new_password')
         if not consume_code(user, 'password', attrs['code']):
             raise serializers.ValidationError({'code': 'That code is invalid or has expired.'})
         return attrs
@@ -223,15 +214,15 @@ class ForgotPasswordSerializer(serializers.Serializer):
     confirm_password = serializers.CharField(write_only=True)
     recaptcha_token = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
-    def validate_new_password(self, value):
-        return validate_password_strength(value)
-
     def validate(self, attrs):
         verify_recaptcha(attrs.pop('recaptcha_token', ''))
         if attrs['new_password'] != attrs['confirm_password']:
             raise serializers.ValidationError({'confirm_password': 'Passwords do not match.'})
         user = find_portal_user(attrs['identifier'])
-        if user is None or not user.has_usable_password() or not consume_code(user, 'password', attrs['code']):
+        if user is None or not user.has_usable_password() or not check_code(user, 'password', attrs['code']):
+            raise serializers.ValidationError({'code': 'That code is invalid or has expired.'})
+        check_new_password(attrs['new_password'], user, field='new_password')
+        if not consume_code(user, 'password', attrs['code']):
             raise serializers.ValidationError({'code': 'That code is invalid or has expired.'})
         attrs['user'] = user
         return attrs

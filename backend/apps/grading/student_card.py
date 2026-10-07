@@ -4,7 +4,6 @@ from decimal import Decimal
 from apps.accounts.models import StudentProfile
 from apps.grading.advisory import section_subject_assignments
 from apps.grading.models import Grade
-from apps.grading.recommend import recommend_payload
 from apps.grading.scores import average
 from apps.people.models import Registration, StudentSection
 from apps.school.models import SchoolYear, Term
@@ -191,5 +190,4 @@ def student_grade_card(profile: StudentProfile):
         'partial': bool(incomplete and posted),
         'coverage_note': note,
         'term_coverage': term_coverage,
-        'recommendation': recommend_payload(released, program.code if program else None) if released else None,
     }

@@ -5,9 +5,12 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import StudentProfile, User
 from apps.grading.models import Grade
-from apps.grading.recommend import recommend_payload
+from apps.grading.recommend import recommend_payload, recommendation_grades
+from apps.guidance.consent import NOTICE_VERSION
+from apps.guidance.models import GuidanceConsent
 from apps.ml.knn_model import METHOD
 from apps.ml.models import CollegeProgram
+from apps.ml.recommender import RecommenderContext
 from apps.people.models import StudentSection, TeacherAssignment
 from apps.school.models import Program, SchoolYear, Section, SkillDomain, Subject, Term
 
@@ -39,17 +42,20 @@ class GradeRow:
         self.score = score
 
 
-class CollegeKnnTests(TestCase):
+class CollegeMatchTests(TestCase):
     def setUp(self):
         self.subjects = {code: make_subject(code) for code in DOMAINS}
 
     def rows(self, scores):
         return [GradeRow(self.subjects[code], score) for code, score in scores]
 
+    def payload(self, rows):
+        return recommend_payload(rows, RecommenderContext())
+
     def test_same_section_strengths_pick_different_courses(self):
-        ana = recommend_payload(self.rows([('phys-1', '93'), ('chem-1', '91'), ('gen-math', '88'), ('eff-comm', '75')]))
-        ben = recommend_payload(self.rows([('gen-math', '90'), ('emtech', '94'), ('prog-java', '91'), ('phys-1', '76')]))
-        cara = recommend_payload(self.rows([('eff-comm', '92'), ('kasaysayan', '90'), ('gen-math', '78'), ('gen-sci', '74')]))
+        ana = self.payload(self.rows([('phys-1', '93'), ('chem-1', '91'), ('gen-math', '88'), ('eff-comm', '75')]))
+        ben = self.payload(self.rows([('gen-math', '90'), ('emtech', '94'), ('prog-java', '91'), ('phys-1', '76')]))
+        cara = self.payload(self.rows([('eff-comm', '92'), ('kasaysayan', '90'), ('gen-math', '78'), ('gen-sci', '74')]))
         self.assertTrue(ana['ready'])
         self.assertTrue(ben['ready'])
         self.assertTrue(cara['ready'])
@@ -59,79 +65,63 @@ class CollegeKnnTests(TestCase):
         self.assertEqual(len({ana['courses'][0]['code'], ben['courses'][0]['code'], cara['courses'][0]['code']}), 3)
 
     def test_too_few_skills_is_not_ready(self):
-        payload = recommend_payload(self.rows([('gen-math', '90'), ('phys-1', '88')]))
+        payload = self.payload(self.rows([('gen-math', '90'), ('phys-1', '88')]))
         self.assertFalse(payload['ready'])
         self.assertEqual(payload['courses'], [])
 
 
-class StudentRecommendationApiTests(TestCase):
+def make_subject_variant(status):
+    return Subject.objects.create(code=f'gen-math-{status}', name=status, skill_domain=SkillDomain.objects.get(key='math'))
+
+
+class EligibleGradesTests(TestCase):
+    """The one eligibility rule: students read released grades, staff and training read approved and released."""
+
     def setUp(self):
-        self.year = SchoolYear.objects.create(label='2025-2026', is_current=True)
-        self.program = Program.objects.create(code='STEMC', name='STEM Cluster', sort_order=1)
-        self.term = Term.objects.create(school_year=self.year, number=1, label='Term 1')
-        self.math = make_subject('gen-math')
-        self.phys = make_subject('phys-1')
-        self.chem = make_subject('chem-1')
-        self.comm = make_subject('eff-comm')
-        self.section = Section.objects.create(
-            school_year=self.year,
-            name='STEMC-A',
-            grade_level='Grade 11',
-            program=self.program,
-        )
-        self.user = User.objects.create_user(
-            email='ana@example.com',
-            password='Strongpass1',
-            first_name='Ana',
-            last_name='Reyes',
-            role=User.Role.STUDENT,
-        )
-        self.profile = StudentProfile.objects.create(user=self.user, lrn='136000009921')
-        StudentSection.objects.create(student=self.profile, section=self.section, school_year=self.year)
-        self.client = APIClient()
-        self.client.force_authenticate(user=self.user)
+        year = SchoolYear.objects.create(label='2025-2026', is_current=True)
+        term = Term.objects.create(school_year=year, number=1, label='Term 1')
+        user = User.objects.create_user(email='rule@example.com', password='Strongpass1', role=User.Role.STUDENT)
+        self.profile = StudentProfile.objects.create(user=user, lrn='136000009930')
+        subject = make_subject('gen-math')
+        for status in Grade.Status.values:
+            Grade.objects.create(
+                student=self.profile,
+                subject=subject if status == Grade.Status.RELEASED else make_subject_variant(status),
+                term=term,
+                school_year=year,
+                score=Decimal('90'),
+                status=status,
+            )
 
-    def _release(self, subject, score):
-        Grade.objects.create(
-            student=self.profile,
-            subject=subject,
-            term=self.term,
-            school_year=self.year,
-            score=Decimal(score),
-            status=Grade.Status.RELEASED,
-        )
+    def test_students_read_released_grades_only(self):
+        rows = recommendation_grades([self.profile.pk], released_only=True)[self.profile.pk]
+        self.assertEqual({row.status for row in rows}, {Grade.Status.RELEASED})
 
-    def test_hidden_card_has_no_recommendation(self):
-        Grade.objects.create(
-            student=self.profile,
-            subject=self.phys,
-            term=self.term,
-            school_year=self.year,
-            score=Decimal('90.00'),
-            status=Grade.Status.APPROVED,
-        )
-        response = self.client.get('/api/grades/me/')
-        self.assertEqual(response.data['recommendation'], None)
+    def test_staff_read_approved_and_released_grades(self):
+        rows = recommendation_grades([self.profile.pk], released_only=False)[self.profile.pk]
+        self.assertEqual({row.status for row in rows}, {Grade.Status.APPROVED, Grade.Status.RELEASED})
 
-    def test_shown_card_includes_college_match(self):
-        self._release(self.phys, '93')
-        self._release(self.chem, '91')
-        self._release(self.math, '88')
-        self._release(self.comm, '75')
-        rec = self.client.get('/api/grades/me/').data['recommendation']
-        self.assertEqual(rec['method'], METHOD)
-        self.assertTrue(rec['ready'])
-        self.assertEqual(strongest_domain(rec['courses'][0]['code']), 'science')
+
+class GradeCardTests(TestCase):
+    def test_grade_card_no_longer_embeds_a_recommendation(self):
+        """The student's College recommendation page owns recommendations; the card shows grades only."""
+        year = SchoolYear.objects.create(label='2025-2026', is_current=True)
+        user = User.objects.create_user(email='card@example.com', password='Strongpass1', role=User.Role.STUDENT)
+        StudentProfile.objects.create(user=user, lrn='136000009931')
+        Term.objects.create(school_year=year, number=1, label='Term 1')
+        client = APIClient()
+        client.force_authenticate(user=user)
+        self.assertNotIn('recommendation', client.get('/api/grades/me/').data)
 
 
 class AdvisoryRecommendationTests(TestCase):
     def setUp(self):
         self.year = SchoolYear.objects.create(label='2025-2026', is_current=True)
-        self.program = Program.objects.create(code='STEMC', name='STEM Cluster', sort_order=1)
+        self.program = Program.objects.create(code='ICTP', name='ICT Programming', sort_order=1, strand_group='ICT')
         self.term = Term.objects.create(school_year=self.year, number=1, label='Term 1')
         self.section = Section.objects.create(
             school_year=self.year,
-            name='STEMC-A',
+            name='ICTP-A',
             grade_level='Grade 11',
             program=self.program,
         )
@@ -142,19 +132,18 @@ class AdvisoryRecommendationTests(TestCase):
             last_name='Santos',
             role=User.Role.TEACHER,
         )
-        student_user = User.objects.create_user(
+        self.student_user = User.objects.create_user(
             email='ben@example.com',
             password='Strongpass1',
             first_name='Ben',
             last_name='Cruz',
             role=User.Role.STUDENT,
         )
-        self.student_user = student_user
-        student = StudentProfile.objects.create(user=student_user, lrn='136000009922')
-        StudentSection.objects.create(student=student, section=self.section, school_year=self.year)
+        self.student = StudentProfile.objects.create(user=self.student_user, lrn='136000009922')
+        StudentSection.objects.create(student=self.student, section=self.section, school_year=self.year)
         for code, score in (('gen-math', '90'), ('emtech', '94'), ('prog-java', '91'), ('phys-1', '76')):
             Grade.objects.create(
-                student=student,
+                student=self.student,
                 subject=make_subject(code),
                 term=self.term,
                 school_year=self.year,
@@ -168,61 +157,65 @@ class AdvisoryRecommendationTests(TestCase):
             school_year=self.year,
             section=self.section,
         )
-        # The track boost only matters if the student's program leads to a course.
         CollegeProgram.objects.get(code='bsit').shs_programs.add(self.program)
+        GuidanceConsent.objects.create(
+            student=self.student,
+            kind=GuidanceConsent.Kind.ASSESSMENT,
+            party=GuidanceConsent.Party.STUDENT,
+            notice_version=NOTICE_VERSION,
+            active_marker=f'{self.student.pk}:assessment',
+        )
 
-    def test_adviser_sees_college_match(self):
-        client = APIClient()
-        client.force_authenticate(user=self.adviser)
-        response = client.get(f'/api/grades/advisory/?assignment={self.advisory.id}&term={self.term.id}')
-        self.assertEqual(response.status_code, 200)
-        rec = response.data['students'][0]['recommendation']
-        self.assertEqual(rec['method'], METHOD)
-        self.assertEqual(strongest_domain(rec['courses'][0]['code']), 'tech')
-
-    def test_advisory_endpoint_loads_with_the_full_recommendation_payload(self):
-        """Regression: GET /api/grades/advisory/ raised ValueError when rank() and its caller disagreed."""
+    def advisory_rec(self):
         client = APIClient()
         client.force_authenticate(user=self.adviser)
         response = client.get(f'/api/grades/advisory/?assignment={self.advisory.id}&term={self.term.id}')
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(len(response.data['students']), 1)
-        rec = response.data['students'][0]['recommendation']
+        return response.data['students'][0]['recommendation']
+
+    def test_adviser_sees_college_match(self):
+        rec = self.advisory_rec()
+        self.assertEqual(rec['method'], METHOD)
+        self.assertEqual(strongest_domain(rec['courses'][0]['code']), 'tech')
+
+    def test_advisory_endpoint_loads_with_the_full_recommendation_payload(self):
+        rec = self.advisory_rec()
         self.assertTrue(rec['ready'])
         self.assertIn(rec['evidence'], ('strong', 'limited'))
         self.assertEqual(
             set(rec['coverage']),
             {'observed', 'dimensions', 'threshold', 'needs', 'not_evaluated', 'excluded_subjects', 'unmapped_subjects'},
         )
-        self.assertIsInstance(rec['coverage']['not_evaluated'], int)
-        self.assertIsInstance(rec['coverage']['needs'], list)
         top = rec['courses'][0]
-        self.assertEqual(set(top), {'code', 'name', 'distance', 'reason', 'track_match', 'evidence'})
+        self.assertEqual(
+            set(top),
+            {'code', 'name', 'family', 'label', 'label_text', 'tier', 'distance', 'reason', 'strand_context', 'evidence'},
+        )
         self.assertEqual(
             set(top['evidence']),
             {'status', 'observed', 'total', 'coverage', 'observed_domains', 'missing_domains'},
         )
-        self.assertTrue(top['track_match'])
         self.assertFalse(rec['model']['trained_on_outcomes'])
+        bsit = next(row for row in rec['courses'] if row['code'] == 'bsit')
+        self.assertEqual(bsit['strand_context'], 'typical')
 
     def test_student_adviser_and_admin_views_agree(self):
-        """Every screen passes the student's program, so the same grades give the same result."""
-        adviser = APIClient()
-        adviser.force_authenticate(user=self.adviser)
+        """Every screen goes through the one ranking path, so the same released grades give the same order."""
         student = APIClient()
         student.force_authenticate(user=self.student_user)
+        guidance = student.get('/api/guidance/me/').data['recommendation']
         admin = APIClient()
         admin.force_authenticate(
             user=User.objects.create_user(email='admin@dampol1nhs.edu.ph', password='changeme123', role=User.Role.ADMIN)
         )
-        from_adviser = adviser.get(f'/api/grades/advisory/?assignment={self.advisory.id}&term={self.term.id}').data
-        from_student = student.get('/api/grades/me/').data
         report = admin.get(f'/api/grades/report/?term={self.term.id}')
         self.assertEqual(report.status_code, 200)
         from_admin = report.data['sections'][0]['students'][0]['recommendation']
-        self.assertEqual(from_adviser['students'][0]['recommendation'], from_student['recommendation'])
-        self.assertEqual(from_admin, from_student['recommendation'])
-        top = from_student['recommendation']['courses'][0]
-        self.assertIn(top['evidence']['status'], ('strong', 'limited'))
-        self.assertEqual(from_admin['evidence'], top['evidence']['status'])
-        self.assertEqual(from_adviser['students'][0]['recommendation']['courses'][0]['evidence'], top['evidence'])
+        from_adviser = self.advisory_rec()
+        student_order = [item['program']['code'] for item in guidance['primary'] + guidance['additional']]
+        self.assertEqual([row['code'] for row in from_adviser['courses']], student_order)
+        self.assertEqual([row['code'] for row in from_admin['courses']], student_order)
+        self.assertEqual(
+            [row['label'] for row in from_adviser['courses']],
+            [item['label'] for item in guidance['primary'] + guidance['additional']],
+        )

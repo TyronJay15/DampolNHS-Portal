@@ -1,3 +1,6 @@
+import logging
+
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
@@ -11,16 +14,36 @@ from apps.school.labels import section_label
 from apps.school.models import SchoolYear, Section
 from apps.school.serializers import SchoolYearSerializer, SectionSerializer
 
+logger = logging.getLogger('apps.school')
+
 
 def _year_busy(year):
     return year.sections.exists()
 
 
-def _retrain_forecast():
-    """The set of completed years changed, so the enrollment trend is refit (snapshots included)."""
-    from apps.ml.forecast import train_forecast
+def _snapshot_archived_year(year):
+    """Save that year's final Grade 11 counts. Called inside the archive transaction."""
+    from apps.ml.forecast import snapshot_year
 
-    train_forecast()
+    snapshot_year(year)
+
+
+def _retrain_forecast(user, year, archived):
+    """Refit the enrollment trend after the year change has already been saved.
+
+    A training failure must not undo the archive or restore. The planning page marks a stale model
+    until the next successful retrain.
+    """
+    from apps.ml.forecast import retrain
+
+    try:
+        retrain(user, f'after {"archiving" if archived else "restoring"} {year.label}')
+    except Exception:
+        logger.exception(
+            'Enrollment forecast was not retrained after %s school year %s.',
+            'archiving' if archived else 'restoring',
+            year.pk,
+        )
 
 
 class SchoolYearArchiveView(APIView):
@@ -30,23 +53,25 @@ class SchoolYearArchiveView(APIView):
         year = get_object_or_404(SchoolYear, pk=pk, archived_at__isnull=True)
         if year.is_current:
             return Response({'detail': 'Make another year current before archiving this one.'}, status=400)
-        now = timezone.now()
-        year.archived_at = now
-        year.is_current = False
-        year.save(update_fields=['archived_at', 'is_current'])
-        year.sections.filter(archived_at__isnull=True).update(archived_at=now, is_active=False)
-        TeacherAssignment.objects.filter(school_year=year, status=TeacherAssignment.Status.ACTIVE).update(
-            status=TeacherAssignment.Status.ENDED,
-            ended_at=now,
-        )
-        audit.record(
-            user=request.user,
-            action='school_year_archived',
-            summary=f'Archived school year {year.label}',
-            target_type='SchoolYear',
-            target_id=year.id,
-        )
-        _retrain_forecast()
+        with transaction.atomic():
+            now = timezone.now()
+            year.archived_at = now
+            year.is_current = False
+            year.save(update_fields=['archived_at', 'is_current'])
+            year.sections.filter(archived_at__isnull=True).update(archived_at=now, is_active=False)
+            TeacherAssignment.objects.filter(school_year=year, status=TeacherAssignment.Status.ACTIVE).update(
+                status=TeacherAssignment.Status.ENDED,
+                ended_at=now,
+            )
+            audit.record(
+                user=request.user,
+                action='school_year_archived',
+                summary=f'Archived school year {year.label}',
+                target_type='SchoolYear',
+                target_id=year.id,
+            )
+            _snapshot_archived_year(year)
+        _retrain_forecast(request.user, year, archived=True)
         return Response(SchoolYearSerializer(year).data)
 
 
@@ -57,51 +82,52 @@ class SchoolYearRestoreView(APIView):
         year = get_object_or_404(SchoolYear, pk=pk)
         if year.archived_at is None:
             return Response({'detail': 'That year is already live.'}, status=400)
-        year_archived_at = year.archived_at
-        year.archived_at = None
-        year.save(update_fields=['archived_at'])
-        from apps.school.section_progress import recompute_status
+        with transaction.atomic():
+            year_archived_at = year.archived_at
+            year.archived_at = None
+            year.save(update_fields=['archived_at'])
+            from apps.school.section_progress import recompute_status
 
-        for section in year.sections.filter(archived_at=year_archived_at):
-            section.archived_at = None
-            section.is_active = True
-            section.save(update_fields=['archived_at', 'is_active'])
-            recompute_status(section)
-            ended = TeacherAssignment.objects.filter(
-                section=section,
-                school_year=year,
-                status=TeacherAssignment.Status.ENDED,
-                ended_at=year_archived_at,
+            for section in year.sections.filter(archived_at=year_archived_at):
+                section.archived_at = None
+                section.is_active = True
+                section.save(update_fields=['archived_at', 'is_active'])
+                recompute_status(section)
+                ended = TeacherAssignment.objects.filter(
+                    section=section,
+                    school_year=year,
+                    status=TeacherAssignment.Status.ENDED,
+                    ended_at=year_archived_at,
+                )
+                for row in ended:
+                    if row.assignment_type == TeacherAssignment.Type.ADVISER:
+                        if TeacherAssignment.objects.filter(
+                            section=section,
+                            school_year=year,
+                            assignment_type=TeacherAssignment.Type.ADVISER,
+                            status=TeacherAssignment.Status.ACTIVE,
+                        ).exists():
+                            continue
+                    elif row.subject_id:
+                        if TeacherAssignment.objects.filter(
+                            section=section,
+                            school_year=year,
+                            assignment_type=TeacherAssignment.Type.SUBJECT_TEACHER,
+                            subject_id=row.subject_id,
+                            status=TeacherAssignment.Status.ACTIVE,
+                        ).exists():
+                            continue
+                    row.status = TeacherAssignment.Status.ACTIVE
+                    row.ended_at = None
+                    row.save(update_fields=['status', 'ended_at'])
+            audit.record(
+                user=request.user,
+                action='school_year_restored',
+                summary=f'Restored school year {year.label}',
+                target_type='SchoolYear',
+                target_id=year.id,
             )
-            for row in ended:
-                if row.assignment_type == TeacherAssignment.Type.ADVISER:
-                    if TeacherAssignment.objects.filter(
-                        section=section,
-                        school_year=year,
-                        assignment_type=TeacherAssignment.Type.ADVISER,
-                        status=TeacherAssignment.Status.ACTIVE,
-                    ).exists():
-                        continue
-                elif row.subject_id:
-                    if TeacherAssignment.objects.filter(
-                        section=section,
-                        school_year=year,
-                        assignment_type=TeacherAssignment.Type.SUBJECT_TEACHER,
-                        subject_id=row.subject_id,
-                        status=TeacherAssignment.Status.ACTIVE,
-                    ).exists():
-                        continue
-                row.status = TeacherAssignment.Status.ACTIVE
-                row.ended_at = None
-                row.save(update_fields=['status', 'ended_at'])
-        audit.record(
-            user=request.user,
-            action='school_year_restored',
-            summary=f'Restored school year {year.label}',
-            target_type='SchoolYear',
-            target_id=year.id,
-        )
-        _retrain_forecast()
+        _retrain_forecast(request.user, year, archived=False)
         return Response(SchoolYearSerializer(year).data)
 
 

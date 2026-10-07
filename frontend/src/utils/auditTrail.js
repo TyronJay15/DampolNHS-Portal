@@ -7,9 +7,12 @@ const EVENT_FAMILIES = [
   { value: 'grades', label: 'Grades' },
   { value: 'announcements', label: 'Announcements' },
   { value: 'access', label: 'Access' },
+  { value: 'guidance', label: 'College recommendation' },
+  { value: 'security', label: 'Security' },
 ];
 
-export const NOTIFICATION_FILTERS = EVENT_FAMILIES;
+// College recommendation records audit events but sends no notifications, so its tab is left out here.
+export const NOTIFICATION_FILTERS = EVENT_FAMILIES.filter((row) => row.value !== 'guidance');
 
 const ACTION_LABELS = {
   register: 'Registration submitted',
@@ -46,6 +49,7 @@ const ACTION_LABELS = {
   program_created: 'Program created',
   program_updated: 'Program updated',
   model_trained: 'Model retrained',
+  retention_rate_changed: 'Retention rate changed',
   adviser_assigned: 'Adviser assigned',
   subject_teacher_assigned: 'Subject teacher assigned',
   assignment_ended: 'Assignment ended',
@@ -71,6 +75,41 @@ const ACTION_LABELS = {
   access_request_approved: 'Request approved and applied',
   access_request_declined: 'Request declined',
   access_request_failed: 'Request could not be applied',
+  college_program_added: 'College program added',
+  college_program_updated: 'College program updated',
+  college_program_verified: 'College program verified',
+  college_catalog_imported: 'College catalog imported',
+  program_family_saved: 'Program family saved',
+  program_profile_applied: 'Program profile validated',
+  interest_map_saved: 'Family interest map saved',
+  interest_instrument_activated: 'Interest assessment activated',
+  recommender_config_saved: 'Recommender settings saved',
+  recommender_config_activated: 'Recommender settings activated',
+  recommender_training_queued: 'Recommender training requested',
+  recommender_training_finished: 'Recommender training finished',
+  recommender_model_activated: 'Recommender model activated',
+  recommender_model_archived: 'Recommender model switched off',
+  recommender_permission_changed: 'Recommender permission changed',
+  guidance_consent_given: 'Recommendation consent given',
+  guidance_consent_withdrawn: 'Recommendation consent withdrawn',
+  guidance_data_deleted: 'Recommendation answers deleted',
+  guidance_student_viewed: 'Adviser opened college recommendation',
+  adviser_note_added: 'Adviser note added',
+  adviser_recommendation_added: 'Adviser recommendation added',
+  college_outcome_recorded: 'College outcome recorded',
+  college_outcome_validated: 'College outcome validated',
+  logout: 'Signed out',
+  login_locked: 'Sign-in paused after failed attempts',
+  session_replay_detected: 'Stolen sign-in token blocked',
+  sessions_ended_by_admin: 'Signed out on every device',
+  register_duplicate: 'Registration repeated existing details',
+  mfa_enrolled: 'Authenticator app set up',
+  mfa_disabled: 'Authenticator app turned off',
+  mfa_reset: 'Authenticator app reset',
+  mfa_recovery_used: 'Recovery code used to sign in',
+  mfa_recovery_codes_renewed: 'New recovery codes made',
+  django_admin_login: 'Maintenance console sign-in',
+  console_access_changed: 'Maintenance console access changed',
 };
 
 const ROLE_LABELS = {
@@ -88,6 +127,8 @@ const CATEGORY_LABELS = {
   grades: 'Grades',
   announcements: 'Announcement',
   access: 'Access',
+  guidance: 'College recommendation',
+  security: 'Security',
 };
 
 export const AUDIT_FILTERS = EVENT_FAMILIES;
@@ -141,6 +182,8 @@ export function familyIcon(family) {
   if (family === 'announcements') return 'cms';
   if (family === 'accounts') return 'user';
   if (family === 'access') return 'access';
+  if (family === 'guidance') return 'guidance';
+  if (family === 'security') return 'alert';
   return 'audit';
 }
 
@@ -164,6 +207,9 @@ export function timeLabel(value) {
 }
 
 const DETAIL_LABELS = {
+  note: 'Note',
+  panel_approved: 'Panel approved',
+  changes: 'Changed values',
   term: 'Term',
   term_label: 'Term',
   section: 'Section',

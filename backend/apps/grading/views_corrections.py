@@ -153,7 +153,7 @@ class CorrectionReviewView(APIView):
         if row.grade.section_id:
             require_grade_in_scope(request.user, row.grade.section.grade_level)
         try:
-            review_correction(row, request.data.get('status'), str(request.data.get('note') or '').strip(), request.user)
+            row = review_correction(row, request.data.get('status'), str(request.data.get('note') or '').strip(), request.user)
         except CorrectionBlocked as exc:
             return Response({'detail': str(exc)}, status=400)
         return Response(_payload(row))

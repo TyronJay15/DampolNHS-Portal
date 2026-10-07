@@ -77,18 +77,18 @@ def show_student_card(*, section, term, student, user):
         reason='Adviser showed report card' if complete else 'Adviser showed partial report card',
         duty=ADVISER,
     )
-    shown_rows = student_term_grades(section, term, student, statuses=[Grade.Status.RELEASED])
-    assigned = len(counted_subject_ids(term_subject_ids(section, term), shown_rows))
-    released = len(shown_rows)
-    audit.record(
-        user=user,
-        action='grades_shown',
-        summary=f'Showed {student.user.get_full_name()} report card for {term.label}',
-        target_type='StudentProfile',
-        target_id=student.id,
-        details={'term': term.id, 'section': section.id, 'shown': moved, 'partial': not complete},
-    )
     if moved:
+        shown_rows = student_term_grades(section, term, student, statuses=[Grade.Status.RELEASED])
+        assigned = len(counted_subject_ids(term_subject_ids(section, term), shown_rows))
+        released = len(shown_rows)
+        audit.record(
+            user=user,
+            action='grades_shown',
+            summary=f'Showed {student.user.get_full_name()} report card for {term.label}',
+            target_type='StudentProfile',
+            target_id=student.id,
+            details={'term': term.id, 'section': section.id, 'shown': moved, 'partial': not complete},
+        )
         if complete:
             body = f'Your adviser showed your {term.label} grades for {section.name}.'
         else:

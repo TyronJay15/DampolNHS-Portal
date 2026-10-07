@@ -197,15 +197,15 @@ class TeacherSubmitClassView(APIView):
             reason='Teacher submitted class grades',
             duty=SUBJECT_TEACHER,
         )
-        audit.record(
-            user=request.user,
-            action='grades_submitted',
-            summary=f'Submitted {moved} {assignment.subject.name} grade(s) for {assignment.section.name}',
-            target_type='Section',
-            target_id=assignment.section_id,
-            details={'term': term.id, 'subject': assignment.subject_id, 'submitted': moved},
-        )
         if moved:
+            audit.record(
+                user=request.user,
+                action='grades_submitted',
+                summary=f'Submitted {moved} {assignment.subject.name} grade(s) for {assignment.section.name}',
+                target_type='Section',
+                target_id=assignment.section_id,
+                details={'term': term.id, 'subject': assignment.subject_id, 'submitted': moved},
+            )
             notify(
                 head_teachers(),
                 title=f'{term.label} · {assignment.subject.name} submitted',

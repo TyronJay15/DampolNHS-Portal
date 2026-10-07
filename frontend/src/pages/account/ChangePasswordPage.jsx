@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AuthenticatorSettings from '../../components/auth/AuthenticatorSettings';
 import PasswordRules from '../../components/auth/PasswordRules';
 import ResendCodeButton from '../../components/auth/ResendCodeButton';
 import { nextResendAt } from '../../components/auth/resendTime';
@@ -10,7 +11,7 @@ import PageHead from '../../components/PageHead/PageHead';
 import PasswordInput from '../../components/Input/PasswordInput';
 import { useAuth } from '../../context/AuthContext';
 import { changePassword, requestPasswordOtp, verifyPasswordOtp } from '../../services/authService';
-import { checkPassword, checkPasswordMatch, firstApiError } from '../../utils/authRules';
+import { checkPassword, checkPasswordMatch, firstApiError, passwordMinFor } from '../../utils/authRules';
 import '../../styles/studio.css';
 import './ChangePasswordPage.css';
 
@@ -36,6 +37,7 @@ const ROLE_LABEL = {
 
 export default function ChangePasswordPage() {
   const { user } = useAuth();
+  const minimum = passwordMinFor(user?.role);
   const confirm = useConfirm();
   const [step, setStep] = useState('send');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -93,7 +95,7 @@ export default function ChangePasswordPage() {
     event.preventDefault();
     setError('');
     setMessage('');
-    const passwordError = checkPassword(newPassword) || checkPasswordMatch(newPassword, confirmPassword);
+    const passwordError = checkPassword(newPassword, minimum) || checkPasswordMatch(newPassword, confirmPassword);
     if (passwordError) {
       setError(passwordError);
       return;
@@ -236,7 +238,7 @@ export default function ChangePasswordPage() {
                   autoComplete="new-password"
                   required
                 />
-                <PasswordRules value={newPassword} />
+                <PasswordRules value={newPassword} min={minimum} />
               </label>
               <label className="form-field">
                 <span className="desk-line">
@@ -260,6 +262,7 @@ export default function ChangePasswordPage() {
           ) : null}
         </section>
       </div>
+      {user?.role === 'admin' || user?.role === 'head_teacher' ? <AuthenticatorSettings /> : null}
     </div>
   );
 }

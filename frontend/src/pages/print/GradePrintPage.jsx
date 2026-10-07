@@ -2,15 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Loading from '../../components/Loading/Loading';
 import { fetchGradePrint } from '../../services/gradeService';
+import PrintFooter from './PrintFooter';
 import PrintToolbar from './PrintToolbar';
 import { pdfFileName } from './pdfFileName';
 import './GradePrintPage.css';
-
-function formatDate(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-}
 
 // A standalone document page: no dashboard shell, so nothing but the report is printed.
 export default function GradePrintPage() {
@@ -125,9 +120,7 @@ export default function GradePrintPage() {
         </table>
 
         <p className="gp-note">Passing grade: {report.passing_score}. Only grades released by the school are included.</p>
-        <footer className="gp-foot">
-          <span>Date generated: {formatDate(report.generated_at)}</span>
-        </footer>
+        <PrintFooter generatedAt={report.generated_at} />
       </article>
     </div>
   );

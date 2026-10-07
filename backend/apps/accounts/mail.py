@@ -1,3 +1,4 @@
+import json
 import logging
 from html import escape
 from smtplib import (
@@ -8,6 +9,8 @@ from smtplib import (
     SMTPRecipientsRefused,
     SMTPServerDisconnected,
 )
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives, get_connection
@@ -18,6 +21,7 @@ from apps.accounts.models import MailOutbox
 
 logger = logging.getLogger('apps.accounts.mail')
 FALLBACK_PORT = 2525  # Brevo's alternative when the usual port is blocked
+BREVO_URL = 'https://api.brevo.com/v3/smtp/email'
 
 
 class MailError(RuntimeError):
@@ -88,10 +92,54 @@ def _message(to, subject, body, port):
 
 
 def send_message(to, subject, body):
-    """Send one email over one connection, trying the fallback port if the usual one is unreachable.
+    """Send one email with the configured transport. Raises MailError and writes nothing to the database."""
+    if settings.MAIL_TRANSPORT == 'brevo_api':
+        return _send_brevo(to, subject, body)
+    return _send_smtp(to, subject, body)
 
-    Raises MailError and writes nothing to the database. smtplib errors are OSErrors too, so the
-    specific ones are caught first.
+
+def masked(address):
+    """An address for the server log: enough to tell messages apart, not enough to read who they went to."""
+    name, _, domain = str(address or '').partition('@')
+    return f'{name[:1]}***@{domain}' if domain else '***'
+
+
+def _send_brevo(to, subject, body):
+    """Brevo's HTTPS API, for hosts that block SMTP. The API key stays on the server, in a header."""
+    payload = json.dumps(
+        {
+            'sender': {'name': settings.EMAIL_FROM_NAME, 'email': settings.DEFAULT_FROM_EMAIL},
+            'to': [{'email': to}],
+            'replyTo': {'email': settings.DEFAULT_FROM_EMAIL},
+            'subject': subject,
+            'textContent': body,
+            'htmlContent': _html_body(subject, body),
+            'headers': {'X-Auto-Response-Suppress': 'All'},
+        }
+    ).encode()
+    request = Request(
+        BREVO_URL,
+        data=payload,
+        method='POST',
+        headers={'accept': 'application/json', 'content-type': 'application/json', 'api-key': settings.BREVO_API_KEY},
+    )
+    try:
+        with urlopen(request, timeout=settings.EMAIL_TIMEOUT) as response:
+            response.read()
+    except HTTPError as exc:
+        # 400 means the message or address is wrong, so a retry cannot help. Key problems (401/403) and
+        # limits or outages (429, 5xx) are worth retrying once fixed or later.
+        raise MailError(f'Brevo refused the email for {to} ({exc.code}).', permanent=exc.code == 400) from exc
+    except (URLError, OSError) as exc:
+        raise MailError(f'Could not reach Brevo. {getattr(exc, "reason", exc)}') from exc
+    logger.info('Mail accepted for %s via the Brevo API', masked(to))
+    return 1
+
+
+def _send_smtp(to, subject, body):
+    """One SMTP connection, trying the fallback port if the usual one is unreachable.
+
+    smtplib errors are OSErrors too, so the specific ones are caught first.
     """
     backend = _smtp_ready()
     ports = [settings.EMAIL_PORT]
@@ -116,9 +164,7 @@ def send_message(to, subject, body):
         else:
             if not sent:
                 raise MailError(f'Mail was not accepted for {to}.')
-            logger.info('Mail accepted for %s via %s:%s', to, backend, port)
-            if 'locmem' not in backend:
-                print(f'Mail accepted by Brevo for {to}', flush=True)
+            logger.info('Mail accepted for %s via %s:%s', masked(to), backend, port)
             return sent
     raise MailError(f'Could not reach the mail server. {unreachable}') from unreachable
 
@@ -129,7 +175,7 @@ def _log(to, subject, kind, user, **fields):
         with transaction.atomic():
             MailOutbox.objects.create(kind=kind, to_email=to, subject=subject[:200], user=user, attempts=1, **fields)
     except DatabaseError:
-        logger.exception('Could not log the mail for %s', to)
+        logger.exception('Could not log the mail for %s', masked(to))
 
 
 def send_portal_mail(to, subject, body, kind=MailOutbox.Kind.NOTICE, user=None):
@@ -144,7 +190,8 @@ def _try_send(to, subject, body, kind, user):
     try:
         send_portal_mail(to, subject, body, kind, user)
     except MailError as exc:
-        logger.exception('Mail skipped for %s; use the code in the Django terminal.', to)
+        # No traceback: the error text names the address. The full reason is kept in the outbox row for the Admin.
+        logger.warning('Mail to %s was not sent (%s).', masked(to), 'permanent' if exc.permanent else 'retryable')
         _log(to, subject, kind, user, status=MailOutbox.Status.FAILED, last_error=str(exc)[:255])
         return False
     return True
@@ -197,6 +244,23 @@ def account_ready_email(user):
         (
             f'Hello {user.first_name},\n\n'
             f'Your password is set. Sign in at {settings.FRONTEND_URL}/login with {how}.\n'
+        ),
+    )
+
+
+DUPLICATE_NOTICE_SUBJECT = 'Dampol 1st NHS: a registration used your details'
+
+
+def duplicate_registration_message(user):
+    """Subject and body telling an account owner that a registration repeated their email or LRN."""
+    return (
+        DUPLICATE_NOTICE_SUBJECT,
+        (
+            f'Hello {user.first_name},\n\n'
+            'Someone submitted a registration with your email address or LRN. Your account already exists, so no '
+            'new account was created.\n\n'
+            f'If this was you, sign in at {settings.FRONTEND_URL}/login, or use "Forgot password" there.\n'
+            'If it was not you, no action is needed. Tell the school office if it keeps happening.\n'
         ),
     )
 

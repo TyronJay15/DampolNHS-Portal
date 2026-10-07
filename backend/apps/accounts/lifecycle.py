@@ -8,7 +8,8 @@ logger = logging.getLogger('apps.accounts.lifecycle')
 
 from apps.accounts.codes import issue_code
 from apps.accounts.mail import account_deactivated_email, activation_email
-from apps.accounts.models import User
+from apps.accounts import sessions
+from apps.accounts.models import AuthSession, User
 from apps.audit import services as audit
 from apps.audit.catalog import ACCOUNTS
 from apps.notifications.services import notify
@@ -76,11 +77,12 @@ def archive_account(actor, user, reason=''):
                 pending.save(update_fields=['status', 'rejection_reason', 'reviewed_at', 'reviewed_by'])
                 rejected_pending = True
         user.save(update_fields=fields)
+        sessions.end_all(user, AuthSession.EndReason.ACCOUNT)
 
     try:
         account_deactivated_email(user, note, rejected_pending=rejected_pending)
     except Exception:
-        logger.exception('Archive email failed for %s', user.email)
+        logger.exception('Archive email failed for user %s', user.pk)
     audit.record(
         user=actor,
         action='account_archived',
@@ -228,6 +230,7 @@ def anonymize_account(actor, user):
         user.first_name = 'Removed'
         user.last_name = f'Account {user.id}'
         user.set_unusable_password()
+        sessions.end_all(user, AuthSession.EndReason.ACCOUNT)
         user.account_status = User.AccountStatus.REMOVED
         user.approval_note = 'Removed from archive.'
         user.approval_updated_at = timezone.now()

@@ -299,10 +299,10 @@
   color: var(--dash-ink);
 }
 
-/* Email delivery strip (Admin only): message, four counts, today's allowance and Resend in one row. */
+/* Status strip: the message on the left, the mini-stat cards on the right edge; the allowance and Resend sit on a second row. */
 .acct-mail {
   display: grid;
-  grid-template-columns: minmax(200px, 1.3fr) auto minmax(150px, 0.8fr) auto;
+  grid-template-columns: minmax(200px, 1fr) auto;
   align-items: center;
   gap: 0.75rem 1.25rem;
   margin-bottom: 1rem;
@@ -327,42 +327,8 @@
 }
 
 .acct-mail-counts {
-  display: flex;
-  gap: 1.1rem;
-  margin: 0;
-}
-
-.acct-mail-counts dt {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--dash-muted);
-}
-
-.acct-mail-counts dd {
-  margin: 0.1rem 0 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--dash-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.acct-mail-counts .is-sent dd {
-  color: var(--dash-green);
-}
-
-.acct-mail-counts .is-queued dd {
-  color: var(--dash-green-dark);
-}
-
-.acct-mail-counts .is-waiting dd {
-  color: var(--dash-gold-ink);
-}
-
-.acct-mail-counts .is-failed dd {
-  color: #b3261e;
+  justify-content: flex-end;
+  justify-self: end;
 }
 
 .acct-mail-meter {
@@ -404,11 +370,6 @@
   color: var(--dash-gold-ink);
   font-size: 0.86rem;
   font-weight: 600;
-}
-
-/* The staff activation strip has only a message and counts. */
-.acct-mail.is-compact {
-  grid-template-columns: minmax(200px, 1.3fr) auto;
 }
 
 /* A staff member's activation: three facts in one shaded row. */
@@ -548,9 +509,13 @@
   .acct-staff-list,
   .acct-facts,
   .acct-card-head,
-  .acct-mail,
-  .acct-mail.is-compact {
+  .acct-mail {
     grid-template-columns: 1fr;
+  }
+
+  .acct-mail-counts {
+    justify-content: flex-start;
+    justify-self: stretch;
   }
 
   .acct-activation {
