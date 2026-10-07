@@ -1,5 +1,5 @@
 from django.core import mail
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 
 from apps.accounts.codes import issue_code
 from apps.accounts.models import EmailCode, StudentProfile, User
@@ -54,24 +54,16 @@ class AuthApiTests(APITestCase):
         self.assertEqual(res.data['user']['role'], 'teacher')
         self.assertIn('access', res.data)
 
-    def test_logout_revokes_only_that_sessions_refresh_token(self):
+    def test_logout_ends_only_that_devices_sign_in(self):
         def sign_in():
-            return self.client.post(
-                '/api/auth/login/',
-                {'identifier': 'teacher@school.test', 'password': 'teacher-pass'},
-                format='json',
-            ).data
-
-        def refresh(token):
-            return self.client.post('/api/auth/refresh/', {'refresh': token}, format='json').status_code
+            device = APIClient()
+            device.post('/api/auth/login/', {'identifier': 'teacher@school.test', 'password': 'teacher-pass'}, format='json')
+            return device
 
         signed_out, other_device = sign_in(), sign_in()
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {signed_out["access"]}')
-        response = self.client.post('/api/auth/logout/', {'refresh': signed_out['refresh']}, format='json')
-        self.assertEqual(response.status_code, 204)
-        self.client.credentials()
-        self.assertEqual(refresh(signed_out['refresh']), 401)
-        self.assertEqual(refresh(other_device['refresh']), 200)
+        self.assertEqual(signed_out.post('/api/auth/logout/').status_code, 204)
+        self.assertEqual(signed_out.post('/api/auth/refresh/').status_code, 401)
+        self.assertEqual(other_device.post('/api/auth/refresh/').status_code, 200)
 
     def test_student_logs_in_with_lrn(self):
         res = self.client.post(
@@ -132,7 +124,7 @@ class AuthApiTests(APITestCase):
             format='json',
         )
         self.assertEqual(res.status_code, 401)
-        self.assertEqual(res.data.get('code'), 'account_needs_activation')
+        self.assertEqual(res.data.get('detail'), 'Invalid credentials.')
 
     def test_wrong_password(self):
         res = self.client.post(

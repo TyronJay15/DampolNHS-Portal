@@ -1,7 +1,7 @@
 from django.apps import apps as django_apps
 
 from apps.school.models import Program, ProgramSubject, Subject
-from apps.school.program_catalog import CURRICULA, CURRICULUM_BY_GRADE, GRADE11_TO_GRADE12, PROGRAMS
+from apps.school.program_catalog import CURRICULA, CURRICULUM_BY_GRADE, GRADE11_TO_GRADE12, PROGRAMS, STRAND_GROUPS
 from apps.school.subject_catalog import (
     LEGACY_SUBJECT_CODES,
     MATCHING_EXCLUDED,
@@ -130,6 +130,17 @@ def seed_matching_exclusions(get_model=None):
         code__in=MATCHING_EXCLUDED,
         skill_domain__isnull=True,
     ).update(matching_excluded=True)
+
+
+def seed_strand_groups(get_model=None):
+    """Give each catalog SHS program its strand group, where it has none yet.
+
+    Migration school.0016 calls this with historical models, so it must only touch fields that exist there.
+    """
+    get_model = get_model or django_apps.get_model
+    program_model = get_model('school', 'Program')
+    for code, group in STRAND_GROUPS.items():
+        program_model.objects.filter(code=code, strand_group='').update(strand_group=group)
 
 
 def replace_program_subjects(program, rows):

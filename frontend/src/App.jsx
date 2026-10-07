@@ -32,6 +32,11 @@ import StudentLayout from './pages/student/StudentLayout';
 import StudentOverview from './pages/student/StudentOverview';
 import StudentProfilePage from './pages/student/StudentProfilePage';
 import StudentGradesPage from './pages/student/StudentGradesPage';
+import StudentGuidancePage from './pages/student/guidance/GuidancePage';
+import StudentAssessmentPage from './pages/student/guidance/AssessmentPage';
+import StudentProgramsPage from './pages/student/guidance/ProgramsPage';
+import StudentProgramPage from './pages/student/guidance/ProgramPage';
+import StudentComparePage from './pages/student/guidance/ComparePage';
 import NotificationsPage from './pages/account/NotificationsPage';
 import EventsPage from './pages/events/EventsPage';
 import TeacherLayout from './pages/teacher/TeacherLayout';
@@ -43,12 +48,22 @@ import TeacherAdvisoryListPage from './pages/teacher/TeacherAdvisoryListPage';
 import TeacherAdvisoryPage from './pages/teacher/TeacherAdvisoryPage';
 import TeacherAdvisoryRecordsPage from './pages/teacher/TeacherAdvisoryRecordsPage';
 import TeacherRecordsPage from './pages/teacher/TeacherRecordsPage';
+import AdvisoryGuidancePage from './pages/teacher/guidance/AdvisoryGuidancePage';
+import AdviseeGuidancePage from './pages/teacher/guidance/AdviseeGuidancePage';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminAccountsLayout from './pages/admin/AdminAccountsLayout';
 import AdminAccountsPage from './pages/admin/AdminAccountsPage';
 import AdminStaffPage from './pages/admin/AdminStaffPage';
 import AdminForecastPage from './pages/admin/AdminForecastPage';
+import AdminGuidanceLayout from './pages/admin/guidance/AdminGuidanceLayout';
+import GuidanceCatalogPage from './pages/admin/guidance/GuidanceCatalogPage';
+import GuidanceProgramPage from './pages/admin/guidance/GuidanceProgramPage';
+import GuidanceFamiliesPage from './pages/admin/guidance/GuidanceFamiliesPage';
+import GuidanceAssessmentPage from './pages/admin/guidance/GuidanceAssessmentPage';
+import GuidanceOutcomesPage from './pages/admin/guidance/GuidanceOutcomesPage';
+import GuidanceRecommenderPage from './pages/admin/guidance/GuidanceRecommenderPage';
+import GuidanceSettingsPage from './pages/admin/guidance/GuidanceSettingsPage';
 import GradePrintPage from './pages/print/GradePrintPage';
 import RecordsPrintPage from './pages/print/RecordsPrintPage';
 import AdminAssistantPage from './pages/admin/AdminAssistantPage';
@@ -92,6 +107,11 @@ export default function App() {
               <Route index element={<StudentOverview />} />
               <Route path="profile" element={<StudentProfilePage />} />
               <Route path="grades" element={<StudentGradesPage />} />
+              <Route path="guidance" element={<StudentGuidancePage />} />
+              <Route path="guidance/assessment" element={<StudentAssessmentPage />} />
+              <Route path="guidance/programs" element={<StudentProgramsPage />} />
+              <Route path="guidance/programs/:code" element={<StudentProgramPage />} />
+              <Route path="guidance/compare" element={<StudentComparePage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="events" element={<EventsPage />} />
               <Route path="password" element={<ChangePasswordPage />} />
@@ -111,6 +131,8 @@ export default function App() {
               <Route path="advisory" element={<TeacherAdvisoryListPage />} />
               <Route path="advisory/:assignmentId" element={<TeacherAdvisoryPage />} />
               <Route path="advisory/:assignmentId/records" element={<TeacherAdvisoryRecordsPage />} />
+              <Route path="advisory/:assignmentId/guidance" element={<AdvisoryGuidancePage />} />
+              <Route path="advisory/:assignmentId/guidance/:studentId" element={<AdviseeGuidancePage />} />
               <Route path="records" element={<TeacherRecordsPage />} />
               <Route path="my-access" element={<MyAccessPage />} />
               <Route path="access/:work" element={<DelegatedWork myAccessPath="/teacher/my-access" />} />
@@ -159,6 +181,15 @@ export default function App() {
                 <Route path="staff" element={<AdminStaffPage />} />
               </Route>
               <Route path="forecast" element={<AdminForecastPage />} />
+              <Route path="guidance" element={<AdminGuidanceLayout />}>
+                <Route index element={<GuidanceCatalogPage />} />
+                <Route path="programs/:code" element={<GuidanceProgramPage />} />
+                <Route path="families" element={<GuidanceFamiliesPage />} />
+                <Route path="assessment" element={<GuidanceAssessmentPage />} />
+                <Route path="outcomes" element={<GuidanceOutcomesPage />} />
+                <Route path="recommender" element={<GuidanceRecommenderPage />} />
+                <Route path="settings" element={<GuidanceSettingsPage />} />
+              </Route>
               <Route path="assistant" element={<AdminAssistantPage />} />
               <Route path="audit" element={<AdminAuditPage />} />
               <Route path="access" element={<AccessPage />} />

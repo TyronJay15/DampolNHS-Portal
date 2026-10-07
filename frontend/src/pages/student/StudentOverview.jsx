@@ -8,7 +8,7 @@ import { fetchNotifications, fetchStudentGrades, fetchStudentMe } from '../../se
 import WelcomeBanner from '../../components/WelcomeBanner/WelcomeBanner';
 import UpcomingEvents from '../../components/UpcomingEvents/UpcomingEvents';
 import PublicLinks from '../../components/PublicLinks/PublicLinks';
-import RecommendationPanel from './RecommendationPanel';
+import GuidanceSummaryCard from './guidance/GuidanceSummaryCard';
 import './StudentStudio.css';
 
 function greeting() {
@@ -23,7 +23,7 @@ export default function StudentOverview() {
   const [me, setMe] = useState(null);
   const [notes, setNotes] = useState([]);
   const [unread, setUnread] = useState(0);
-  const [card, setCard] = useState({ subjects: [], grades: [], school_year: '', recommendation: null });
+  const [card, setCard] = useState({ subjects: [], grades: [], school_year: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -31,7 +31,7 @@ export default function StudentOverview() {
     Promise.all([
       fetchStudentMe(),
       fetchNotifications().catch(() => ({ notifications: [], unread: 0 })),
-      fetchStudentGrades().catch(() => ({ subjects: [], grades: [], school_year: '', recommendation: null })),
+      fetchStudentGrades().catch(() => ({ subjects: [], grades: [], school_year: '' })),
     ])
       .then(([profile, noticeData, grades]) => {
         setMe(profile);
@@ -41,7 +41,6 @@ export default function StudentOverview() {
           subjects: grades.subjects || [],
           grades: grades.grades || [],
           school_year: grades.school_year || '',
-          recommendation: grades.recommendation || null,
         });
       })
       .catch((err) => setError(err.message))
@@ -181,7 +180,7 @@ export default function StudentOverview() {
             </Link>
           </article>
 
-          <RecommendationPanel rec={card.recommendation} compact />
+          <GuidanceSummaryCard />
         </div>
 
         <aside className="desk-rail">

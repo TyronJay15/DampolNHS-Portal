@@ -161,3 +161,33 @@ def distance(left, right):
     if not left:
         return 0.0
     return math.sqrt(sum((a - b) ** 2 for a, b in zip(left, right)) / len(left))
+
+
+RIASEC_ORDER = ('R', 'I', 'A', 'S', 'E', 'C')
+STRAND_FEATURE = 'strand'
+
+
+def model_feature_names(schema):
+    """Numeric feature names in a fixed order, then the one categorical feature (the strand group)."""
+    numeric = [name for key in schema.keys for name in (f'strength:{key}', f'observed:{key}')]
+    numeric += ['overall'] + [f'interest:{letter}' for letter in RIASEC_ORDER]
+    return numeric, [STRAND_FEATURE]
+
+
+def model_features(features, interest, strand_group):
+    """The machine-learning feature row for one student; training and live prediction both call this.
+
+    Academic evidence is the relative-strength space (to_model_space) plus an explicit observed flag per
+    domain, so a missing domain is marked as missing and is never read as a grade of 0. The caller must
+    supply a completed interest assessment (six scores from 1 to 5).
+    """
+    row = {}
+    space = to_model_space(features.values, features.observed)
+    for key, value, seen in zip(features.schema.keys, space, features.observed):
+        row[f'strength:{key}'] = value
+        row[f'observed:{key}'] = 1.0 if seen else 0.0
+    row['overall'] = float(features.overall) if features.overall is not None else 0.0
+    for letter in RIASEC_ORDER:
+        row[f'interest:{letter}'] = float(interest[letter])
+    row[STRAND_FEATURE] = strand_group or ''
+    return row

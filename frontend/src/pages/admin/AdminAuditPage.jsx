@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import LineMark from '../../components/LineMark/LineMark';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
@@ -17,9 +18,16 @@ import {
 import './AdminAccountsPage.css';
 import './AdminAuditPage.css';
 
+// A link may open the log on one family, for example ?family=guidance from the recommender settings.
+function initialFamily(params) {
+  const wanted = params.get('family');
+  return AUDIT_FILTERS.some((tab) => tab.value === wanted) ? wanted : 'all';
+}
+
 export default function AdminAuditPage() {
+  const [params] = useSearchParams();
   const [rows, setRows] = useState([]);
-  const [family, setFamily] = useState('all');
+  const [family, setFamily] = useState(() => initialFamily(params));
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);

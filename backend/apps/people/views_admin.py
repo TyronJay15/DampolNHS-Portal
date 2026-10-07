@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.throttles import ScopedThrottle
 from apps.accounts import outbox
 from apps.accounts.lifecycle import HIDDEN
 from apps.accounts.models import StudentProfile, User
@@ -162,6 +163,8 @@ class RegistrationEmailResendView(APIView):
     """Queue every failed registration email again."""
 
     permission_classes = [IsAuthenticated, IsAdmin]
+    throttle_classes = [ScopedThrottle]
+    throttle_scope = 'email_resend'
 
     def post(self, request):
         resent = outbox.resend_failed()

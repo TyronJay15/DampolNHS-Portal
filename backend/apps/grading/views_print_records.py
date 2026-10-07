@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
+from apps.accounts.throttles import ScopedThrottle
 from apps.grading.models import Grade, GradeHistory
 from apps.grading.views_print import school_name
 from apps.people.models import TeacherAssignment
@@ -100,6 +101,8 @@ def _head_groups(user, year, term):
 
 class GradeRecordsPrintView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedThrottle]
+    throttle_scope = 'reports'  # heavy queries: repeated calls must not stall the server for everyone
 
     def get(self, request):
         user = request.user

@@ -1031,13 +1031,16 @@ a.studio-card {
 
 .studio-panel .studio-table-wrap {
   margin-top: 0.75rem;
-}@media (max-width: 900px) {.studio-grid,
-.studio-grid.is-wide,
-.studio-form,
-.studio-row,
-.studio-row.is-stack,
-.studio-row.is-windows,
-.studio-row.is-place {
+}
+
+@media (max-width: 900px) {
+  .studio-grid,
+  .studio-grid.is-wide,
+  .studio-form,
+  .studio-row,
+  .studio-row.is-stack,
+  .studio-row.is-windows,
+  .studio-row.is-place {
     grid-template-columns: 1fr;
   }
 

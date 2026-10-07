@@ -1,23 +1,23 @@
 """Read-only trace of the ML pipeline against the live database. Writes nothing.
 
---student shows every step behind a recommendation: the grades read, where each one
-went (a skill domain, excluded, unmapped), the fixed feature vector and its observed
-mask, and the comparison with every active college program. No names are printed.
+--student shows every step behind the academic side of a recommendation: the grades read,
+where each one went (a skill domain, excluded, unmapped), the fixed feature vector and its
+observed mask, and the comparison with every active college program. Interest scores are
+not part of this trace; manage.py recommender_readiness prints the distance distribution. No names
+are printed.
 """
 
 import json
-from collections import Counter
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from apps.accounts.models import StudentProfile
-from apps.grading.models import Grade
-from apps.grading.recommend import MIN_SKILLS, RecommendationContext, recommend_payload
+from apps.grading.recommend import recommend_payload, recommendation_grades
 from apps.ml.features import subject_domains, to_model_space, transform
 from apps.ml.forecast import attach_attractiveness
-from apps.ml.knn_model import METHOD, TRACK_BOOST, compare_all, evidence_threshold, outcome_dataset
-from apps.ml.models import CollegeOutcome
+from apps.ml.knn_model import compare_all, evidence_threshold
+from apps.ml.recommender import MIN_SKILLS, RecommenderContext
 from apps.people.models import StudentSection
 from apps.school.curriculum import curriculum_for
 from apps.school.forecast import build_grade11_forecast
@@ -25,24 +25,21 @@ from apps.school.models import ProgramSubject, SchoolYear
 
 
 class Command(BaseCommand):
-    help = 'Trace database data -> ML input -> result: --student <id>, --outcomes, or --forecast.'
+    help = 'Trace database data -> ML input -> result: --student <id> or --forecast.'
 
     def add_arguments(self, parser):
         parser.add_argument('--student', type=int, help='StudentProfile id')
         parser.add_argument('--staff', action='store_true', help='Use approved + released grades (adviser view).')
-        parser.add_argument('--outcomes', action='store_true', help='Labeled rows available for outcome training.')
         parser.add_argument('--forecast', action='store_true')
         parser.add_argument('--year', help='School year label for --forecast, e.g. 2025-2026')
 
     def handle(self, *args, **options):
         if options['student']:
             report = self._student(options['student'], options['staff'])
-        elif options['outcomes']:
-            report = self._outcomes()
         elif options['forecast']:
             report = self._forecast(options.get('year'))
         else:
-            raise CommandError('Pass --student <id>, --outcomes or --forecast.')
+            raise CommandError('Pass --student <id> or --forecast.')
         self.stdout.write(json.dumps(report, indent=2, default=str))
 
     def _student(self, pk, staff):
@@ -57,23 +54,19 @@ class Command(BaseCommand):
         section = placement.section if placement else None
         program = section.program if section and section.program_id else None
         year = placement.school_year if placement else SchoolYear.objects.filter(is_current=True).first()
-        statuses = [Grade.Status.APPROVED, Grade.Status.RELEASED] if staff else [Grade.Status.RELEASED]
-        grades = list(
-            Grade.objects.filter(student=profile, status__in=statuses, **({'school_year': year} if year else {}))
-            .select_related('subject', 'term')
-            .order_by('term__number', 'subject__code')
-        )
-        context = RecommendationContext()
+        grades = recommendation_grades([profile.pk], released_only=not staff)[profile.pk]
+        context = RecommenderContext()
         schema = context.schema
         features = transform(grades, schema, context.domains)
         student = to_model_space(features.values, features.observed)
         curriculum = curriculum_for(year, section.grade_level) if section else None
         offered = set(ProgramSubject.objects.filter(program=program).values_list('subject_id', flat=True)) if program else set()
         domains = subject_domains({grade.subject_id for grade in grades}, context.domains)
-        result = recommend_payload(grades, program.code if program else None, context)
-        # Programs that may be shown come first, in the order students see them.
+        strand_group = program.strand_group if program else ''
+        program_code = program.code if program else ''
+        result = recommend_payload(grades, context, program_code=program_code, strand_group=strand_group)
         ordered = sorted(
-            compare_all(features, context.candidates, program.code if program else None),
+            compare_all(features, context.candidates, strand_group, program_code),
             key=lambda row: (not row.eligible, row.distance, row.candidate.name),
         )
         positions = {
@@ -95,7 +88,7 @@ class Command(BaseCommand):
             'grades': [
                 {
                     'subject': grade.subject.code,
-                    'term': grade.term.number,
+                    'term_id': grade.term_id,
                     'score': str(grade.score),
                     'counts_as': place(grade),
                     'in_program': grade.subject_id in offered,
@@ -112,11 +105,9 @@ class Command(BaseCommand):
             'observed': list(features.observed),
             'model_space': [round(value, 3) for value in student],
             'enough_data': features.observed_count >= MIN_SKILLS,
-            'baseline': {
-                'method': METHOD,
-                'trained_on_outcomes': False,
-                'outcomes_recorded': CollegeOutcome.objects.count(),
-                'track_boost': TRACK_BOOST,
+            'configuration': {
+                'version': context.config_row.version if context.config_row else None,
+                'academic_tiers': context.config['academic_tiers'],
             },
             'evidence_threshold': evidence_threshold(),
             'comparisons': [
@@ -126,7 +117,9 @@ class Command(BaseCommand):
             'result': {
                 'ready': result['ready'],
                 'evidence': result['evidence'],
-                'courses': [(row['code'], row['distance'], row['evidence']['status']) for row in result['courses']],
+                'courses': [
+                    (row['code'], row['label'], row['distance'], row['evidence']['status']) for row in result['courses']
+                ],
                 'needs': result['coverage']['needs'],
                 'not_evaluated': result['coverage']['not_evaluated'],
             },
@@ -138,29 +131,27 @@ class Command(BaseCommand):
     def _comparison(row, position, features, student):
         """Every number behind one student-vs-program comparison."""
         candidate = row.candidate
-        boost = TRACK_BOOST if row.track_match else 1
         return {
             'code': candidate.code,
             'name': candidate.name,
             'ranking_position': position,
             'eligible': row.eligible,
-            'minimum_outcome': row.status,
             'evidence': row.evidence,
+            'strand_context': row.strand_context,
             'relevant_domains': list(candidate.levels),
             'observed_relevant_domains': list(row.observed),
             'unobserved_relevant_domains': list(row.unobserved),
             'coverage': f'{len(row.observed)} / {row.total} = {100 * row.coverage:.2f}%',
-            'distance_before_boost': round(row.distance / boost, 3),
-            'program_boost': TRACK_BOOST if row.track_match else None,
             'distance': round(row.distance, 3),
             'imputed_share': round(row.imputed_share, 3),
-            'minimums': {
+            'benchmarks': {
                 key: {
-                    'required': str(minimum),
+                    'benchmark': str(item.value),
+                    'official': item.official,
                     'student': str(features.value(key)) if features.value(key) is not None else None,
-                    'status': row.minimum_status[key],
+                    'status': row.benchmark_status[key],
                 }
-                for key, minimum in candidate.minimums.items()
+                for key, item in candidate.benchmarks.items()
             },
             'by_domain': {
                 key: {
@@ -174,17 +165,6 @@ class Command(BaseCommand):
                 for key, left, right, seen in zip(features.schema.keys, student, candidate.vector, features.observed)
                 if seen or key in candidate.levels
             },
-        }
-
-    def _outcomes(self):
-        rows = outcome_dataset()
-        return {
-            'method_in_use': METHOD,
-            'outcomes_recorded': len(rows),
-            'labels': dict(Counter(row['label'] for row in rows)),
-            'rows_with_enough_data': sum(1 for row in rows if sum(row['observed']) >= MIN_SKILLS),
-            'note': 'Recommendations use curated profiles until real outcomes are recorded here.',
-            'generated_at': timezone.now(),
         }
 
     def _forecast(self, label):

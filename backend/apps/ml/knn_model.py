@@ -1,57 +1,63 @@
-"""College-course recommender baseline: nearest active CollegeProgram profiles in the shared feature space.
+"""Profile matching: compare a student with every active college program profile.
 
-KDD data-mining and interpretation stages. This is the current baseline, not an
-outcome-trained model: profiles are curated in the database, and no CollegeOutcome
-records exist to learn from. outcome_dataset() builds the labeled rows a trained
-model will use once real outcomes are recorded, through the same features.transform().
+This is the knowledge-based method of the recommender (KDD data-mining stage). Profiles are validated
+reference data in the database, not learned from outcomes. apps.ml.recommender orders and labels the
+comparisons; this module only measures them, so ranking and diagnostics always share one comparison.
 
-Missing data: every vector has one dimension per active SkillDomain (see
-features.to_model_space), and an unobserved dimension is neutral (0), never a score.
-compare_all() is the single path behind both the ranking and the diagnostics.
+Missing data: every vector has one dimension per active SkillDomain (see features.to_model_space), and
+an unobserved dimension is neutral (0) for distance only, never a score.
 
-Similarity and evidence are separate. Similarity is the distance. Evidence is how
-much of a program's own profile the student has real grades for:
-  coverage      = program skill areas with student grades / all program skill areas
-  strong        coverage >= settings.MIN_RECOMMENDATION_EVIDENCE_COVERAGE
-  limited       some coverage, below the threshold: comparable, but under-supported
-  insufficient  a required minimum cannot be checked (no grade there), or no
-                program skill area has grades: not presented as a recommendation
-A minimum with no grade behind it is "unknown", never "passed". Evidence never
-changes the distance or the order; it decides what may be shown and how it is labeled.
+Similarity, evidence and benchmarks are separate:
+  distance   root-mean-square difference of relative strengths, every domain weighted equally
+  evidence   share of the program's skill areas backed by the student's real grades
+               strong        coverage >= settings.MIN_RECOMMENDATION_EVIDENCE_COVERAGE
+               limited       some coverage, below the threshold
+               insufficient  no program skill area has a grade: the program cannot be evaluated
+  benchmarks a profile benchmark is guidance; MET, BELOW or UNKNOWN (no grade). A benchmark never
+             removes a program. An UNKNOWN benchmark means the program's key area cannot be checked
+             yet, so the recommender places it after programs that can be. Only a sourced OFFICIAL
+             requirement may be shown as a requirement, and even then the program stays visible.
+  strand     context only: TYPICAL when the program usually follows the student's strand. It never
+             changes the distance. The recommender uses it only as a last tie-break, never as a gate.
 """
 
 import hashlib
-from collections import Counter
 from dataclasses import dataclass
-from typing import NamedTuple
 
 from django.conf import settings
 
-from apps.grading.models import Grade
-from apps.ml.features import distance, load_schema, to_model_space, transform
-from apps.ml.models import CollegeOutcome, CollegeProgram
+from apps.ml.features import distance, to_model_space
+from apps.ml.models import CollegeProgram, CollegeProgramSkill
 
-METHOD = 'profile_similarity'
-RESULTS = 3
-TRACK_BOOST = 0.85
-RANKED = 'ranked'
-NEEDS_DATA = 'needs_data'
-BELOW_MINIMUM = 'below_minimum'
-PASSED = 'passed'
-FAILED = 'failed'
+METHOD = 'profile_matching'
+MET = 'met'
+BELOW = 'below'
 UNKNOWN = 'unknown'
 STRONG = 'strong'
 LIMITED = 'limited'
 INSUFFICIENT = 'insufficient'
+TYPICAL = 'typical'
+OTHER = 'other'
+
+
+@dataclass(frozen=True)
+class Benchmark:
+    value: object
+    official: bool
+    source: str
 
 
 @dataclass(frozen=True)
 class Candidate:
+    pk: int
     code: str
     name: str
+    family_code: str
+    family_name: str
     levels: dict
-    minimums: dict
+    benchmarks: dict
     shs_codes: frozenset
+    strand_groups: frozenset
     vector: tuple
 
 
@@ -60,14 +66,13 @@ class Comparison:
     """One student against one college program."""
 
     candidate: Candidate
-    status: str
     distance: float
-    track_match: bool
-    minimum_status: dict
+    benchmark_status: dict
     observed: tuple
     unobserved: tuple
     imputed_share: float
     evidence: str
+    strand_context: str
 
     @property
     def total(self):
@@ -78,17 +83,21 @@ class Comparison:
         return len(self.observed) / self.total if self.total else 0.0
 
     @property
-    def missing_minimums(self):
-        return tuple(key for key, state in self.minimum_status.items() if state == UNKNOWN)
+    def below_benchmarks(self):
+        return tuple(key for key, state in self.benchmark_status.items() if state == BELOW)
 
     @property
-    def below_minimums(self):
-        return tuple(key for key, state in self.minimum_status.items() if state == FAILED)
+    def unchecked_benchmarks(self):
+        return tuple(key for key, state in self.benchmark_status.items() if state == UNKNOWN)
+
+    @property
+    def official_unmet(self):
+        return tuple(key for key in self.below_benchmarks if self.candidate.benchmarks[key].official)
 
     @property
     def eligible(self):
-        """May be presented as a recommendation: minimums met, and some real evidence behind it."""
-        return self.status == RANKED and self.evidence != INSUFFICIENT
+        """Can be evaluated and shown: at least one of its skill areas has a real grade."""
+        return self.evidence != INSUFFICIENT
 
 
 def evidence_threshold():
@@ -98,6 +107,8 @@ def evidence_threshold():
 def load_candidates(schema):
     rows = (
         CollegeProgram.objects.filter(is_active=True)
+        .exclude(family__is_active=False)
+        .select_related('family')
         .prefetch_related('skills__domain', 'shs_programs')
         .order_by('sort_order', 'code')
     )
@@ -106,14 +117,27 @@ def load_candidates(schema):
         # A program's relevant domains are its profile rows inside the active schema.
         skills = [skill for skill in program.skills.all() if skill.domain.key in schema.keys]
         levels = {skill.domain.key: skill.level for skill in skills}
-        minimums = {skill.domain.key: skill.minimum for skill in skills if skill.minimum is not None}
+        benchmarks = {
+            skill.domain.key: Benchmark(
+                value=skill.minimum,
+                official=skill.minimum_kind == CollegeProgramSkill.MinimumKind.OFFICIAL,
+                source=skill.requirement_source,
+            )
+            for skill in skills
+            if skill.minimum is not None
+        }
+        linked = list(program.shs_programs.all())
         candidates.append(
             Candidate(
+                pk=program.pk,
                 code=program.code,
                 name=program.name,
+                family_code=program.family.code if program.family_id else '',
+                family_name=program.family.name if program.family_id else '',
                 levels=levels,
-                minimums=minimums,
-                shs_codes=frozenset(item.code for item in program.shs_programs.all()),
+                benchmarks=benchmarks,
+                shs_codes=frozenset(item.code for item in linked),
+                strand_groups=frozenset(item.strand_group for item in linked if item.strand_group),
                 vector=to_model_space(
                     tuple(levels.get(key) for key in schema.keys),
                     tuple(key in levels for key in schema.keys),
@@ -125,121 +149,53 @@ def load_candidates(schema):
 
 def catalog_version(candidates):
     parts = [
-        f'{row.code}:{sorted(row.levels.items())}:{sorted(row.minimums.items())}:{sorted(row.shs_codes)}'
+        f'{row.code}:{row.family_code}:{sorted(row.levels.items())}:'
+        f'{sorted((key, item.value, item.official) for key, item in row.benchmarks.items())}:{sorted(row.shs_codes)}'
         for row in candidates
     ]
     return hashlib.sha1('|'.join(parts).encode()).hexdigest()[:10]
 
 
-def compare_all(features, candidates, program_code=None):
+def strand_context(candidate, strand_group='', program_code=''):
+    """TYPICAL when the program usually follows the student's strand, OTHER when it usually follows another,
+    and '' when the catalog or the student gives nothing to compare."""
+    if not candidate.shs_codes or not (strand_group or program_code):
+        return ''
+    if program_code in candidate.shs_codes or (strand_group and strand_group in candidate.strand_groups):
+        return TYPICAL
+    return OTHER
+
+
+def compare_all(features, candidates, strand_group='', program_code=''):
     """Compare a student with every candidate. Ranking and diagnostics both read this."""
     student = to_model_space(features.values, features.observed)
     threshold = evidence_threshold()
     comparisons = []
     for candidate in candidates:
-        minimum_status = {
-            key: UNKNOWN if features.value(key) is None else PASSED if features.value(key) >= minimum else FAILED
-            for key, minimum in candidate.minimums.items()
+        benchmark_status = {
+            key: UNKNOWN if features.value(key) is None else MET if features.value(key) >= item.value else BELOW
+            for key, item in candidate.benchmarks.items()
         }
-        states = set(minimum_status.values())
-        status = NEEDS_DATA if UNKNOWN in states else BELOW_MINIMUM if FAILED in states else RANKED
         observed = tuple(key for key in candidate.levels if features.value(key) is not None)
         unobserved = tuple(key for key in candidate.levels if features.value(key) is None)
         coverage = len(observed) / len(candidate.levels) if candidate.levels else 0.0
-        if status == NEEDS_DATA or not observed:
+        if not observed:
             evidence = INSUFFICIENT
         else:
             evidence = STRONG if round(coverage, 4) >= threshold else LIMITED
-        track_match = bool(program_code and program_code in candidate.shs_codes)
         squares = [(left - right) ** 2 for left, right in zip(student, candidate.vector)]
         total = sum(squares)
         imputed = sum(square for square, seen in zip(squares, features.observed) if not seen)
         comparisons.append(
             Comparison(
                 candidate=candidate,
-                status=status,
-                distance=distance(student, candidate.vector) * (TRACK_BOOST if track_match else 1),
-                track_match=track_match,
-                minimum_status=minimum_status,
+                distance=distance(student, candidate.vector),
+                benchmark_status=benchmark_status,
                 observed=observed,
                 unobserved=unobserved,
                 imputed_share=imputed / total if total else 0.0,
                 evidence=evidence,
+                strand_context=strand_context(candidate, strand_group, program_code),
             )
         )
     return comparisons
-
-
-def _reason(features, comparison):
-    """States what was compared. It does not claim a match; the distance decides that."""
-    parts = [f'{features.schema.label(key)} ({features.value(key)})' for key in comparison.observed]
-    return f'Compared on your grades in {" and ".join(parts)}.'
-
-
-class Ranking(NamedTuple):
-    """What rank() returns. Callers read it by field name, so adding a field never breaks them."""
-
-    courses: list
-    blocked: Counter
-    not_evaluated: int
-
-
-def rank(features, candidates, program_code=None, limit=RESULTS):
-    """Return a Ranking: courses to show, domain keys that would unlock more programs, programs not evaluated.
-
-    Order is by distance alone. Evidence only decides whether a program may be shown.
-    """
-    comparisons = compare_all(features, candidates, program_code)
-    unevaluated = [row for row in comparisons if row.evidence == INSUFFICIENT]
-    blocked = Counter(key for row in unevaluated for key in (row.missing_minimums or row.unobserved))
-    eligible = sorted(
-        (row for row in comparisons if row.eligible),
-        key=lambda row: (row.distance, row.candidate.name),
-    )
-    label = features.schema.label
-    ranked = [
-        {
-            'code': row.candidate.code,
-            'name': row.candidate.name,
-            'distance': round(row.distance, 2),
-            'reason': _reason(features, row),
-            'track_match': row.track_match,
-            'evidence': {
-                'status': row.evidence,
-                'observed': len(row.observed),
-                'total': row.total,
-                'coverage': round(100 * row.coverage, 2),
-                'observed_domains': [label(key) for key in row.observed],
-                'missing_domains': [label(key) for key in row.unobserved],
-            },
-        }
-        for row in eligible[:limit]
-    ]
-    return Ranking(courses=ranked, blocked=blocked, not_evaluated=len(unevaluated))
-
-
-def outcome_dataset(schema=None):
-    """Labeled rows for a future outcome-trained model. Empty until real outcomes are recorded.
-
-    Each recorded graduate becomes one row: the feature vector from their approved
-    and released grades (the same transform live students go through) and the
-    college program they actually entered as the label.
-    """
-    schema = schema or load_schema()
-    cache = {}
-    rows = []
-    for outcome in CollegeOutcome.objects.select_related('college_program').order_by('pk'):
-        grades = Grade.objects.filter(
-            student_id=outcome.student_id,
-            status__in=[Grade.Status.APPROVED, Grade.Status.RELEASED],
-        ).select_related('subject')
-        features = transform(grades, schema, cache)
-        rows.append(
-            {
-                'student': outcome.student_id,
-                'label': outcome.college_program.code,
-                'observed': features.observed,
-                'vector': to_model_space(features.values, features.observed),
-            }
-        )
-    return rows

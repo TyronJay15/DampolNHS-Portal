@@ -295,3 +295,7 @@ GRADE11_TO_GRADE12 = {
     'HT': 'HE',
     'ICTP': 'ICT',
 }
+
+# Seed for Program.strand_group: a Grade 12 strand is its own group, and each Grade 11 cluster joins the
+# group of the strand it leads to, so both curricula share one group for the college recommender.
+STRAND_GROUPS = {**{strand: strand for strand in GRADE11_TO_GRADE12.values()}, **GRADE11_TO_GRADE12}

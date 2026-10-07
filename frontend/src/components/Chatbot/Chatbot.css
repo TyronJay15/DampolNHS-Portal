@@ -98,3 +98,12 @@
   border-radius: 10px;
   padding: 0.55rem 0.7rem;
 }
+
+/* A standing reminder under the question box: no personal details. */
+.chatbot-privacy {
+  margin: 0;
+  padding: 0 0.8rem 0.7rem;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--color-muted);
+}

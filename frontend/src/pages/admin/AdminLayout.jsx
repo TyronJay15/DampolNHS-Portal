@@ -17,6 +17,7 @@ export default function AdminLayout() {
         { to: '/admin/accounts/staff', label: 'Teacher Accounts', icon: 'staff' },
         { to: '/admin/archive', label: 'Archive', icon: 'archive' },
         { to: '/admin/forecast', label: 'Grade 11 forecast', icon: 'forecast' },
+        { to: '/admin/guidance', label: 'College recommendation', icon: 'guidance' },
         { to: '/admin/assistant', label: 'Assistant', icon: 'bell' },
         { to: '/admin/audit', label: 'Audit log', icon: 'audit' },
         { to: '/admin/access', label: 'Access', icon: 'access', badge: access.inbox || null },

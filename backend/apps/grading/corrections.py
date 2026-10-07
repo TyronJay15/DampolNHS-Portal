@@ -16,14 +16,16 @@ class CorrectionBlocked(Exception):
 
 
 def review_correction(row, decision, note, actor):
-    """Approve (apply the proposed score) or reject a pending correction, then tell the requester."""
-    if row.status != CorrectionRequest.Status.PENDING:
-        raise CorrectionBlocked('This correction was already reviewed.')
+    """Approve (apply the proposed score) or reject a pending correction, then tell the requester. Returns the row."""
     if decision not in DECISIONS:
         raise CorrectionBlocked('Approve or reject this correction.')
-    if decision == CorrectionRequest.Status.APPROVED and row.grade.status == Grade.Status.RELEASED:
-        raise CorrectionBlocked('Hide this student’s report card before applying a correction.')
     with transaction.atomic():
+        # Locked and read again, so two simultaneous reviews cannot both apply: the second sees it reviewed.
+        row = CorrectionRequest.objects.select_for_update().select_related('grade').get(pk=row.pk)
+        if row.status != CorrectionRequest.Status.PENDING:
+            raise CorrectionBlocked('This correction was already reviewed.')
+        if decision == CorrectionRequest.Status.APPROVED and row.grade.status == Grade.Status.RELEASED:
+            raise CorrectionBlocked('Hide this student’s report card before applying a correction.')
         row.mark_reviewed(by_user=actor, status=decision, note=note)
         if decision == CorrectionRequest.Status.APPROVED:
             grade = row.grade
@@ -57,3 +59,4 @@ def review_correction(row, decision, note, actor):
         category=GRADES,
         action_path='/teacher/classes',
     )
+    return row

@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import StudentProfile, User
+from apps.accounts.throttles import ScopedThrottle
 from apps.cms.models import SiteContent
 from apps.grading.models import Grade
 from apps.grading.scores import average
@@ -80,6 +81,8 @@ def allowed_subject_ids(user, profile, placement):
 
 class GradePrintView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedThrottle]
+    throttle_scope = 'reports'  # heavy queries: repeated calls must not stall the server for everyone
 
     def get(self, request):
         user = request.user

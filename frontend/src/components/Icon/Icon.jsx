@@ -14,6 +14,7 @@ const ICONS = {
   classes: 'M4 6h16v12H4z M8 6v12 M4 10h16',
   advisory: 'M7 18V6h10l-2 4 2 4H7',
   forecast: 'M4 18V6 M4 18h16 M7 14l3-3 3 2 4-5',
+  guidance: 'M3 9.5 12 5l9 4.5-9 4.5z M7 11.6V15c0 1.5 2.2 3 5 3s5-1.5 5-3v-3.4 M21 9.5V14',
   audit: 'M8 6h11 M8 12h11 M8 18h11 M5 6h.01 M5 12h.01 M5 18h.01',
   history: 'M12 7v5l3 2 M12 4a8 8 0 1 0 8 8',
   cms: 'M5 6h14v4H5z M5 12h6v6H5z M13 12h6v6h-6z',
@@ -30,6 +31,8 @@ const ICONS = {
   alert: 'M12 4 3 19h18z M12 10v4 M12 16.8v.01',
   trash: 'M5 7h14 M9 7V4h6v3 M7 7l1 13h8l1-13 M10 11v5 M14 11v5',
   logout: 'M10 4H5v16h5 M14 8l4 4-4 4 M18 12H9',
+  close: 'M6 6l12 12 M18 6 6 18',
+  sliders: 'M4 7h9 M17 7h3 M15 5v4 M4 17h3 M11 17h9 M9 15v4',
   guardian: 'M8 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M16.2 11a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z M3 19c.4-2.8 2.5-4.4 5-4.4S12.6 16.2 13 19 M14.2 19c.3-1.8 1.5-3.1 3.2-3.4',
 };
 

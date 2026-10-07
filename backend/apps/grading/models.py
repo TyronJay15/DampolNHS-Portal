@@ -156,35 +156,3 @@ class CorrectionRequest(models.Model):
         self.review_note = note or ''
         self.reviewed_at = timezone.now()
         self.save(update_fields=['status', 'reviewed_by', 'review_note', 'reviewed_at'])
-
-
-class PtpaAttendance(models.Model):
-    """Retired: parent attendance per term. Nothing reads or writes it; the table is dropped in the
-    database clean-up, after which this model is removed with a migration."""
-
-    student = models.ForeignKey(
-        'accounts.StudentProfile',
-        on_delete=models.CASCADE,
-        related_name='ptpa_records',
-    )
-    term = models.ForeignKey('school.Term', on_delete=models.CASCADE, related_name='ptpa_records')
-    section = models.ForeignKey('school.Section', on_delete=models.CASCADE, related_name='ptpa_records')
-    attended = models.BooleanField(default=False, db_index=True)
-    marked_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='ptpa_marks',
-    )
-    marked_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'grading_ptpa'
-        constraints = [
-            models.UniqueConstraint(fields=['student', 'term'], name='one_ptpa_per_student_term'),
-        ]
-
-    def __str__(self):
-        state = 'attended' if self.attended else 'absent'
-        return f'{self.student.lrn} {self.term.label}: {state}'

@@ -1,5 +1,6 @@
 from django.urls import path
 
+from apps.accounts.views_mfa import AdminMfaResetView
 from apps.school.views_admin import AdminProgramDetailView, AdminProgramListView, AdminSubjectCreateView
 
 from .views_admin import (
@@ -12,8 +13,14 @@ from .views_admin import (
     RegistrationRejectView,
     StudentGenderView,
 )
-from .views_lock import AccountDeactivateView, AccountReactivateView, AccountRemoveView, AccountRestorePendingView
-from .views_forecast import Grade11ForecastView
+from .views_lock import (
+    AccountDeactivateView,
+    AccountReactivateView,
+    AccountRemoveView,
+    AccountRestorePendingView,
+    AccountSignOutView,
+)
+from .views_forecast import ForecastRetentionView, Grade11ForecastView
 from apps.school.views_archive import ArchiveDeskView
 
 from .views_school import (
@@ -52,10 +59,13 @@ urlpatterns = [
     path('staff/', StaffAccountView.as_view(), name='admin-staff'),
     path('staff/<int:pk>/resend-activation/', StaffActivationResendView.as_view(), name='admin-staff-resend'),
     path('forecast/', Grade11ForecastView.as_view(), name='admin-forecast'),
+    path('forecast/retention/', ForecastRetentionView.as_view(), name='admin-forecast-retention'),
     path('accounts/<int:pk>/deactivate/', AccountDeactivateView.as_view(), name='admin-account-deactivate'),
     path('accounts/<int:pk>/reactivate/', AccountReactivateView.as_view(), name='admin-account-reactivate'),
     path('accounts/<int:pk>/restore-pending/', AccountRestorePendingView.as_view(), name='admin-account-restore-pending'),
     path('accounts/<int:pk>/remove/', AccountRemoveView.as_view(), name='admin-account-remove'),
+    path('accounts/<int:pk>/sign-out/', AccountSignOutView.as_view(), name='admin-account-sign-out'),
+    path('accounts/<int:pk>/reset-authenticator/', AdminMfaResetView.as_view(), name='admin-account-reset-authenticator'),
     path('accounts/<int:pk>/gender/', StudentGenderView.as_view(), name='admin-student-gender'),
     path('programs/', AdminProgramListView.as_view(), name='admin-programs'),
     path('programs/<int:pk>/', AdminProgramDetailView.as_view(), name='admin-program-detail'),

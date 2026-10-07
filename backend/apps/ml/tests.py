@@ -6,6 +6,7 @@ from django.contrib import admin
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import IntegrityError, transaction
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -15,30 +16,45 @@ from apps.chatbot.admin import FaqEntryAdmin
 from apps.chatbot.models import FaqEntry
 from apps.chatbot.seeds import seed_faqs
 from apps.grading.models import Grade
-from apps.grading.recommend import RecommendationContext, recommend_payload
-from apps.ml.features import load_schema, to_model_space, transform
+from apps.grading.recommend import recommend_payload
+from apps.ml.explain import sentences
+from apps.ml.features import load_schema, model_features, to_model_space, transform
 from apps.ml.forecast import FEATURE_SCHEMA, attach_attractiveness, snapshot_year, train_forecast
 from apps.ml.forecast import is_stale as forecast_is_stale
 from apps.ml.intent import answers_for, classify_question, matching_faq_answer, train_intent
 from apps.ml.intent import is_stale as intent_is_stale
 from apps.ml.knn_model import (
-    BELOW_MINIMUM,
-    FAILED,
+    BELOW,
     INSUFFICIENT,
     LIMITED,
-    NEEDS_DATA,
-    PASSED,
-    RANKED,
+    MET,
+    METHOD,
+    OTHER,
     STRONG,
-    TRACK_BOOST,
+    TYPICAL,
     UNKNOWN,
-    Ranking,
     compare_all,
     load_candidates,
-    outcome_dataset,
-    rank,
 )
-from apps.ml.models import ClusterSnapshot, CollegeOutcome, CollegeProgram, CollegeProgramSkill, ModelRun
+from apps.ml.models import (
+    ClusterSnapshot,
+    CollegeProgram,
+    CollegeProgramSkill,
+    ModelRun,
+    ProgramFamily,
+    RecommenderConfig,
+)
+from apps.ml.recommender import (
+    ACADEMIC_ORDER,
+    BY_PROFILE,
+    INTEREST_ORDER,
+    LOW,
+    RecommenderContext,
+    StudentInput,
+    evidence_for,
+    recommend,
+)
+from apps.ml.recommender_config import DEFAULTS
 from apps.ml.seed import seed_college_programs
 from apps.ml.regression import fit_line, predict_line
 from apps.ml.store import KEEP_RUNS, last_run, save_run
@@ -168,6 +184,24 @@ class FeatureSchemaTests(AcademicDataMixin, TestCase):
             self.assertEqual(len(candidate.vector), len(schema.keys))
 
 
+INTEREST_FLAT = {letter: 3.0 for letter in 'RIASEC'}
+
+
+def payload_for(grades, **kwargs):
+    return recommend_payload(grades, RecommenderContext(), **kwargs)
+
+
+def recommendation_for(grades, interest=None, strand_group='', program_code=''):
+    context = RecommenderContext()
+    student = StudentInput(
+        features=transform(grades, context.schema),
+        interest=interest,
+        strand_group=strand_group,
+        program_code=program_code,
+    )
+    return recommend(student, context), context
+
+
 class RecommendationTests(AcademicDataMixin, TestCase):
     TECH = {('css', 'tech'): 95, ('prog-java', 'tech'): 87, ('prog-dotnet', 'tech'): 90, ('kasaysayan', 'social'): 90, ('life-career', 'social'): 85, ('mab-kom', 'language'): 80}
     SCIENCE = {('phys-1', 'science'): 93, ('chem-1', 'science'): 91, ('gen-math', 'math'): 88, ('eff-comm', 'language'): 75}
@@ -176,42 +210,44 @@ class RecommendationTests(AcademicDataMixin, TestCase):
     def test_partial_profile_is_not_ranked_on_missing_dimensions(self):
         """Regression: a tech-strong student with no math/science grades once matched Psychology first."""
         _profile, grades = self.student(self.TECH)
-        payload = recommend_payload(grades, 'ICTP')
+        payload = payload_for(grades, program_code='ICTP', strand_group='ICT')
         self.assertTrue(payload['ready'])
         self.assertEqual(strongest_domain(payload['courses'][0]['code']), 'tech')
-        features = transform(grades)
-        for course in payload['courses']:
-            program = CollegeProgram.objects.get(code=course['code'])
-            for skill in program.skills.exclude(minimum__isnull=True):
-                self.assertIsNotNone(features.value(skill.domain.key))
         self.assertIn('Math', payload['coverage']['needs'])
 
     def test_different_profiles_change_vector_and_result(self):
         _a, science = self.student(self.SCIENCE)
         _b, language = self.student(self.LANGUAGE)
         self.assertNotEqual(transform(science).values, transform(language).values)
-        first = recommend_payload(science)
-        second = recommend_payload(language)
+        first = payload_for(science)
+        second = payload_for(language)
         self.assertEqual(strongest_domain(first['courses'][0]['code']), 'science')
         self.assertIn(strongest_domain(second['courses'][0]['code']), ('language', 'social'))
         self.assertNotEqual(first['courses'][0]['code'], second['courses'][0]['code'])
 
     def test_inactive_college_program_is_never_returned(self):
         _profile, grades = self.student(self.SCIENCE)
-        top = recommend_payload(grades)['courses'][0]['code']
+        top = payload_for(grades)['courses'][0]['code']
         CollegeProgram.objects.filter(code=top).update(is_active=False)
-        self.assertNotIn(top, [row['code'] for row in recommend_payload(grades)['courses']])
+        self.assertNotIn(top, [row['code'] for row in payload_for(grades)['courses']])
+
+    def test_programs_of_a_retired_family_are_never_returned(self):
+        _profile, grades = self.student(self.SCIENCE)
+        ProgramFamily.objects.filter(code='sciences').update(is_active=False)
+        codes = [row['code'] for row in payload_for(grades)['courses']]
+        self.assertNotIn('bsbio', codes)
 
     def test_too_few_domains_is_not_ready(self):
         _profile, grades = self.student({('gen-math', 'math'): 90, ('phys-1', 'science'): 88})
-        payload = recommend_payload(grades)
+        payload = payload_for(grades)
         self.assertFalse(payload['ready'])
         self.assertEqual(payload['courses'], [])
 
-    def test_payload_identifies_model_and_schema(self):
+    def test_payload_identifies_method_and_schema(self):
         _profile, grades = self.student(self.SCIENCE)
-        payload = recommend_payload(grades)
-        context = RecommendationContext()
+        context = RecommenderContext()
+        payload = recommend_payload(grades, context)
+        self.assertEqual(payload['method'], METHOD)
         self.assertEqual(payload['model']['feature_schema'], context.schema.version)
         self.assertEqual(payload['model']['catalog'], context.catalog)
         self.assertFalse(payload['model']['trained_on_outcomes'])
@@ -219,10 +255,10 @@ class RecommendationTests(AcademicDataMixin, TestCase):
     def test_grade_change_is_used_on_next_prediction_without_retraining(self):
         _profile, grades = self.student(self.SCIENCE)
         runs = ModelRun.objects.count()
-        before = recommend_payload(grades)
+        before = payload_for(grades)
         Grade.objects.filter(pk__in=[row.pk for row in grades], subject__code='phys-1').update(score=Decimal('70'))
         refreshed = list(Grade.objects.filter(pk__in=[row.pk for row in grades]).select_related('subject'))
-        after = recommend_payload(refreshed)
+        after = payload_for(refreshed)
         self.assertNotEqual(before['skills'], after['skills'])
         self.assertEqual(ModelRun.objects.count(), runs)
 
@@ -233,7 +269,7 @@ class RecommendationTests(AcademicDataMixin, TestCase):
         self.assertEqual(features.excluded, ('peh',))
         self.assertEqual(features.unmapped, ('new-elective',))
         self.assertEqual(features.used, len(self.SCIENCE))
-        coverage = recommend_payload(grades)['coverage']
+        coverage = payload_for(grades)['coverage']
         self.assertEqual(coverage['excluded_subjects'], ['peh'])
         self.assertEqual(coverage['unmapped_subjects'], ['new-elective'])
         with self.assertRaisesMessage(CommandError, '1 record(s) need fixing'):
@@ -257,37 +293,77 @@ class RecommendationTests(AcademicDataMixin, TestCase):
         self.assertEqual(features.value('research'), Decimal('90.00'))
         self.assertEqual(features.subjects['research'], ['pr2', 'iii', 'capstone', 'culminating'])
         self.assertEqual(features.observed_count, 1)
-        self.assertFalse(recommend_payload(grades)['ready'])
+        self.assertFalse(payload_for(grades)['ready'])
 
     def test_ranking_and_diagnostics_share_one_comparison(self):
         _profile, grades = self.student(self.TECH)
-        context = RecommendationContext()
-        features = transform(grades, context.schema)
-        comparisons = compare_all(features, context.candidates, 'ICTP')
-        best = min((row for row in comparisons if row.status == RANKED), key=lambda row: (row.distance, row.candidate.name))
-        top = recommend_payload(grades, 'ICTP', context)['courses'][0]
-        self.assertEqual(top['code'], best.candidate.code)
-        self.assertEqual(top['distance'], round(best.distance, 2))
-        self.assertEqual(top['evidence']['observed_domains'], [context.schema.label(key) for key in best.observed])
-        self.assertEqual(top['evidence']['status'], best.evidence)
+        result, context = recommendation_for(grades, strand_group='ICT', program_code='ICTP')
+        comparisons = compare_all(transform(grades, context.schema), context.candidates, 'ICT', 'ICTP')
+        top = result.items[0]
+        same = next(row for row in comparisons if row.candidate.code == top.candidate.code)
+        self.assertEqual(round(top.comparison.distance, 6), round(same.distance, 6))
+        self.assertEqual(top.comparison.observed, same.observed)
         for row in comparisons:
             self.assertTrue(0.0 <= row.imputed_share <= 1.0)
-            self.assertEqual(row.status == NEEDS_DATA, bool(row.missing_minimums))
-        unobserved = [index for index, seen in enumerate(features.observed) if not seen]
-        self.assertTrue(all(features.values[index] is None for index in unobserved))
 
-    def test_outcome_dataset_uses_only_recorded_outcomes(self):
-        self.assertEqual(outcome_dataset(), [])
-        profile, grades = self.student(self.SCIENCE)
-        CollegeOutcome.objects.create(
-            student=profile,
-            college_program=CollegeProgram.objects.get(code='bsbio'),
-            school_year=self.year,
+    def test_order_is_academic_tier_then_interest_tier_then_distance(self):
+        _profile, grades = self.student(self.SCIENCE)
+        result, _context = recommendation_for(grades, interest={**INTEREST_FLAT, 'I': 5.0, 'S': 1.0})
+        keys = [
+            (
+                bool(row.comparison.unchecked_benchmarks),
+                len(row.comparison.below_benchmarks),
+                ACADEMIC_ORDER[row.academic],
+                INTEREST_ORDER[row.interest],
+                row.comparison.distance,
+                0 if row.comparison.strand_context == TYPICAL else 1,
+            )
+            for row in result.ranked
+        ]
+        self.assertEqual(keys, sorted(keys))
+        self.assertTrue(all(row.ordered_by == BY_PROFILE for row in result.ranked))
+
+    def test_interest_changes_order_only_within_an_academic_tier(self):
+        _profile, grades = self.student(self.SCIENCE)
+        social, _ = recommendation_for(grades, interest={**INTEREST_FLAT, 'S': 5.0, 'I': 1.0})
+        investigative, _ = recommendation_for(grades, interest={**INTEREST_FLAT, 'S': 1.0, 'I': 5.0})
+        for result in (social, investigative):
+            tiers = [(bool(row.comparison.unchecked_benchmarks), ACADEMIC_ORDER[row.academic]) for row in result.ranked]
+            self.assertEqual(tiers, sorted(tiers))
+        self.assertNotEqual([row.candidate.code for row in social.ranked], [row.candidate.code for row in investigative.ranked])
+
+    def test_shortlist_has_three_primary_and_at_most_seven_more(self):
+        _profile, grades = self.student(self.SCIENCE)
+        result, context = recommendation_for(grades, interest=INTEREST_FLAT)
+        primary = [row for row in result.items if row.tier == 'primary']
+        extra = [row for row in result.items if row.tier == 'additional']
+        self.assertEqual(len(primary), context.config['shortlist']['primary'])
+        self.assertLessEqual(len(extra), context.config['shortlist']['additional'])
+        self.assertTrue(all(row.academic != LOW for row in extra))
+        self.assertLessEqual(len(result.items), 10)
+
+    def test_weak_evidence_returns_fewer_programs(self):
+        _profile, grades = self.student(self.SCIENCE)
+        RecommenderConfig.objects.filter(active_marker='active').update(
+            values={**DEFAULTS, 'academic_tiers': {'strong': 0.01, 'moderate': 0.02}}
         )
-        rows = outcome_dataset()
-        self.assertEqual([(row['student'], row['label']) for row in rows], [(profile.pk, 'bsbio')])
-        self.assertEqual(len(rows[0]['vector']), len(load_schema().keys))
-        self.assertFalse(recommend_payload(grades)['model']['trained_on_outcomes'])
+        result, _context = recommendation_for(grades, interest=INTEREST_FLAT)
+        self.assertEqual(len(result.items), 3)
+        self.assertTrue(all(row.tier == 'primary' for row in result.items))
+
+    def test_labels_follow_the_written_rules(self):
+        _profile, grades = self.student(self.SCIENCE)
+        no_interest, _ = recommendation_for(grades)
+        self.assertTrue(all(row.label == 'limited' for row in no_interest.items))
+        result, _ = recommendation_for(grades, interest={letter: 5.0 for letter in 'RIASEC'})
+        for row in result.items:
+            capped = any(state == BELOW for state in row.comparison.benchmark_status.values())
+            if row.label == 'strong':
+                self.assertFalse(capped)
+                self.assertEqual((row.academic, row.interest), ('strong', 'high'))
+                self.assertLessEqual(row.family_rank, 2)
+            if capped and row.comparison.evidence == STRONG:
+                self.assertEqual(row.label, 'possible')
 
 
 class EvidenceCoverageTests(AcademicDataMixin, TestCase):
@@ -295,59 +371,46 @@ class EvidenceCoverageTests(AcademicDataMixin, TestCase):
 
     BASE = {('css', 'tech'): 90, ('eff-comm', 'language'): 85, ('kasaysayan', 'social'): 88}
 
-    def program(self, code, levels, minimums=None):
-        college = CollegeProgram.objects.create(code=code, name=code.upper())
+    def program(self, code, levels, benchmarks=None, official=None):
+        college = CollegeProgram.objects.create(code=code, name=code.upper(), family=ProgramFamily.objects.get(code='computing'))
         for key, level in levels.items():
+            minimum = (benchmarks or {}).get(key)
             CollegeProgramSkill.objects.create(
                 college_program=college,
                 domain=SkillDomain.objects.get(key=key),
                 level=Decimal(level),
-                minimum=Decimal((minimums or {})[key]) if key in (minimums or {}) else None,
+                minimum=Decimal(minimum) if minimum is not None else None,
+                minimum_kind=CollegeProgramSkill.MinimumKind.OFFICIAL if key in (official or {}) else CollegeProgramSkill.MinimumKind.BENCHMARK,
+                requirement_source=(official or {}).get(key, ''),
             )
         return college
 
     def comparison(self, grades, code):
-        context = RecommendationContext()
+        context = RecommenderContext()
         features = transform(grades, context.schema)
         return next(row for row in compare_all(features, context.candidates) if row.candidate.code == code)
 
-    def shown(self, grades):
-        context = RecommendationContext()
-        ranking = rank(transform(grades, context.schema), context.candidates, limit=None)
-        return {row['code']: row for row in ranking.courses}
-
-    def test_rank_returns_a_named_result_that_its_caller_reads_by_field(self):
-        """Regression: the caller once unpacked two values from a three-value rank()."""
-        _profile, grades = self.student(self.BASE)
-        context = RecommendationContext()
-        ranking = rank(transform(grades, context.schema), context.candidates)
-        self.assertIsInstance(ranking, Ranking)
-        self.assertEqual(Ranking._fields, ('courses', 'blocked', 'not_evaluated'))
-        payload = recommend_payload(grades, None, context)
-        self.assertEqual(payload['courses'], ranking.courses)
-        self.assertEqual(payload['coverage']['not_evaluated'], ranking.not_evaluated)
-        self.assertEqual(payload['coverage']['needs'], [context.schema.label(key) for key, _n in ranking.blocked.most_common()])
+    def shown(self, grades, interest=INTEREST_FLAT):
+        result, _context = recommendation_for(grades, interest=interest)
+        return {row.candidate.code: row for row in result.ranked}
 
     def test_full_coverage_is_strong(self):
         self.program('full3', {'math': 85, 'science': 85, 'language': 80}, {'math': 80})
         _profile, grades = self.student({('gen-math', 'math'): 90, ('phys-1', 'science'): 88, ('eff-comm', 'language'): 82})
         row = self.comparison(grades, 'full3')
         self.assertEqual((len(row.observed), row.total, row.coverage), (3, 3, 1.0))
-        self.assertEqual(row.minimum_status, {'math': PASSED})
+        self.assertEqual(row.benchmark_status, {'math': MET})
         self.assertEqual(row.evidence, STRONG)
         self.assertTrue(row.eligible)
-        self.assertEqual(self.shown(grades)['full3']['evidence']['status'], STRONG)
+        self.assertIn('full3', self.shown(grades))
 
-    def test_partial_coverage_is_limited_not_strong(self):
+    def test_partial_coverage_is_limited_and_labeled_limited_evidence(self):
         self.program('part3', {'tech': 86, 'math': 72, 'service': 75}, {'tech': 78})
         _profile, grades = self.student(self.BASE)
         row = self.comparison(grades, 'part3')
         self.assertEqual((len(row.observed), row.total), (1, 3))
-        self.assertEqual(round(100 * row.coverage, 2), 33.33)
         self.assertEqual(row.evidence, LIMITED)
-        self.assertTrue(row.eligible)
-        evidence = self.shown(grades)['part3']['evidence']
-        self.assertEqual((evidence['status'], evidence['observed'], evidence['total'], evidence['coverage']), (LIMITED, 1, 3, 33.33))
+        self.assertEqual(self.shown(grades)['part3'].label, 'limited')
 
     def test_threshold_is_one_setting(self):
         self.program('part3', {'tech': 86, 'math': 72, 'service': 75}, {'tech': 78})
@@ -355,7 +418,7 @@ class EvidenceCoverageTests(AcademicDataMixin, TestCase):
         before = self.comparison(grades, 'part3')
         with override_settings(MIN_RECOMMENDATION_EVIDENCE_COVERAGE=0.3):
             after = self.comparison(grades, 'part3')
-            self.assertEqual(recommend_payload(grades)['coverage']['threshold'], 0.3)
+            self.assertEqual(payload_for(grades)['coverage']['threshold'], 0.3)
         self.assertEqual((before.evidence, after.evidence), (LIMITED, STRONG))
         self.assertEqual(before.distance, after.distance)
 
@@ -365,26 +428,40 @@ class EvidenceCoverageTests(AcademicDataMixin, TestCase):
         row = self.comparison(grades, 'zero2')
         self.assertEqual((row.coverage, row.evidence, row.eligible), (0.0, INSUFFICIENT, False))
         self.assertNotIn('zero2', self.shown(grades))
-        self.assertIn('Arts', recommend_payload(grades)['coverage']['needs'])
+        self.assertIn('Arts', payload_for(grades)['coverage']['needs'])
 
-    def test_minimum_without_a_grade_is_unknown_not_passed(self):
+    def test_benchmark_without_a_grade_is_unknown_and_never_blocks(self):
         self.program('needmath', {'math': 90, 'tech': 80}, {'math': 85})
         _profile, grades = self.student(self.BASE)
         row = self.comparison(grades, 'needmath')
-        self.assertEqual(row.minimum_status, {'math': UNKNOWN})
-        self.assertEqual((row.status, row.evidence, row.eligible), (NEEDS_DATA, INSUFFICIENT, False))
-        self.assertNotIn('needmath', self.shown(grades))
-        payload = recommend_payload(grades)
-        self.assertIn('Math', payload['coverage']['needs'])
-        self.assertGreaterEqual(payload['coverage']['not_evaluated'], 1)
+        self.assertEqual(row.benchmark_status, {'math': UNKNOWN})
+        self.assertTrue(row.eligible)
+        shown = self.shown(grades)
+        self.assertEqual(shown['needmath'].label, 'limited')
+        order = list(shown)
+        checkable = [code for code in order if not shown[code].comparison.unchecked_benchmarks]
+        self.assertGreater(order.index('needmath'), order.index(checkable[-1]))
 
-    def test_known_minimum_that_fails_is_failed(self):
-        self.program('hightech', {'tech': 95, 'language': 80}, {'tech': 95})
+    def test_benchmark_below_keeps_the_program_as_a_possible_match(self):
+        self.program('hightech', {'tech': 95, 'language': 80, 'social': 85}, {'tech': 95})
         _profile, grades = self.student(self.BASE)
         row = self.comparison(grades, 'hightech')
-        self.assertEqual(row.minimum_status, {'tech': FAILED})
-        self.assertEqual(row.status, BELOW_MINIMUM)
-        self.assertFalse(row.eligible)
+        self.assertEqual(row.benchmark_status, {'tech': BELOW})
+        self.assertTrue(row.eligible)
+        match = self.shown(grades, interest={letter: 5.0 for letter in 'RIASEC'})['hightech']
+        self.assertEqual(match.label, 'possible')
+        evidence = evidence_for(match, recommendation_for(grades, interest=INTEREST_FLAT)[0], StudentInput(transform(grades), INTEREST_FLAT), RecommenderContext())
+        self.assertEqual(evidence['below_benchmark'][0]['official'], False)
+        self.assertIn('benchmark is guidance, not a requirement', ' '.join(sentences(evidence)))
+
+    def test_official_requirement_needs_a_source(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self.program('nosource', {'tech': 90}, {'tech': 85}, official={'tech': ''})
+        self.program('sourced', {'tech': 95, 'language': 80, 'social': 85}, {'tech': 95}, official={'tech': 'CHED CMO No. 25, s. 2015'})
+        _profile, grades = self.student(self.BASE)
+        row = self.comparison(grades, 'sourced')
+        self.assertEqual(row.official_unmet, ('tech',))
+        self.assertIn('sourced', self.shown(grades))
 
     def test_peh_grade_does_not_add_evidence(self):
         _profile, grades = self.student(self.BASE)
@@ -405,20 +482,46 @@ class EvidenceCoverageTests(AcademicDataMixin, TestCase):
         with_research = self.comparison(more, 'bsbio')
         self.assertNotIn('research', without.observed)
         self.assertIn('research', with_research.observed)
-        self.assertEqual(len(with_research.observed), len(without.observed) + 1)
         self.assertEqual(with_research.coverage, 1.0)
 
     def test_missing_domains_stay_missing(self):
         _profile, grades = self.student(self.BASE)
         features = transform(grades)
-        payload = recommend_payload(grades)
+        payload = payload_for(grades)
         for key, value, seen in zip(features.schema.keys, features.values, features.observed):
             self.assertEqual(value is None, not seen, key)
         self.assertEqual({row['key'] for row in payload['skills']}, {'tech', 'language', 'social'})
-        space = to_model_space(features.values, features.observed)
-        self.assertTrue(all(value == 0.0 for value, seen in zip(space, features.observed) if not seen))
-        self.assertEqual(CollegeOutcome.objects.count(), 0)
-        self.assertFalse(payload['model']['trained_on_outcomes'])
+        row = model_features(features, INTEREST_FLAT, 'ICT')
+        for key, seen in zip(features.schema.keys, features.observed):
+            self.assertEqual(row[f'observed:{key}'], 1.0 if seen else 0.0)
+            if not seen:
+                self.assertEqual(row[f'strength:{key}'], 0.0)
+
+
+class StrandTests(AcademicDataMixin, TestCase):
+    SCIENCE = RecommendationTests.SCIENCE
+
+    def setUp(self):
+        super().setUp()
+        self.stem = Program.objects.create(code='STEM', name='STEM', strand_group='STEM')
+        self.abm = Program.objects.create(code='ABM', name='ABM', strand_group='ABM')
+        CollegeProgram.objects.get(code='bsbio').shs_programs.set([self.stem])
+
+    def test_strand_is_context_and_never_changes_the_distance(self):
+        _profile, grades = self.student(self.SCIENCE)
+        context = RecommenderContext()
+        features = transform(grades, context.schema)
+        stem = {row.candidate.code: row for row in compare_all(features, context.candidates, 'STEM', 'STEM')}
+        abm = {row.candidate.code: row for row in compare_all(features, context.candidates, 'ABM', 'ABM')}
+        self.assertEqual(stem['bsbio'].strand_context, TYPICAL)
+        self.assertEqual(abm['bsbio'].strand_context, OTHER)
+        self.assertEqual(stem['bsbio'].distance, abm['bsbio'].distance)
+
+    def test_a_different_strand_never_removes_a_program(self):
+        _profile, grades = self.student(self.SCIENCE)
+        stem, _ = recommendation_for(grades, interest=INTEREST_FLAT, strand_group='STEM', program_code='STEM')
+        abm, _ = recommendation_for(grades, interest=INTEREST_FLAT, strand_group='ABM', program_code='ABM')
+        self.assertEqual([row.candidate.code for row in stem.ranked], [row.candidate.code for row in abm.ranked])
 
 
 class ScreenshotStudentTests(TestCase):
@@ -448,7 +551,7 @@ class ScreenshotStudentTests(TestCase):
             )
             for code, score in self.GRADES.items()
         ]
-        self.context = RecommendationContext()
+        self.context = RecommenderContext()
         self.features = transform(self.grades, self.context.schema)
 
     def expected_distance(self, code):
@@ -463,8 +566,7 @@ class ScreenshotStudentTests(TestCase):
             ((seen[key] - mean if key in seen else 0.0) - (levels[key] - level_mean if key in levels else 0.0)) ** 2
             for key in keys
         )
-        boost = TRACK_BOOST if college.shs_programs.filter(code='ICTP').exists() else 1
-        return math.sqrt(total / len(keys)) * boost
+        return math.sqrt(total / len(keys))
 
     def test_feature_values(self):
         self.assertEqual(self.features.value('tech'), Decimal('86.67'))
@@ -474,31 +576,23 @@ class ScreenshotStudentTests(TestCase):
         self.assertEqual((self.features.used, self.features.excluded, self.features.unmapped), (6, (), ()))
 
     def test_named_programs_have_limited_evidence_and_the_documented_distance(self):
-        rows = {row.candidate.code: row for row in compare_all(self.features, self.context.candidates, 'ICTP')}
+        rows = {row.candidate.code: row for row in compare_all(self.features, self.context.candidates, 'ICT', 'ICTP')}
         for code, (observed, total) in self.NAMED.items():
             row = rows[code]
             self.assertEqual((len(row.observed), row.total), (observed, total), code)
             self.assertEqual(row.evidence, LIMITED, code)
             self.assertTrue(row.eligible, code)
-            self.assertNotIn(UNKNOWN, row.minimum_status.values(), code)
             self.assertAlmostEqual(row.distance, self.expected_distance(code), places=6, msg=code)
         self.assertEqual(rows['bsindtech'].observed, ('tech',))
-        self.assertTrue(rows['bsindtech'].track_match)
-        self.assertFalse(rows['bsed'].track_match)
+        self.assertEqual(rows['bsindtech'].strand_context, TYPICAL)
+        self.assertEqual(rows['bsed'].strand_context, OTHER)
 
-    def test_order_follows_distance_and_evidence_is_reported(self):
-        payload = recommend_payload(self.grades, 'ICTP', self.context)
-        rows = compare_all(self.features, self.context.candidates, 'ICTP')
-        by_distance = sorted((row for row in rows if row.eligible), key=lambda row: (row.distance, row.candidate.name))
-        self.assertEqual([row['code'] for row in payload['courses']], [row.candidate.code for row in by_distance[:3]])
+    def test_payload_is_ready_on_limited_evidence(self):
+        payload = recommend_payload(self.grades, self.context, program_code='ICTP', strand_group='ICT')
         self.assertTrue(payload['ready'])
         self.assertEqual(payload['evidence'], LIMITED)
         self.assertTrue(payload['summary'].startswith('Closest so far:'))
-        self.assertNotIn('match', payload['courses'][0]['reason'])
-        self.assertEqual(payload['coverage']['not_evaluated'], sum(1 for row in rows if row.evidence == INSUFFICIENT))
-        for row in rows:
-            if UNKNOWN in row.minimum_status.values():
-                self.assertFalse(row.eligible, row.candidate.code)
+        self.assertTrue(all(row['label'] == 'limited' for row in payload['courses']))
 
 
 class CurriculumTransitionTests(TestCase):

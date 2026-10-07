@@ -40,18 +40,27 @@ export function checkAddress(value) {
   return '';
 }
 
-export function passwordChecks(value) {
+// The same minimums as the server (apps/accounts/passwords.py). The server also refuses common passwords and ones
+// too close to the person's name or email, and its message is shown when that happens.
+export const STUDENT_PASSWORD_MIN = 10;
+export const STAFF_PASSWORD_MIN = 12;
+
+export function passwordMinFor(role) {
+  return role === 'student' ? STUDENT_PASSWORD_MIN : STAFF_PASSWORD_MIN;
+}
+
+export function passwordChecks(value, min = STUDENT_PASSWORD_MIN) {
   const text = String(value || '');
   return {
-    length: text.length >= 8,
+    length: text.length >= min,
     letter: /[A-Za-z]/.test(text),
     number: /\d/.test(text),
   };
 }
 
-export function checkPassword(value) {
-  const checks = passwordChecks(value);
-  if (!checks.length) return 'Use at least 8 characters.';
+export function checkPassword(value, min = STUDENT_PASSWORD_MIN) {
+  const checks = passwordChecks(value, min);
+  if (!checks.length) return `Use at least ${min} characters.`;
   if (!checks.letter) return 'Include at least one letter.';
   if (!checks.number) return 'Include at least one number.';
   return '';

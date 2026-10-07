@@ -1,0 +1,1185 @@
+{
+ "DELETE /api/admin/assignments/1/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "DELETE /api/announcements/1/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "DELETE /api/cms/media/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "DELETE /api/guidance/me/assessment/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "DELETE /api/school-years/1/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "DELETE /api/school-years/1/delete/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "DELETE /api/sections/1/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "DELETE /api/terms/1/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/access/overview/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/access/requests/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/access/tags/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/admin/account-archive/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/admin/archive/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/admin/assignments/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/admin/forecast/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/admin/placements/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/admin/programs/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/admin/registrations/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/admin/registrations/emails/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/admin/staff/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/admin/teachers/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/announcements/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/announcements/1/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/audit-logs/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/auth/csrf/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/auth/me/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/auth/mfa/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/cms/content/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/grades/advisory/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/grades/class/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/grades/corrections/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/grades/history/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/grades/me/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "GET /api/grades/print/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/grades/print/records/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/grades/queues/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/grades/report/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/grades/timeline/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/guidance/admin/catalog/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/guidance/admin/config/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/guidance/admin/instruments/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/guidance/admin/outcomes/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/guidance/admin/programs/sample/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/guidance/admin/recommender/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/guidance/advisory/1/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/guidance/advisory/1/students/1/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/guidance/me/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "GET /api/guidance/me/assessment/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "GET /api/guidance/me/compare/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "GET /api/guidance/me/programs/sample/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "GET /api/guidance/programs/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/guidance/ratings/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/health/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/health/ready/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/ml/assistant/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/notifications/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/programs/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/programs/1/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "GET /api/school-years/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/school-years/1/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/school-years/1/term-plan/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/sections/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/sections/1/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/sections/1/detail/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "GET /api/students/me/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "GET /api/subjects/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/subjects/1/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/teachers/assignments/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/terms/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/terms/1/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "GET /api/terms/window-history/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PATCH /api/admin/accounts/1/gender/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PATCH /api/admin/forecast/retention/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PATCH /api/admin/programs/1/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PATCH /api/announcements/1/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PATCH /api/cms/content/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PATCH /api/guidance/admin/families/sample/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PATCH /api/guidance/admin/programs/sample/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PATCH /api/school-years/1/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PATCH /api/sections/1/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PATCH /api/students/me/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "PATCH /api/terms/1/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/access/requests/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "POST /api/access/requests/1/decide/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "POST /api/access/requests/1/withdraw/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "POST /api/access/tags/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "POST /api/access/tags/1/close/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "POST /api/admin/accounts/1/deactivate/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/accounts/1/reactivate/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/accounts/1/remove/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/accounts/1/reset-authenticator/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/accounts/1/restore-pending/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/accounts/1/sign-out/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/assignments/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/assignments/1/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/forecast/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/placements/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/placements/bulk/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/programs/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/registrations/1/approve/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/registrations/1/reject/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/registrations/approve-bulk/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/registrations/emails/resend/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/staff/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/staff/1/resend-activation/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/admin/subjects/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/announcements/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/auth/activate/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/change-password/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/change-password/otp/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/change-password/verify/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/forgot-password/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/forgot-password/otp/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/forgot-password/verify/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/login/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/logout/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/mfa/disable/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/mfa/enroll/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/mfa/enroll/confirm/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/mfa/recovery-codes/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/mfa/verify/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/auth/refresh/": {
+  "admin": "sign-in",
+  "anonymous": "sign-in",
+  "head_teacher": "sign-in",
+  "student": "sign-in",
+  "teacher": "sign-in"
+ },
+ "POST /api/chatbot/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/cms/media/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/grades/approve/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/grades/approve/all/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/grades/approve/teacher/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/grades/corrections/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/grades/corrections/1/review/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/grades/encode/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/grades/hide/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/grades/return/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/grades/show-ready/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/grades/show/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/grades/submit/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/admin/config/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/admin/config/1/activate/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/admin/families/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/admin/instruments/1/activate/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/admin/outcomes/1/validate/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/admin/programs/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/admin/programs/import/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/admin/programs/sample/verify/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/advisory/1/students/1/notes/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "POST /api/guidance/advisory/1/students/1/outcome/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "POST /api/guidance/advisory/1/students/1/recommendation/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "allowed"
+ },
+ "POST /api/guidance/me/assessment/complete/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/me/assessment/start/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/me/consent/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "POST /api/guidance/me/consent/withdraw/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "POST /api/ml/assistant/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/notifications/1/read/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/notifications/read-all/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/register/": {
+  "admin": "allowed",
+  "anonymous": "allowed",
+  "head_teacher": "allowed",
+  "student": "allowed",
+  "teacher": "allowed"
+ },
+ "POST /api/school-years/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/school-years/1/archive/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/school-years/1/restore/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/sections/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/sections/1/activate/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/sections/1/archive/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/sections/1/restore/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "POST /api/terms/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PUT /api/announcements/1/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PUT /api/guidance/admin/interest-map/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PUT /api/guidance/me/assessment/answer/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "refused",
+  "student": "allowed",
+  "teacher": "refused"
+ },
+ "PUT /api/school-years/1/": {
+  "admin": "allowed",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PUT /api/school-years/1/term-plan/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PUT /api/sections/1/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ },
+ "PUT /api/terms/1/": {
+  "admin": "refused",
+  "anonymous": "sign-in",
+  "head_teacher": "allowed",
+  "student": "refused",
+  "teacher": "refused"
+ }
+}

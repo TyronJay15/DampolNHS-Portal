@@ -1,7 +1,10 @@
+import uuid
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from django.utils import timezone
+from django_otp.models import Device, ThrottlingMixin, TimestampMixin
 
 
 class PortalUserManager(UserManager):
@@ -111,11 +114,6 @@ class StudentProfile(models.Model):
     def __str__(self):
         return f'{self.lrn} — {self.user.get_full_name()}'
 
-    @property
-    def full_name(self):
-        parts = [self.user.first_name, self.middle_name, self.user.last_name]
-        return ' '.join(part for part in parts if part).strip()
-
 
 class TeacherProfile(models.Model):
     user = models.OneToOneField(
@@ -211,3 +209,95 @@ class MailOutbox(models.Model):
 
     def __str__(self):
         return f'{self.kind} to {self.to_email} ({self.status})'
+
+
+class AuthSession(models.Model):
+    """One sign-in. Every refresh token it issues belongs to it, so ending it signs that browser out everywhere.
+
+    The refresh token itself is never stored: only the SHA-256 of each one (SessionToken). See apps.accounts.sessions.
+    """
+
+    class EndReason(models.TextChoices):
+        LOGOUT = 'logout', 'Signed out'
+        IDLE = 'idle', 'Idle too long'
+        EXPIRED = 'expired', 'Session time limit reached'
+        PASSWORD = 'password', 'Password changed or reset'
+        ACCOUNT = 'account', 'Account can no longer sign in'
+        REPLAY = 'replay', 'A used refresh token came back'
+        ADMIN = 'admin', 'Signed out by an administrator'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='auth_sessions')
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_refreshed_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    ended_at = models.DateTimeField(null=True, blank=True)
+    end_reason = models.CharField(max_length=20, choices=EndReason.choices, blank=True)
+
+    class Meta:
+        db_table = 'accounts_auth_sessions'
+        indexes = [
+            models.Index(fields=['user', 'ended_at'], name='auth_session_user_open'),
+            models.Index(fields=['expires_at'], name='auth_session_expires'),
+        ]
+
+    def __str__(self):
+        return f'Session {self.pk} for user {self.user_id}'
+
+    @property
+    def is_open(self):
+        return self.ended_at is None and self.expires_at > timezone.now()
+
+
+class SessionToken(models.Model):
+    """One refresh token of a session, kept only as a hash. A token is used once; a used one coming back is a replay."""
+
+    session = models.ForeignKey(AuthSession, on_delete=models.CASCADE, related_name='tokens')
+    token_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'accounts_session_tokens'
+
+    def __str__(self):
+        return f'Refresh token {self.pk} of session {self.session_id}'
+
+
+class AuthenticatorDevice(TimestampMixin, ThrottlingMixin, Device):
+    """An authenticator app (TOTP) for the second sign-in step. Required for Admin and Head Teacher accounts.
+
+    The shared secret is stored encrypted with MFA_ENCRYPTION_KEY, never in plain text. Code checking, replay
+    protection and the wrong-code back-off are django-otp's (see apps.accounts.mfa).
+    """
+
+    secret = models.TextField()
+    drift = models.SmallIntegerField(default=0)
+    last_t = models.BigIntegerField(default=-1)
+
+    class Meta(Device.Meta):
+        db_table = 'accounts_authenticator_devices'
+
+    def verify_token(self, token):
+        from apps.accounts.mfa import verify_totp
+
+        return verify_totp(self, token)
+
+    def get_throttle_factor(self):
+        # Wrong codes wait 10, 20, 40, 80 ... seconds (django-otp caps the wait), so guessing is hopeless.
+        return settings.MFA_THROTTLE_FACTOR
+
+
+class RecoveryCode(models.Model):
+    """A one-time code for signing in when the phone is lost. Only a keyed hash is stored."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='recovery_codes')
+    code_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'accounts_recovery_codes'
+
+    def __str__(self):
+        return f'Recovery code {self.pk} of user {self.user_id}'

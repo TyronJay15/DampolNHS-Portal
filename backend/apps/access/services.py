@@ -7,6 +7,7 @@ their own request, a head teacher stays inside their grade levels, and students 
 
 from datetime import date, timedelta
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -253,79 +254,81 @@ def _finish(request, owner, status, note='', result=None):
 
 def decide(owner, request, approve, note=''):
     expire_due()
-    request.refresh_from_db()
-    if request.status != AccessRequest.Status.PENDING:
-        raise ValidationError({'detail': 'This request is no longer waiting.'})
-    if not can_decide(owner, request):
-        raise PermissionDenied('You cannot decide this request.')
-    activity = _activity(request.activity)
-    note = str(note or '').strip()
-    proposer = request.requested_by
-    if not approve:
-        if not note:
-            raise ValidationError({'detail': 'Give a reason for declining.'})
-        _finish(request, owner, AccessRequest.Status.DECLINED, note)
-        activity.discard(request.payload)
+    with transaction.atomic():
+        request = AccessRequest.objects.select_for_update().get(pk=request.pk)
+        if request.status != AccessRequest.Status.PENDING:
+            raise ValidationError({'detail': 'This request is no longer waiting.'})
+        if not can_decide(owner, request):
+            raise PermissionDenied('You cannot decide this request.')
+        activity = _activity(request.activity)
+        note = str(note or '').strip()
+        proposer = request.requested_by
+        if not approve:
+            if not note:
+                raise ValidationError({'detail': 'Give a reason for declining.'})
+            _finish(request, owner, AccessRequest.Status.DECLINED, note)
+            activity.discard(request.payload)
+            audit.record(
+                user=owner,
+                action='access_request_declined',
+                summary=f'Declined: {request.summary}',
+                target_type='AccessRequest',
+                target_id=request.id,
+                details={'proposed_by': _name(proposer), 'reason': note},
+            )
+            notify(
+                [proposer],
+                title=f'Request declined · {activity.label}',
+                body=f'{_name(owner)} declined "{request.summary}". Reason: {note}',
+                level='warning',
+                category=ACCESS,
+                action_path=my_access_path(proposer),
+            )
+            return request
+        # Checked again now: the data may have changed since the request was prepared.
+        try:
+            cleaned = activity.clean(request.payload, request.tag, proposer)
+            with transaction.atomic():
+                result = activity.execute(cleaned, owner)
+        except (ActivityFailed, *EXECUTION_ERRORS) as exc:
+            reason = _error_text(exc)
+            _finish(request, owner, AccessRequest.Status.FAILED, note, {'error': reason})
+            activity.discard(request.payload)
+            audit.record(
+                user=owner,
+                action='access_request_failed',
+                summary=f'Could not apply: {request.summary}',
+                target_type='AccessRequest',
+                target_id=request.id,
+                details={'proposed_by': _name(proposer), 'error': reason},
+            )
+            notify(
+                [proposer],
+                title=f'Request could not be applied · {activity.label}',
+                body=f'"{request.summary}" was approved but could not be applied: {reason}',
+                level='warning',
+                category=ACCESS,
+                action_path=my_access_path(proposer),
+            )
+            return request
+        _finish(request, owner, AccessRequest.Status.APPROVED, note, result)
         audit.record(
             user=owner,
-            action='access_request_declined',
-            summary=f'Declined: {request.summary}',
+            action='access_request_approved',
+            summary=f'Approved and applied: {request.summary} (proposed by {_name(proposer)})',
             target_type='AccessRequest',
             target_id=request.id,
-            details={'proposed_by': _name(proposer), 'reason': note},
+            details={'proposed_by': _name(proposer), 'note': note, 'result': result},
         )
         notify(
             [proposer],
-            title=f'Request declined · {activity.label}',
-            body=f'{_name(owner)} declined "{request.summary}". Reason: {note}',
-            level='warning',
+            title=f'Request approved · {activity.label}',
+            body=f'{_name(owner)} approved and applied "{request.summary}".',
+            level='success',
             category=ACCESS,
             action_path=my_access_path(proposer),
         )
         return request
-    # Checked again now: the data may have changed since the request was prepared.
-    try:
-        cleaned = activity.clean(request.payload, request.tag, proposer)
-        result = activity.execute(cleaned, owner)
-    except (ActivityFailed, *EXECUTION_ERRORS) as exc:
-        reason = _error_text(exc)
-        _finish(request, owner, AccessRequest.Status.FAILED, note, {'error': reason})
-        activity.discard(request.payload)
-        audit.record(
-            user=owner,
-            action='access_request_failed',
-            summary=f'Could not apply: {request.summary}',
-            target_type='AccessRequest',
-            target_id=request.id,
-            details={'proposed_by': _name(proposer), 'error': reason},
-        )
-        notify(
-            [proposer],
-            title=f'Request could not be applied · {activity.label}',
-            body=f'"{request.summary}" was approved but could not be applied: {reason}',
-            level='warning',
-            category=ACCESS,
-            action_path=my_access_path(proposer),
-        )
-        return request
-    _finish(request, owner, AccessRequest.Status.APPROVED, note, result)
-    audit.record(
-        user=owner,
-        action='access_request_approved',
-        summary=f'Approved and applied: {request.summary} (proposed by {_name(proposer)})',
-        target_type='AccessRequest',
-        target_id=request.id,
-        details={'proposed_by': _name(proposer), 'note': note, 'result': result},
-    )
-    notify(
-        [proposer],
-        title=f'Request approved · {activity.label}',
-        body=f'{_name(owner)} approved and applied "{request.summary}".',
-        level='success',
-        category=ACCESS,
-        action_path=my_access_path(proposer),
-    )
-    return request
 
 
 def _error_text(exc):

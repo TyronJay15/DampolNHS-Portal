@@ -1,0 +1,111 @@
+.ia-progress {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--dash-line);
+  overflow: hidden;
+}
+
+.ia-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--dash-green);
+  transition: width 0.2s ease;
+}
+
+.ia-scale {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ia-scale legend {
+  grid-column: 1 / -1;
+  margin-bottom: 0.9rem;
+  padding: 0;
+  font-size: clamp(1.05rem, 2.2vw, 1.3rem);
+  font-weight: 700;
+  color: var(--dash-green-dark);
+  outline: none;
+}
+
+.ia-scale label {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  padding: 0.85rem 0.4rem;
+  border-radius: 14px;
+  border: 1px solid var(--dash-line);
+  background: var(--dash-panel);
+  color: var(--dash-muted);
+  font-size: 0.82rem;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ia-scale label:hover {
+  background: var(--dash-hover);
+}
+
+.ia-scale input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ia-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--dash-line);
+  background: var(--dash-panel);
+}
+
+.ia-scale label.is-picked {
+  border-color: var(--dash-green);
+  background: var(--dash-hover);
+  color: var(--dash-green-dark);
+  font-weight: 700;
+}
+
+.ia-scale label.is-picked .ia-dot {
+  border-color: var(--dash-green);
+  background: var(--dash-green);
+  box-shadow: inset 0 0 0 4px var(--dash-panel);
+}
+
+.ia-scale label:has(input:focus-visible) {
+  outline: 3px solid var(--dash-gold);
+  outline-offset: 2px;
+}
+
+.ia-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+@media (max-width: 560px) {
+  .ia-scale {
+    grid-template-columns: 1fr;
+  }
+
+  .ia-scale label {
+    grid-template-columns: 24px 1fr;
+    justify-items: start;
+    align-items: center;
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ia-progress i,
+  .ia-scale label {
+    transition: none;
+  }
+}

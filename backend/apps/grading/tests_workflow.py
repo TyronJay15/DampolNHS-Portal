@@ -170,7 +170,7 @@ class GradeWorkflowTests(TestCase):
         student_client.force_authenticate(user=self.student_user)
         seen = student_client.get('/api/grades/me/')
         self.assertEqual(len(seen.data['grades']), 1)
-        self.assertEqual(seen.data['recommendation']['method'], METHOD)
+        self.assertEqual(student_client.get('/api/guidance/me/').data['recommendation']['method'], METHOD)
 
         hide = self._hide()
         self.assertEqual(hide.data['hidden'], 1)

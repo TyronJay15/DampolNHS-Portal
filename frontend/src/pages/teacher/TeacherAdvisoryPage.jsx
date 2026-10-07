@@ -185,6 +185,7 @@ export default function TeacherAdvisoryPage() {
       <div className="studio-actions">
         <Link to="/teacher/advisory">Back to advisory</Link>
         <Link to={`/teacher/advisory/${assignmentId}/records`}>Records</Link>
+        <Link to={`/teacher/advisory/${assignmentId}/guidance`}>College recommendation</Link>
       </div>
       {message ? <p className="alert alert-info">{message}</p> : null}
       {error ? <p className="alert alert-error">{error}</p> : null}

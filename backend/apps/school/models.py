@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -8,6 +11,14 @@ class SchoolYear(models.Model):
     starts_on = models.DateField(null=True, blank=True)
     ends_on = models.DateField(null=True, blank=True)
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    retention_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('100'),
+        validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('100'))],
+        help_text="Percent of this year's approved Grade 11 students expected to continue to Grade 12 next year. "
+        'An assumption set by the Admin, used only for the planning estimate.',
+    )
 
     class Meta:
         db_table = 'school_years'
@@ -102,6 +113,11 @@ class Program(models.Model):
     summary = models.TextField(blank=True)
     description = models.TextField(blank=True)
     track = models.CharField(max_length=64, blank=True)
+    strand_group = models.CharField(
+        max_length=16,
+        blank=True,
+        help_text='Stable strand group across curricula (e.g. STEM for STEM and STEMC). Read by the college recommender.',
+    )
     grade_level = models.CharField(max_length=16, blank=True, choices=GradeLevel.choices)
     pathways = models.JSONField(default=list, blank=True)
     curriculum = models.ForeignKey(

@@ -61,10 +61,6 @@ class AccessTag(models.Model):
             return 'ended'
         return 'active'
 
-    @property
-    def is_live(self):
-        return self.state == 'active'
-
 
 class AccessRequest(models.Model):
     class Status(models.TextChoices):

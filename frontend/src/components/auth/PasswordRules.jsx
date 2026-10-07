@@ -1,17 +1,16 @@
-import { passwordChecks } from '../../utils/authRules';
+import { STUDENT_PASSWORD_MIN, passwordChecks } from '../../utils/authRules';
 import './PasswordRules.css';
 
-const RULES = [
-  ['length', 'At least 8 characters'],
-  ['letter', 'At least one letter'],
-  ['number', 'At least one number'],
-];
-
-export default function PasswordRules({ value }) {
-  const checks = passwordChecks(value);
+export default function PasswordRules({ value, min = STUDENT_PASSWORD_MIN }) {
+  const checks = passwordChecks(value, min);
+  const rules = [
+    ['length', `At least ${min} characters`],
+    ['letter', 'At least one letter'],
+    ['number', 'At least one number'],
+  ];
   return (
     <ul className="password-rules">
-      {RULES.map(([key, label]) => (
+      {rules.map(([key, label]) => (
         <li key={key} className={checks[key] ? 'is-ok' : ''}>
           {label}
         </li>

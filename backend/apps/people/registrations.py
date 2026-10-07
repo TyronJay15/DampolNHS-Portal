@@ -20,6 +20,15 @@ class AlreadyReviewed(Exception):
     """The registration is no longer pending."""
 
 
+def _lock_pending(registration):
+    """Lock the row and read it again inside the transaction, so two simultaneous decisions on the same
+    registration cannot both find it pending: the second waits, then sees it reviewed."""
+    locked = Registration.objects.select_for_update().select_related('user').get(pk=registration.pk)
+    if locked.status != Registration.Status.PENDING:
+        raise AlreadyReviewed
+    return locked
+
+
 def _payload(registration, email):
     registration.refresh_from_db()
     payload = dict(RegistrationReviewSerializer(registration).data)
@@ -34,9 +43,8 @@ def approve_registration(registration, actor):
     Raises AlreadyReviewed when the registration is not pending. Returns the review payload plus
     the email's state: queued, waiting, sent or failed.
     """
-    if registration.status != Registration.Status.PENDING:
-        raise AlreadyReviewed
     with transaction.atomic():
+        registration = _lock_pending(registration)
         now = timezone.now()
         user = registration.user
         user.approval_status = User.ApprovalStatus.APPROVED
@@ -74,9 +82,8 @@ def reject_registration(registration, actor, reason):
     Raises AlreadyReviewed when the registration is not pending. Returns the review payload plus
     the email's state.
     """
-    if registration.status != Registration.Status.PENDING:
-        raise AlreadyReviewed
     with transaction.atomic():
+        registration = _lock_pending(registration)
         now = timezone.now()
         user = registration.user
         user.approval_status = User.ApprovalStatus.REJECTED

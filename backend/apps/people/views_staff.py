@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.throttles import ScopedThrottle
 from apps.accounts.codes import issue_code
 from apps.accounts.mail import activation_email
 from apps.accounts.models import User
@@ -20,6 +21,9 @@ def _send_activation(user):
 
 class StaffAccountView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
+    throttle_classes = [ScopedThrottle]
+    throttle_scope = 'email_resend'
+    throttle_methods = ('POST',)
 
     def get(self, request):
         rows = list(
@@ -71,6 +75,8 @@ class StaffAccountView(APIView):
 
 class StaffActivationResendView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
+    throttle_classes = [ScopedThrottle]
+    throttle_scope = 'email_resend'
 
     def post(self, request, pk):
         user = get_object_or_404(

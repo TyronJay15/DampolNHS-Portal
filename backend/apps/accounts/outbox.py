@@ -53,8 +53,29 @@ def notice_left():
     return max(0, notice_limit() - used_today())
 
 
+DUPLICATE_NOTICE_GAP = timedelta(hours=6)
+
+
 def _registration_rows():
     return MailOutbox.objects.filter(kind=MailOutbox.Kind.REGISTRATION)
+
+
+def _queued_rows():
+    """Everything the sender delivers: registration results and queued account notices."""
+    return MailOutbox.objects.filter(kind__in=(MailOutbox.Kind.REGISTRATION, MailOutbox.Kind.NOTICE), status=QUEUED)
+
+
+def queue_duplicate_registration_notice(user):
+    """Queue the notice for an owner whose email or LRN was used in a new registration. Queued rather than sent,
+    so the public answer takes the same time either way. At most one per DUPLICATE_NOTICE_GAP, so it cannot flood."""
+    subject, body = mail.duplicate_registration_message(user)
+    recent = MailOutbox.objects.filter(
+        user=user, subject=subject, created_at__gte=timezone.now() - DUPLICATE_NOTICE_GAP
+    ).exists()
+    if recent or not user.email:
+        return None
+    row = MailOutbox.objects.create(kind=MailOutbox.Kind.NOTICE, to_email=user.email, subject=subject, body=body, user=user)
+    return deliver_inline(row)
 
 
 def queue_registration_result(registration, approved, reason=''):
@@ -116,7 +137,7 @@ def run_once(limit=100, seconds=180):
     deadline = time.monotonic() + seconds
     result = {'sent': 0, 'retrying': 0, 'failed': 0}
     while sum(result.values()) < limit and time.monotonic() < deadline and notice_left() > 0:
-        due = _registration_rows().filter(status=QUEUED, next_attempt_at__lte=timezone.now())
+        due = _queued_rows().filter(next_attempt_at__lte=timezone.now())
         row_id = due.order_by('id').values_list('id', flat=True).first()
         if row_id is None:
             break

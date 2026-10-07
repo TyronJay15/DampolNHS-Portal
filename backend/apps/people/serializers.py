@@ -3,7 +3,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import StudentProfile, User
-from apps.accounts.passwords import validate_password_strength
+from apps.accounts.passwords import check_new_password
 from apps.accounts.recaptcha import verify_recaptcha
 from apps.people.models import Registration
 from apps.school.curriculum import programs_for
@@ -16,6 +16,15 @@ def digits_only(value, field_name):
     if not text.isdigit():
         raise serializers.ValidationError({field_name: 'Use numbers only.'})
     return text
+
+
+def existing_owners(email, lrn):
+    """Accounts that already hold this email or LRN. The register view answers the same way either way, so the
+    form cannot be used to find out who is enrolled; the owners are emailed instead."""
+    owners = {user.pk: user for user in User.objects.filter(email__iexact=email)}
+    for profile in StudentProfile.objects.filter(lrn__iexact=lrn).select_related('user'):
+        owners.setdefault(profile.user_id, profile.user)
+    return list(owners.values())
 
 
 class StudentRegisterSerializer(serializers.Serializer):
@@ -45,12 +54,7 @@ class StudentRegisterSerializer(serializers.Serializer):
             raise serializers.ValidationError('LRN may contain numbers and hyphens only.')
         if len(''.join(ch for ch in cleaned if ch.isdigit())) != 12:
             raise serializers.ValidationError('LRN must be 12 digits.')
-        if StudentProfile.objects.filter(lrn__iexact=cleaned).exists():
-            raise serializers.ValidationError('An account with this LRN already exists.')
         return cleaned
-
-    def validate_password(self, value):
-        return validate_password_strength(value)
 
     def validate_address(self, value):
         cleaned = value.strip()
@@ -59,10 +63,7 @@ class StudentRegisterSerializer(serializers.Serializer):
         return cleaned
 
     def validate_email(self, value):
-        email = value.lower().strip()
-        if User.objects.filter(email__iexact=email).exists():
-            raise serializers.ValidationError('An account with this email already exists.')
-        return email
+        return value.lower().strip()
 
     def validate_contact_number(self, value):
         digits = digits_only(value, 'contact_number')
@@ -85,6 +86,11 @@ class StudentRegisterSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs['password'] != attrs['confirm_password']:
             raise serializers.ValidationError({'confirm_password': 'Passwords do not match.'})
+        # Checked against the name and email typed in, so a password like "juan.delacruz1" is refused.
+        applicant = User(
+            email=attrs['email'], first_name=attrs['first_name'], last_name=attrs['last_name'], role=User.Role.STUDENT
+        )
+        check_new_password(attrs['password'], applicant)
         year_label = attrs.get('school_year')
         year = (
             SchoolYear.objects.filter(label=year_label).first()
@@ -104,6 +110,7 @@ class StudentRegisterSerializer(serializers.Serializer):
             raise ValidationError({'program': f'{program.code} is not offered for {grade} in {year.label}.'})
         attrs['grade_level_enrollment'] = grade
         attrs['school_year'] = year
+        attrs['existing_owners'] = existing_owners(attrs['email'], attrs['lrn'])
         return attrs
 
     @transaction.atomic
@@ -112,6 +119,7 @@ class StudentRegisterSerializer(serializers.Serializer):
         school_year = validated_data['school_year']
         password = validated_data.pop('password')
         validated_data.pop('confirm_password')
+        validated_data.pop('existing_owners', None)
         validated_data.pop('school_year')
         validated_data.pop('program')
 

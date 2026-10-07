@@ -1,0 +1,157 @@
+/* Planning charts and basis tags. Observed data is green, estimates are outlined, forecasts carry a triangle;
+   each tag also names its basis in words, so nothing depends on color alone. */
+.fc-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.fc-tag.is-live,
+.fc-tag.is-observed {
+  background: var(--dash-hover);
+  color: var(--dash-green-dark);
+}
+
+.fc-tag.is-estimate,
+.fc-tag.is-retention {
+  background: transparent;
+  border-color: var(--dash-line);
+  color: var(--dash-muted);
+}
+
+.fc-tag.is-forecast,
+.fc-tag.is-confident {
+  background: var(--dash-green-dark);
+  color: var(--dash-on-mark);
+}
+
+.fc-tag.is-low_confidence,
+.fc-tag.is-demo {
+  background: var(--dash-field);
+  border-color: var(--dash-gold);
+  color: var(--dash-gold-ink);
+}
+
+.fc-tag.is-untested,
+.fc-tag.is-locked {
+  background: var(--dash-field);
+  color: var(--dash-muted);
+}
+
+.fc-empty {
+  margin: 0;
+  color: var(--dash-muted);
+}
+
+/* Applied (light) with approved (dark) inside, on one scale. */
+.fc-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.fc-bars-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.88rem;
+}
+
+.fc-bars-meta strong {
+  color: var(--dash-green-dark);
+}
+
+.fc-bars-meta span {
+  color: var(--dash-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.fc-bars-track {
+  position: relative;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--dash-field);
+  overflow: hidden;
+}
+
+.fc-bars-track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.fc-bars-track .is-applied {
+  background: color-mix(in srgb, var(--dash-green) 35%, var(--dash-field));
+}
+
+.fc-bars-track .is-approved {
+  background: var(--dash-green);
+}
+
+/* Weekly running total. */
+.fc-line {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.fc-line text {
+  font-size: 10.5px;
+  fill: var(--dash-muted);
+}
+
+.fc-line .fc-end {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--dash-ink);
+}
+
+.fc-grid {
+  stroke: var(--dash-line);
+  stroke-width: 1;
+  opacity: 0.6;
+}
+
+.fc-axis {
+  stroke: var(--dash-line);
+  stroke-width: 1;
+}
+
+.fc-area {
+  fill: color-mix(in srgb, var(--dash-green) 14%, transparent);
+}
+
+.fc-path {
+  fill: none;
+  stroke: var(--dash-green);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.fc-dot {
+  fill: var(--dash-green);
+  stroke: var(--dash-panel);
+  stroke-width: 2;
+}
+
+.fc-table {
+  margin-top: 0.6rem;
+  font-size: 0.86rem;
+}
+
+.fc-table summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--dash-muted);
+}

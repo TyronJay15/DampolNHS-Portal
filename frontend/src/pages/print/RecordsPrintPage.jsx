@@ -2,15 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Loading from '../../components/Loading/Loading';
 import { fetchRecordsPrint } from '../../services/gradeService';
+import PrintFooter from './PrintFooter';
 import PrintToolbar from './PrintToolbar';
 import { pdfFileName } from './pdfFileName';
 import './GradePrintPage.css';
-
-function formatDate(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-}
 
 // A teacher's class grade sheets, or a head teacher's grade decisions, as a printable document.
 export default function RecordsPrintPage() {
@@ -108,9 +103,7 @@ export default function RecordsPrintPage() {
         ))}
 
         <p className="gp-note">{report.total} record(s). Generated from the school portal; scores are as recorded on the date below.</p>
-        <footer className="gp-foot">
-          <span>Date generated: {formatDate(report.generated_at)}</span>
-        </footer>
+        <PrintFooter generatedAt={report.generated_at} />
       </article>
     </div>
   );

@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from apps.audit import services as audit
 from apps.audit.catalog import ANNOUNCEMENTS
+from apps.cms.links import require_safe_links
 from apps.cms.media import uploaded_name
 from apps.cms.models import Announcement, SiteContent
 from apps.notifications.services import active_users, notify
@@ -26,7 +27,8 @@ def live_document(document):
 
 
 def save_document(document, payload, actor):
-    """Publish a whole CMS page (landing, about, contact or footer)."""
+    """Publish a whole CMS page (landing, about, contact or footer). Unsafe links are refused (apps.cms.links)."""
+    require_safe_links(payload)
     payload = clean_payload(document, payload)
     row, _created = SiteContent.objects.update_or_create(
         document=document,

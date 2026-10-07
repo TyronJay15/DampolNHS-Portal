@@ -122,3 +122,54 @@ COURSES = (
         'floors': {'tech': 78},
     },
 )
+
+# Seed for ml.ProgramFamily: broad, editable groups of college programs.
+FAMILIES = (
+    ('computing', 'Computing & Information Technology'),
+    ('engineering', 'Engineering & Architecture'),
+    ('health', 'Health & Medical Sciences'),
+    ('business', 'Business & Accounting'),
+    ('education', 'Education'),
+    ('sciences', 'Sciences & Mathematics'),
+    ('social-sciences', 'Social Sciences & Humanities'),
+    ('arts-media', 'Arts, Media & Communication'),
+    ('hospitality', 'Hospitality & Tourism'),
+    ('agriculture', 'Agriculture & Environment'),
+    ('public-service', 'Public Service & Criminal Justice'),
+)
+
+# Seed for ml.FamilyInterestMap. A starting proposal from the general meaning of the six Holland types,
+# not a published crosswalk; the school panel approves or edits it in the admin screen.
+FAMILY_INTERESTS = {
+    'computing': ('I', 'C'),
+    'engineering': ('R', 'I'),
+    'health': ('S', 'I'),
+    'business': ('E', 'C'),
+    'education': ('S', 'A'),
+    'sciences': ('I',),
+    'social-sciences': ('S', 'A'),
+    'arts-media': ('A', 'E'),
+    'hospitality': ('E', 'S'),
+    'agriculture': ('R', 'I'),
+    'public-service': ('S', 'E'),
+}
+
+# Seed for CollegeProgram.family.
+COURSE_FAMILIES = {
+    'bsce': 'engineering',
+    'bscs': 'computing',
+    'bsit': 'computing',
+    'bsn': 'health',
+    'bsbio': 'sciences',
+    'bsarch': 'engineering',
+    'bsa': 'business',
+    'bsba': 'business',
+    'bsentrep': 'business',
+    'bacom': 'arts-media',
+    'bapols': 'social-sciences',
+    'bspsy': 'social-sciences',
+    'bsed': 'education',
+    'bshrm': 'hospitality',
+    'bstm': 'hospitality',
+    'bsindtech': 'engineering',
+}

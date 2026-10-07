@@ -1,5 +1,5 @@
 import LineMark from '../../components/LineMark/LineMark';
-import StripCounts from './StripCounts';
+import MetricStrip from '../../components/MetricStrip/MetricStrip';
 
 // The oldest queued email waiting this long means the background sender is probably stopped.
 const STUCK_MINUTES = 15;
@@ -30,10 +30,10 @@ export default function EmailDelivery({ summary, busy, onResend }) {
   if (!summary) return null;
   const background = summary.delivery === 'background';
   const counts = [
-    { key: 'sent', label: 'Sent today', value: summary.sent_today, tone: 'is-sent' },
-    { key: 'queued', label: 'Queued', value: summary.queued, tone: 'is-queued' },
-    { key: 'waiting', label: 'Waiting', value: summary.waiting, tone: 'is-waiting' },
-    { key: 'failed', label: 'Failed', value: summary.failed, tone: 'is-failed' },
+    { key: 'sent', label: 'Sent today', value: summary.sent_today, icon: 'mail', tone: 'blue' },
+    { key: 'queued', label: 'Queued', value: summary.queued, icon: 'history', tone: 'green' },
+    { key: 'waiting', label: 'Waiting', value: summary.waiting, icon: 'history', tone: 'gold' },
+    { key: 'failed', label: 'Failed', value: summary.failed, icon: 'close', tone: 'red' },
   ];
   const used = Math.min(100, Math.round((summary.used_today / Math.max(1, summary.notice_limit)) * 100));
   const stuck = summary.queued > 0 && summary.oldest_queued_minutes >= STUCK_MINUTES;
@@ -48,7 +48,7 @@ export default function EmailDelivery({ summary, busy, onResend }) {
         <p aria-live="polite">{headline(summary)}</p>
       </div>
 
-      <StripCounts items={counts} />
+      <MetricStrip className="acct-mail-counts" items={counts} />
 
       {background ? (
         <div className="acct-mail-meter">

@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.apps import apps as django_apps
 
-from apps.grading.college_catalog import COURSES, SHS_PROGRAMS
+from apps.grading.college_catalog import COURSE_FAMILIES, COURSES, FAMILIES, FAMILY_INTERESTS, SHS_PROGRAMS
 
 
 def seed_college_programs(get_model=None):
@@ -46,3 +46,28 @@ def seed_college_programs(get_model=None):
                 minimum=Decimal(str(minimum)) if minimum is not None else None,
             )
     return created
+
+
+def seed_program_families(get_model=None):
+    """Create the catalog families and their proposed interest map, and file seeded programs under them.
+
+    Fills blanks only, so admin edits are kept. Migration ml.0007 calls this with historical models.
+    """
+    get_model = get_model or django_apps.get_model
+    family_model = get_model('ml', 'ProgramFamily')
+    interest_model = get_model('ml', 'FamilyInterestMap')
+    college_model = get_model('ml', 'CollegeProgram')
+
+    families = {}
+    for index, (code, name) in enumerate(FAMILIES, start=1):
+        families[code], _created = family_model.objects.get_or_create(
+            code=code,
+            defaults={'name': name, 'sort_order': index},
+        )
+    for code, types in FAMILY_INTERESTS.items():
+        family = families[code]
+        if interest_model.objects.filter(family=family).exists():
+            continue
+        interest_model.objects.bulk_create([interest_model(family=family, riasec=letter) for letter in types])
+    for code, family_code in COURSE_FAMILIES.items():
+        college_model.objects.filter(code=code, family__isnull=True).update(family=families[family_code])

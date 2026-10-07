@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.cms.links import validate_link_field
 from apps.cms.models import Announcement
 
 
@@ -21,6 +22,9 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             'created_at',
         )
         read_only_fields = ('published_at', 'created_at')
+
+    def validate_image(self, value):
+        return validate_link_field(value)
 
     def validate(self, attrs):
         kind = attrs.get('kind', getattr(self.instance, 'kind', Announcement.Kind.NEWS))

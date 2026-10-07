@@ -13,6 +13,7 @@ import HeadAssignPage from '../head/HeadAssignPage';
 import HeadCorrectionsPage from '../head/HeadCorrectionsPage';
 import HeadPlacePage from '../head/HeadPlacePage';
 import HeadTermPlanPage from '../head/HeadTermPlanPage';
+import ProgramRatingsWork from './ProgramRatingsWork';
 import WebsiteWork from './WebsiteWork';
 
 // The owner's own page for each piece of work, opened in proposal mode (see activities.py on the server).
@@ -41,6 +42,12 @@ const WORK = {
     owner: 'Admin',
     Page: AdminCmsNewsPage,
     frame: { className: 'desk admin-cms', title: 'Post news & events', icon: 'cms' },
+  },
+  'program-ratings': {
+    activity: 'rate_programs',
+    owner: 'Admin',
+    Page: ProgramRatingsWork,
+    frame: { className: 'desk', title: 'Rate college program profiles', icon: 'guidance' },
   },
   placements: { activity: 'prepare_placements', owner: 'Head Teacher', Page: HeadPlacePage },
   'term-plan': { activity: 'prepare_term_plan', owner: 'Head Teacher', Page: HeadTermPlanPage },

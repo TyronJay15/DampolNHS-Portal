@@ -15,6 +15,22 @@ from apps.cms.services import is_in_use
 
 ALLOWED = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 MAX_BYTES = 5 * 1024 * 1024
+# The first bytes of each image format. The extension and the browser's content type can be faked;
+# these cannot, so a script or page renamed to .png is refused.
+SIGNATURES = {
+    '.jpg': (b'\xff\xd8\xff',),
+    '.jpeg': (b'\xff\xd8\xff',),
+    '.png': (b'\x89PNG\r\n\x1a\n',),
+    '.gif': (b'GIF87a', b'GIF89a'),
+}
+
+
+def is_real_image(upload, ext):
+    head = upload.read(16)
+    upload.seek(0)
+    if ext == '.webp':
+        return head[:4] == b'RIFF' and head[8:12] == b'WEBP'
+    return head.startswith(SIGNATURES[ext])
 
 
 # People tagged to prepare website pages or news can upload photos for their proposals; a photo only
@@ -38,6 +54,8 @@ class CmsMediaView(APIView):
             return Response({'detail': 'Use a JPG, PNG, WEBP, or GIF photo.'}, status=400)
         if upload.size > MAX_BYTES:
             return Response({'detail': 'Photo must be 5 MB or smaller.'}, status=400)
+        if not is_real_image(upload, ext):
+            return Response({'detail': 'That file is not a real JPG, PNG, WEBP, or GIF image.'}, status=400)
         stored = default_storage.save(f'cms/{uuid4().hex}{ext}', upload)
         url = f'{settings.MEDIA_URL.rstrip("/")}/{stored.replace(chr(92), "/")}'
         return Response({'url': url}, status=201)

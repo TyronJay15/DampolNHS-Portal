@@ -11,6 +11,7 @@ export default function StudentLayout() {
         { to: '/student', label: 'Overview', icon: 'home', end: true },
         { to: '/student/profile', label: 'My Profile', icon: 'user' },
         { to: '/student/grades', label: 'Grades', icon: 'grades' },
+        { to: '/student/guidance', label: 'College recommendation', icon: 'guidance' },
         { to: '/student/notifications', label: 'Notifications', icon: 'bell' },
         { to: '/student/events', label: 'Events', icon: 'year' },
       ]}

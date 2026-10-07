@@ -59,11 +59,15 @@ export default function Chatbot() {
               send(input);
             }}
           >
-            <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask a question" />
+            <input value={input} maxLength={400} onChange={(e) => setInput(e.target.value)} placeholder="Ask a question" />
             <button className="btn" type="submit" disabled={busy}>
               Send
             </button>
           </form>
+          <p className="chatbot-privacy">
+            Please do not type your LRN, phone number, email or other personal details. Questions are kept for 90 days
+            to improve the answers, and some are answered with Google Gemini.
+          </p>
         </div>
       ) : null}
       <button type="button" className="chatbot-toggle" aria-label={open ? 'Close chat' : 'Open chat'} onClick={() => setOpen((v) => !v)}>

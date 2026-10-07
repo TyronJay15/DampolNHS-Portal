@@ -3,7 +3,7 @@ import { useState } from 'react';
 import PasswordRules from '../../components/auth/PasswordRules';
 import PasswordInput from '../../components/Input/PasswordInput';
 import { activateAccount } from '../../services/authService';
-import { checkPassword, checkPasswordMatch, firstApiError } from '../../utils/authRules';
+import { STAFF_PASSWORD_MIN, checkPassword, checkPasswordMatch, firstApiError } from '../../utils/authRules';
 import AuthShell from './AuthShell';
 import './LoginPage.css';
 
@@ -21,7 +21,7 @@ export default function ActivatePage() {
     event.preventDefault();
     setError('');
     setMessage('');
-    const passwordError = checkPassword(password) || checkPasswordMatch(password, confirmPassword);
+    const passwordError = checkPassword(password, STAFF_PASSWORD_MIN) || checkPasswordMatch(password, confirmPassword);
     if (passwordError) {
       setError(passwordError);
       return;
@@ -79,7 +79,7 @@ export default function ActivatePage() {
             autoComplete="new-password"
             required
           />
-          <PasswordRules value={password} />
+          <PasswordRules value={password} min={STAFF_PASSWORD_MIN} />
         </label>
         <label className="form-field">
           Confirm password
