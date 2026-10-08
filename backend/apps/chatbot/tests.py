@@ -188,13 +188,14 @@ class ChatbotAccessTests(LiveDataFixture):
         User.objects.filter(pk=registration.user_id).update(first_name='Ana', last_name='Reyes')
         placement = self.place(registration)
         response = self.ask()
-        self.assertEqual(set(response.data), {'answer', 'topic', 'confidence'})
+        self.assertEqual(set(response.data), {'answer', 'topic', 'confidence', 'kind', 'options'})
+        self.assertEqual(response.data['options'], [])
         answer = response.data['answer']
         for private in ('Ana', 'Reyes', registration.user.email, placement.student.lrn, self.grade11.name, 'approved'):
             self.assertNotIn(private, answer)
 
     def test_gemini_never_sees_a_live_question(self):
-        with mock.patch('apps.chatbot.views.phrase_answer') as gemini:
+        with mock.patch('apps.chatbot.assistant.phrase_answer') as gemini:
             self.ask()
         gemini.assert_not_called()
 
@@ -243,7 +244,7 @@ class ProtectedTopicTests(TestCase):
 
 class PublicChatbotTests(LiveDataFixture):
     def test_visitors_still_get_normal_answers(self):
-        with mock.patch('apps.chatbot.views.phrase_answer', return_value=None):
+        with mock.patch('apps.chatbot.assistant.phrase_answer', return_value=None):
             response = APIClient().post('/api/chatbot/', {'question': 'How do I register?'}, format='json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['topic'], 'registration')

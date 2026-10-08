@@ -85,6 +85,10 @@
   cursor: pointer;
 }
 
+.chatbot-options {
+  padding: 0;
+}
+
 .chatbot-form {
   display: flex;
   gap: 0.4rem;

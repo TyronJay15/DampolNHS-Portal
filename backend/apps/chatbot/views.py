@@ -3,58 +3,51 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.throttles import ScopedThrottle
-from apps.chatbot.live_data import is_live, live_answer
+from apps.chatbot import responses
+from apps.chatbot.assistant import respond
 from apps.chatbot.privacy import redact
-from apps.ml.gemini import phrase_answer
-from apps.ml.intent import FALLBACK, answers_for, classify_question, matching_faq_answer, school_pack
 from apps.ml.models import ChatQuestion
 
-MAX_QUESTION = 400  # characters; longer text is refused before any model or Gemini sees it
+MAX_QUESTION = 400  # characters; longer text is refused before any check, model or Gemini sees it
 
 
 class ChatbotAskView(APIView):
     """Public chatbot. Anyone may ask; a signed-in user is recognized through the normal API authentication, so
-    live topics (apps.chatbot.live_data) can answer the roles allowed to see them."""
+    live topics (apps.chatbot.live_data) can answer the roles allowed to see them. The message flow is in
+    apps.chatbot.assistant."""
 
     permission_classes = [AllowAny]
     throttle_classes = [ScopedThrottle]
     throttle_scope = 'chatbot'
 
     def post(self, request):
-        question = str(request.data.get('question') or '').strip()
+        raw = request.data.get('question')
+        question = raw.strip() if isinstance(raw, str) else ''
         if not question:
-            return Response({'answer': 'Please type a question.', 'topic': None, 'confidence': 0})
+            return Response(
+                {'answer': responses.EMPTY, 'topic': None, 'confidence': 0, 'kind': 'invalid', 'options': []}
+            )
         if len(question) > MAX_QUESTION:
             return Response({'detail': f'Keep the question under {MAX_QUESTION} characters.'}, status=400)
-        # From here on only the redacted text is used: it is what Gemini sees and what is stored.
+
+        # From here on only the redacted text is used: it is what the checks and Gemini see and what is stored.
         question = redact(question)[:MAX_QUESTION]
-
-        # Prediction only: the intent model is trained by setup_school or train_intent, never here.
-        topic, confidence = classify_question(question)
-
-        if is_live(topic):
-            # Today's numbers come from the database and Django writes the sentence; Gemini never sees them.
-            answer, source = live_answer(topic, request.user)
-            return self._reply(question, topic, confidence, answer, source)
-
-        pack = school_pack(topic)
-        answers = answers_for(topic)
-        source = 'fallback'
-        answer = FALLBACK
-        if topic != 'other' and answers:
-            written = phrase_answer(question, topic, pack)
-            if written:
-                answer = written
-                source = 'gemini'
-            else:
-                answer = matching_faq_answer(question, topic) or answers[0]
-                source = 'faq'
-
-        return self._reply(question, topic, confidence, answer, source)
-
-    @staticmethod
-    def _reply(question, topic, confidence, answer, source):
-        """Store the redacted question (never the answer) and send the reply."""
-        confidence = round(float(confidence), 4)
-        ChatQuestion.objects.create(question=question, topic=topic, confidence=confidence, source=source)
-        return Response({'answer': answer, 'topic': topic, 'confidence': confidence})
+        reply = respond(question, request.user)
+        confidence = round(float(reply.confidence), 4)
+        # The redacted question is stored, never the answer. Abuse, attacks and personal safety reports are
+        # counted without their text.
+        ChatQuestion.objects.create(
+            question=question if reply.keep_text else '',
+            topic=reply.topic,
+            confidence=confidence,
+            source=reply.source,
+        )
+        return Response(
+            {
+                'answer': reply.answer,
+                'topic': reply.topic,
+                'confidence': confidence,
+                'kind': reply.kind,
+                'options': list(reply.options),
+            }
+        )

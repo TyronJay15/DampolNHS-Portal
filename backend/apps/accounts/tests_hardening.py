@@ -14,6 +14,7 @@ from rest_framework.test import APIClient
 from apps.accounts import mail as portal_mail
 from apps.accounts.models import MailOutbox, StudentProfile, User
 from apps.audit.models import AuditLog
+from apps.chatbot.relevance import Decision
 from apps.cms.links import is_safe_link, unsafe_links
 from apps.ml.models import ChatQuestion
 from apps.notifications.models import Notification
@@ -111,9 +112,9 @@ class ChatbotPrivacyTests(TestCase):
         return APIClient().post('/api/chatbot/', {'question': question}, format='json')
 
     def test_personal_details_are_removed_before_saving_and_before_gemini(self):
-        with mock.patch('apps.chatbot.views.phrase_answer', return_value=None) as gemini, mock.patch(
-            'apps.chatbot.views.classify_question', return_value=('enrollment', 0.9)
-        ), mock.patch('apps.chatbot.views.answers_for', return_value=['Visit the office.']):
+        with mock.patch('apps.chatbot.assistant.phrase_answer', return_value=None) as gemini, mock.patch(
+            'apps.chatbot.assistant.decide', return_value=Decision('answer', 'enrollment', 0.9)
+        ), mock.patch('apps.chatbot.assistant.answers_for', return_value=['Visit the office.']):
             self.ask('My LRN is 1360-0000-0123 and my email ana.reyes@gmail.com, call 0917 123 4567. Enrollment?')
         stored = ChatQuestion.objects.get().question
         for secret in ('1360-0000-0123', '136000000123', 'ana.reyes@gmail.com', '0917 123 4567'):
@@ -123,7 +124,7 @@ class ChatbotPrivacyTests(TestCase):
         self.assertIn('[number removed]', stored)
 
     def test_short_numbers_like_years_and_grades_stay(self):
-        with mock.patch('apps.chatbot.views.phrase_answer', return_value=None):
+        with mock.patch('apps.chatbot.assistant.phrase_answer', return_value=None):
             self.ask('Is enrollment for Grade 11 open in 2026?')
         self.assertIn('2026', ChatQuestion.objects.get().question)
 

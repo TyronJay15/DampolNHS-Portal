@@ -1,8 +1,10 @@
 import hashlib
+from difflib import get_close_matches
 
 from apps.chatbot.models import FaqEntry
-from apps.ml.store import last_artifact, save_run
-from apps.ml.text import MultinomialNB, TfidfVectorizer, tokenize
+from apps.ml.models import ModelRun
+from apps.ml.store import save_run
+from apps.ml.text import TOKEN, MultinomialNB, TfidfVectorizer, tokenize
 from apps.school.curriculum import GRADE_LEVELS, curriculum_for, programs_for
 from apps.school.models import SchoolYear
 
@@ -23,6 +25,13 @@ PARAPHRASES = {
         'i submitted my registration what now',
         'mali ang nailagay ko sa registration',
         'where can i check my application status',
+        'how can i check my enrollment status',
+        'paano ako mag enroll',
+        'paano mag register sa portal',
+        'saan makikita ang enrollment status',
+        'is my enrollment approved',
+        'status ng enrollment ko',
+        'how to apply for senior high',
     ),
     'programs': (
         'what strands are offered',
@@ -38,6 +47,9 @@ PARAPHRASES = {
         'show me the senior high programs',
         'saan makikita ang subjects ng program',
         'what are the current school offerings',
+        'ano ang available na shs programs',
+        'anong mga strand ang meron',
+        'what tracks and strands can i take',
     ),
     'login': (
         'cannot sign in',
@@ -53,6 +65,9 @@ PARAPHRASES = {
         'nakalimutan ko ang password ko',
         'hindi ako makapasok sa account',
         'i did not receive the reset code',
+        'how to reset my password',
+        'paano palitan ang password ko',
+        'ayaw mag login ng account ko',
     ),
     'approval': (
         'why am i still pending',
@@ -75,6 +90,9 @@ PARAPHRASES = {
         'hindi pa approved ang registration ko',
         'nareject ang application ko',
         'who reviews student registrations',
+        'paano ko malalaman kung approved na ang account ko',
+        'approved na ba ang registration ko',
+        'bakit pending yung account ko',
     ),
     'grades': (
         'when will i see my report card',
@@ -90,6 +108,12 @@ PARAPHRASES = {
         'sino ang nag aapprove ng grades',
         'one of my subjects has no grade',
         'my report card is still locked',
+        'where can i see my grades in the portal',
+        'saan ko makikita ang grades ko',
+        'pwede ko bang makita ang grades ko',
+        'paano tingnan ang report card',
+        'saan makikita ang marka ko',
+        'how do i view my report card online',
     ),
     'contact': (
         'school phone number',
@@ -138,6 +162,61 @@ PARAPHRASES = {
         'how many students this school year',
         'total students this school year',
         'enrollment count this year',
+    ),
+    # Reports of bullying or harassment. The moderation layer routes clear reports first; these teach the
+    # classifier the gentler wordings.
+    'safety': (
+        'how can i report bullying',
+        'someone is bullying me at school',
+        'who can help me if i am being bullied',
+        'paano mag report ng bullying',
+        'may nang aaway sa akin sa school',
+        'sino ang pwede kong lapitan kung inaapi ako',
+        'my classmate keeps teasing me',
+        'i feel unsafe at school',
+        'where do i report harassment',
+        'talk to the guidance counselor',
+        'i need help from the guidance office',
+        'kanino ako magsusumbong',
+    ),
+    # Questions outside the school, kept as their own class so they are declined instead of matched to the
+    # nearest school topic.
+    'out_of_scope': (
+        'who won the nba championship',
+        'who won the game last night',
+        'pba finals score',
+        'is taylor swift dating anyone',
+        'latest celebrity gossip',
+        'sino ang jowa ng artista',
+        'what is the capital of france',
+        'how tall is mount everest',
+        'who invented the light bulb',
+        'tell me a joke',
+        'write me an essay about climate change',
+        'solve this math problem for me',
+        'answer my homework in science',
+        'gawan mo ako ng essay',
+        'best laptop to buy',
+        'recommend a cheap phone',
+        'where can i buy shoes online',
+        'what should i eat for dinner',
+        'recipe for adobo',
+        'who should i vote for president',
+        'what do you think of the senator',
+        'opinion on the election',
+        'how do i get a girlfriend',
+        'paano magka jowa',
+        'dating advice please',
+        'what is the weather today',
+        'translate this sentence to japanese',
+        'write python code for a game',
+        'best mobile legends hero',
+        'what movie should i watch',
+        'how to earn money online',
+        'crypto investment tips',
+        'what is the meaning of life',
+        'sino ang pinakamagaling na singer',
+        'what time is it in new york',
     ),
 }
 
@@ -223,14 +302,72 @@ def train_intent():
 
 
 def faq_fingerprint():
-    """Changes whenever an active FAQ's topic, question or keywords change."""
+    """Changes whenever an active FAQ's topic, question or keywords change, or the built-in phrasings do."""
     rows = FaqEntry.objects.filter(is_active=True).order_by('pk').values_list('pk', 'topic', 'question', 'keywords')
-    return hashlib.sha1(repr(list(rows)).encode()).hexdigest()[:12]
+    return hashlib.sha1(repr((list(rows), PARAPHRASES)).encode()).hexdigest()[:12]
 
 
 def is_stale(run):
-    """True when the FAQs the classifier learns from changed after it was trained."""
+    """True when the FAQs or phrasings the classifier learns from changed after it was trained."""
     return run is not None and (run.dataset or {}).get('fingerprint') != faq_fingerprint()
+
+
+# Common spellings and short forms, mapped before classification.
+VARIANTS = {
+    'enrolment': 'enrollment', 'enrol': 'enroll',
+    'pano': 'paano', 'panu': 'paano', 'nasan': 'nasaan', 'san': 'saan', 'puwede': 'pwede', 'ung': 'yung',
+    'grado': 'grades', 'marka': 'grades', 'pasword': 'password', 'pw': 'password', 'acct': 'account',
+    'acc': 'account', 'pls': 'please', 'u': 'you', 'ur': 'your', 'located': 'location', 'locate': 'location',
+}
+SPELLING_CUTOFF = 0.8  # difflib similarity for correcting an unknown word to a known one
+SPELLING_MIN_LENGTH = 4  # shorter words are too easy to confuse
+
+
+def _spell(question, vectorizer):
+    """Map variants, then correct unknown words of four letters or more to the closest word the model knows
+    (enrolment -> enrollment, staus -> status, pasword -> password)."""
+    known = [token for token in vectorizer.idf if ' ' not in token]
+    fixed = []
+    for word in TOKEN.findall(str(question or '').lower()):
+        word = VARIANTS.get(word, word)
+        if word not in vectorizer.idf and len(word) >= SPELLING_MIN_LENGTH:
+            close = get_close_matches(word, known, n=1, cutoff=SPELLING_CUTOFF)
+            word = close[0] if close else word
+        fixed.append(word)
+    return ' '.join(fixed)
+
+
+_loaded = {'key': None, 'parts': (None, None)}
+
+
+def _load():
+    """The latest trained vectorizer and model, parsed once per training run and kept in this process."""
+    runs = ModelRun.objects.filter(name='intent').order_by('-trained_at', '-id')
+    latest = runs.values_list('id', 'trained_at').first()
+    if latest is None:
+        return None, None
+    if _loaded['key'] != latest:
+        artifact = ModelRun.objects.get(pk=latest[0]).artifact or {}
+        _loaded['parts'] = (TfidfVectorizer.load(artifact.get('vectorizer')), MultinomialNB.load(artifact.get('model')))
+        _loaded['key'] = latest
+    return _loaded['parts']
+
+
+def rank_topics(question):
+    """Every topic with its probability, best first, after spelling correction. Empty when no model is trained."""
+    vectorizer, model = _load()
+    if vectorizer is None:
+        return []
+    scores = model.predict_proba(vectorizer.transform_one(_spell(question, vectorizer)))
+    return sorted(scores.items(), key=lambda item: item[1], reverse=True)
+
+
+def known_words(question):
+    """The question's words (after spelling correction) that the trained model has seen."""
+    vectorizer, _model = _load()
+    if vectorizer is None:
+        return set()
+    return {word for word in _spell(question, vectorizer).split() if word in vectorizer.idf}
 
 
 def _argmax(vectorizer, model, question):
@@ -240,20 +377,14 @@ def _argmax(vectorizer, model, question):
     return max(scores.items(), key=lambda item: item[1])
 
 
-def _label(vectorizer, model, question):
-    topic, confidence = _argmax(vectorizer, model, question)
+def classify_question(question):
+    ranked = rank_topics(question)
+    if not ranked:
+        return 'other', 0.0
+    topic, confidence = ranked[0]
     if confidence < MIN_CONFIDENCE:
         return 'other', confidence
     return topic, confidence
-
-
-def classify_question(question):
-    artifact = last_artifact('intent')
-    if not artifact:
-        return 'other', 0.0
-    vectorizer = TfidfVectorizer.load(artifact.get('vectorizer'))
-    model = MultinomialNB.load(artifact.get('model'))
-    return _label(vectorizer, model, question)
 
 
 def program_summary():
@@ -284,13 +415,31 @@ def answers_for(topic):
 
 def matching_faq_answer(question, topic):
     """Choose the active FAQ whose question and keywords best match the visitor's wording."""
+    entry = best_faq_entry(question, topic)
+    return entry.answer if entry else None
+
+
+def corrected(question):
+    """The question with variants mapped and misspellings corrected against the trained vocabulary."""
+    vectorizer, _model = _load()
+    return _spell(question, vectorizer) if vectorizer is not None else str(question or '')
+
+
+def best_faq_entry(question, topic):
+    """The active FAQ of one topic that shares the most words with the question, or None when none shares any."""
+    return faq_match(question, topic)[0]
+
+
+def faq_match(question, topic):
+    """(entry, shared words, share of the question's words) for the active FAQ of one topic that shares the most
+    words with the question; (None, 0, 0.0) when none shares any."""
     question_terms = {
         token
         for token in tokenize(question)
         if ' ' not in token and token not in FAQ_STOP_WORDS
     }
     if not question_terms:
-        return None
+        return None, 0, 0.0
 
     best_entry = None
     best_score = (0, 0.0)
@@ -307,7 +456,7 @@ def matching_faq_answer(question, topic):
         if score > best_score:
             best_entry = entry
             best_score = score
-    return best_entry.answer if best_entry else None
+    return best_entry, best_score[0], best_score[1]
 
 
 def school_pack(topic):

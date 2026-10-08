@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { askChatbot } from '../../services/publicService';
 import './Chatbot.css';
 
@@ -20,7 +20,8 @@ export default function Chatbot() {
     setInput('');
     try {
       const data = await askChatbot(question);
-      setMessages((prev) => [...prev, { role: 'bot', text: data.answer }]);
+      // When the question was unclear, the server offers approved FAQ questions to pick from.
+      setMessages((prev) => [...prev, { role: 'bot', text: data.answer, options: data.options || [] }]);
     } catch (err) {
       setMessages((prev) => [...prev, { role: 'bot', text: err.message }]);
     } finally {
@@ -40,9 +41,18 @@ export default function Chatbot() {
           </div>
           <div className="chatbot-messages">
             {messages.map((msg, index) => (
-              <p key={`${index}-${msg.text.slice(0, 12)}`} className={`bubble bubble-${msg.role}`}>
-                {msg.text}
-              </p>
+              <Fragment key={`${index}-${msg.text.slice(0, 12)}`}>
+                <p className={`bubble bubble-${msg.role}`}>{msg.text}</p>
+                {msg.options?.length ? (
+                  <div className="chatbot-prompts chatbot-options">
+                    {msg.options.map((option) => (
+                      <button key={option} type="button" disabled={busy} onClick={() => send(option)}>
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </Fragment>
             ))}
           </div>
           <div className="chatbot-prompts">

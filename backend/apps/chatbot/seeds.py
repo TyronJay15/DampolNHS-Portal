@@ -1,4 +1,5 @@
 from .models import FaqEntry
+from .responses import SAFETY
 
 
 FAQS = [
@@ -202,6 +203,29 @@ FAQS = [
         'ilan ang estudyante, ilan ang enrolled, ilang estudyante, kasalukuyang enrolled',
         'How many students are currently enrolled?',
         'The current enrollment total is calculated from approved registrations for the active school year.',
+    ),
+    (
+        'approval',
+        'enrollment status, enrollment approved, check enrollment, status ng enrollment, approved na ba, '
+        'approved na ang enrollment',
+        'How do I know if my enrollment is approved?',
+        'Sign in with your LRN and password. While your registration is still pending, the sign-in page says your '
+        'account is waiting for administrator approval. The school also emails you when your registration is '
+        'approved or not approved.',
+    ),
+    (
+        'grades',
+        'where are my grades, view grades, grades menu, saan ang grades, makita ang grades, report card online',
+        'Where can I see my grades in the portal?',
+        'Sign in to the student portal and open Grades in the menu. A grade appears there after the Head Teacher '
+        'approves it and your adviser shows the report card.',
+    ),
+    # Answered whenever moderation recognizes a report of bullying, harassment, threats or abuse.
+    (
+        'safety',
+        'bullying, bullied, harassment, report bullying, inaapi, binubully, threat, abuse, guidance office',
+        'How do I report bullying or harassment?',
+        SAFETY,
     ),
 ]
 
