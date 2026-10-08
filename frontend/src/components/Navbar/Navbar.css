@@ -191,9 +191,12 @@
     display: flex;
   }
 
+  /* The panel must sit above the backdrop. Both are positioned with no z-index, and the backdrop comes later in
+     the page, so without this it covered the menu: links were visible but every tap closed the menu instead. */
   .public-nav-panel {
     display: none;
     position: absolute;
+    z-index: 2;
     top: 100%;
     left: 0;
     right: 0;
@@ -235,6 +238,7 @@
   .public-nav-backdrop {
     display: block;
     position: fixed;
+    z-index: 1;
     inset: 0;
     top: var(--nav-height);
     border: 0;
