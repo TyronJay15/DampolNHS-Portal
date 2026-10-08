@@ -4,8 +4,7 @@
   --content-editor EMAIL  console access limited to the chatbot FAQs, for the portal Admin
   --revoke EMAIL          no console access
 
-Every console sign-in also needs the account's authenticator code, so the person must set up the app in the portal
-first. Each change is audited.
+Each change is audited.
 """
 
 from django.core.management.base import BaseCommand, CommandError

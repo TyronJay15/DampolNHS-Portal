@@ -7,6 +7,7 @@ import YearChip from '../../components/YearChip';
 import { fetchGrade11Forecast, fetchRegistrations, fetchStaffAccounts } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import WelcomeBanner from '../../components/WelcomeBanner/WelcomeBanner';
+import DashboardAnnouncements from '../../components/DashboardAnnouncements/DashboardAnnouncements';
 import UpcomingEvents from '../../components/UpcomingEvents/UpcomingEvents';
 import PublicLinks from '../../components/PublicLinks/PublicLinks';
 import { forecastStats } from '../../utils/forecastStats';
@@ -103,7 +104,10 @@ export default function AdminDashboard() {
       </div>
 
       <div className="desk-extras">
-        <UpcomingEvents to="/admin/events" />
+        <div className="desk-main">
+          <DashboardAnnouncements />
+          <UpcomingEvents to="/admin/events" />
+        </div>
         <PublicLinks />
       </div>
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { fileUrl } from '../../services/api';
-import { textPreview } from '../../utils/textPreview';
+import { formatEventWhen, textPreview } from '../../utils/textPreview';
 import './BulletinCarousel.css';
 
 const STEP = 380;
@@ -80,6 +80,7 @@ export default function BulletinCarousel({ items, onOpen }) {
           const offset = wrapOffset(index, active, total);
           const preview = textPreview(item.body);
           const center = offset === 0;
+          const eventWhen = item.kind === 'event' ? formatEventWhen(item) : '';
           const far = Math.abs(offset) > 2;
           return (
             <article
@@ -99,10 +100,10 @@ export default function BulletinCarousel({ items, onOpen }) {
                 onClick={() => openOrSelect(item, index, center)}
                 aria-label={center ? `Read ${item.title}` : `Show ${item.title}`}
               >
-                {item.image ? <img src={fileUrl(item.image)} alt="" draggable="false" /> : <span>News</span>}
+                {item.image ? <img src={fileUrl(item.image)} alt="" draggable="false" /> : <span>{eventWhen ? 'Event' : 'News'}</span>}
               </button>
               <div className="lp-car-bar" />
-              <p className="lp-car-tag">{item.category || 'News'}</p>
+              <p className="lp-car-tag">{eventWhen || item.category || 'News'}</p>
               <h3 className="lp-car-title">{item.title}</h3>
               <p className="lp-car-desc">{preview.text}</p>
               {center ? (

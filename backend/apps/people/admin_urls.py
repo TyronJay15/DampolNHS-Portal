@@ -1,6 +1,5 @@
 from django.urls import path
 
-from apps.accounts.views_mfa import AdminMfaResetView
 from apps.school.views_admin import AdminProgramDetailView, AdminProgramListView, AdminSubjectCreateView
 
 from .views_admin import (
@@ -65,7 +64,6 @@ urlpatterns = [
     path('accounts/<int:pk>/restore-pending/', AccountRestorePendingView.as_view(), name='admin-account-restore-pending'),
     path('accounts/<int:pk>/remove/', AccountRemoveView.as_view(), name='admin-account-remove'),
     path('accounts/<int:pk>/sign-out/', AccountSignOutView.as_view(), name='admin-account-sign-out'),
-    path('accounts/<int:pk>/reset-authenticator/', AdminMfaResetView.as_view(), name='admin-account-reset-authenticator'),
     path('accounts/<int:pk>/gender/', StudentGenderView.as_view(), name='admin-student-gender'),
     path('programs/', AdminProgramListView.as_view(), name='admin-programs'),
     path('programs/<int:pk>/', AdminProgramDetailView.as_view(), name='admin-program-detail'),

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Loading from '../../components/Loading/Loading';
 import DeskMark from '../../components/DeskMark/DeskMark';
 import WelcomeBanner from '../../components/WelcomeBanner/WelcomeBanner';
+import DashboardAnnouncements from '../../components/DashboardAnnouncements/DashboardAnnouncements';
 import UpcomingEvents from '../../components/UpcomingEvents/UpcomingEvents';
 import PublicLinks from '../../components/PublicLinks/PublicLinks';
 import { fetchAssignments, fetchPlacements, fetchSchoolYears, fetchSections } from '../../services/adminService';
@@ -96,7 +97,10 @@ export default function HeadOverview() {
       </section>
 
       <div className="desk-extras">
-        <UpcomingEvents to="/head/events" />
+        <div className="desk-main">
+          <DashboardAnnouncements />
+          <UpcomingEvents to="/head/events" />
+        </div>
         <PublicLinks />
       </div>
     </div>

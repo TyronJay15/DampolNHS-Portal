@@ -156,7 +156,6 @@ class AccessMatrixTests(MatrixFixture):
             'GET /api/cms/content/', 'POST /api/chatbot/', 'GET /api/auth/csrf/', 'POST /api/auth/login/',
             'POST /api/auth/refresh/', 'POST /api/auth/logout/', 'POST /api/auth/activate/', 'POST /api/register/',
             'POST /api/auth/forgot-password/otp/', 'POST /api/auth/forgot-password/verify/', 'POST /api/auth/forgot-password/',
-            'POST /api/auth/mfa/verify/', 'POST /api/auth/mfa/enroll/', 'POST /api/auth/mfa/enroll/confirm/',
         }
         expected = json.loads(MATRIX_FILE.read_text(encoding='utf-8'))
         reachable = {key for key, row in expected.items() if row['anonymous'] == 'allowed'}

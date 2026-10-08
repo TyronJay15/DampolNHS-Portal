@@ -406,3 +406,9 @@
     transform: none;
   }
 }
+
+/* A post card's "Publish to" picker: compact, under the status chip. */
+.cms-publish-to {
+  max-width: 220px;
+  margin: 0.6rem 0 0;
+}

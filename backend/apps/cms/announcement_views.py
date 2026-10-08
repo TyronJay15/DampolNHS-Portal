@@ -5,9 +5,9 @@ from rest_framework.viewsets import ModelViewSet
 
 from apps.accounts.permissions import IsAdmin
 from apps.access.services import live_tag
-from apps.cms.models import Announcement
+from apps.cms.models import SURFACES, Announcement
 from apps.cms.serializers import AnnouncementSerializer
-from apps.cms.services import save_announcement_changes, save_new_announcement
+from apps.cms.services import on_surface, save_announcement_changes, save_new_announcement
 
 
 class AnnouncementViewSet(ModelViewSet):
@@ -20,14 +20,22 @@ class AnnouncementViewSet(ModelViewSet):
         return [IsAuthenticated(), IsAdmin()]
 
     def get_queryset(self):
+        """?surface=website or ?surface=dashboard lists what that place shows: published posts whose "Publish to"
+        includes it. Dashboard posts are for signed-in portal users only. Without a surface, the CMS (Admin and
+        people tagged to post news) sees every post including drafts; anyone else sees the website's posts."""
         qs = Announcement.objects.all()
         user = self.request.user
+        surface = self.request.query_params.get('surface')
         # Drafts are for the Admin and for people tagged to prepare news posts.
         sees_drafts = user.is_authenticated and (
             getattr(user, 'role', None) == 'admin' or live_tag(user, 'post_news') is not None
         )
-        if not sees_drafts:
-            qs = qs.filter(is_published=True)
+        if surface == 'dashboard' and not user.is_authenticated:
+            return qs.none()
+        if surface in SURFACES:
+            qs = on_surface(qs, surface)
+        elif not sees_drafts:
+            qs = on_surface(qs, 'website')
 
         kind = self.request.query_params.get('kind')
         if kind in dict(Announcement.Kind.choices):

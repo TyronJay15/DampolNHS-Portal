@@ -135,7 +135,7 @@ CONTACT = {
 
 FOOTER = {
     'brandName': 'Dampol 1st National High School',
-    'brandTagline': 'Grade Portal',
+    'brandTagline': 'School Portal',
     'logo': '/logo/logodampol.jpg',
     'authImage': '/landingpage/dampolzz.jpg',
     'address': 'Dampol, Pulilan, Bulacan, Philippines',

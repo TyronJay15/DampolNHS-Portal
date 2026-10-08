@@ -194,6 +194,15 @@ FAQS = [
         'How do I know if an event schedule changed?',
         'Review the latest school announcements and dashboard event details for schedule updates.',
     ),
+    # A live topic: the chatbot answers it from the database (apps.chatbot.live_data), never from this text.
+    # The row exists so the classifier learns the topic; its answer only describes the statistic.
+    (
+        'enrollment_stats',
+        'how many students, number of students, total students, enrolled students, student population, '
+        'ilan ang estudyante, ilan ang enrolled, ilang estudyante, kasalukuyang enrolled',
+        'How many students are currently enrolled?',
+        'The current enrollment total is calculated from approved registrations for the active school year.',
+    ),
 ]
 
 

@@ -4,9 +4,9 @@ import PublicLayout from './PublicLayout';
 import Loading from '../../components/Loading/Loading';
 import AnnouncementReader from '../../components/AnnouncementReader/AnnouncementReader';
 import { MegaphoneIcon } from '../../components/icons/SchoolIcons';
-import { fetchAnnouncements } from '../../services/publicService';
+import { fetchPublicBulletin } from '../../services/publicService';
 import { fileUrl } from '../../services/api';
-import { formatPostedOn, textPreview } from '../../utils/textPreview';
+import { formatEventWhen, formatPostedOn, textPreview } from '../../utils/textPreview';
 import './AnnouncementsPage.css';
 
 export default function AnnouncementsPage() {
@@ -16,8 +16,8 @@ export default function AnnouncementsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAnnouncements({ kind: 'news' })
-      .then((data) => setItems(Array.isArray(data) ? data : data.results || []))
+    fetchPublicBulletin()
+      .then((rows) => setItems(rows))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -28,7 +28,7 @@ export default function AnnouncementsPage() {
         <header className="public-hero">
           <h1>School news</h1>
           <p className="public-hero-kicker">Campus updates</p>
-          <p>Updates posted by the school appear here after they are published.</p>
+          <p>News and upcoming events appear here after they are published.</p>
         </header>
         {loading ? <Loading /> : null}
         {error ? <p className="alert alert-error">{error}</p> : null}
@@ -52,8 +52,11 @@ export default function AnnouncementsPage() {
                     {item.image ? <img src={fileUrl(item.image)} alt="" className="announcement-photo" /> : null}
                     <div className="announcement-copy">
                       <p className="announcement-meta">
+                        {item.kind === 'event' && formatEventWhen(item) ? (
+                          <time>{formatEventWhen(item, { long: true })}</time>
+                        ) : null}
                         {item.category ? <span className="announcement-category">{item.category}</span> : null}
-                        {item.published_at ? <time>{formatPostedOn(item.published_at)}</time> : null}
+                        {item.kind !== 'event' && item.published_at ? <time>{formatPostedOn(item.published_at)}</time> : null}
                       </p>
                       <h2>{item.title}</h2>
                       <p>{preview.text}</p>

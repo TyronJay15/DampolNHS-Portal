@@ -34,6 +34,13 @@ class Announcement(models.Model):
         NEWS = 'news', 'News'
         EVENT = 'event', 'Event'
 
+    class PublishTo(models.TextChoices):
+        """Where a published post may appear. "Both" is one record shown in both places, never a copy."""
+
+        WEBSITE = 'website', 'Website'
+        DASHBOARD = 'dashboard', 'Dashboard'
+        BOTH = 'both', 'Both'
+
     title = models.CharField(max_length=200)
     body = models.TextField()
     image = models.CharField(max_length=400, blank=True)
@@ -42,6 +49,7 @@ class Announcement(models.Model):
     event_date = models.DateField(null=True, blank=True)
     event_end_date = models.DateField(null=True, blank=True)
     location = models.CharField(max_length=200, blank=True)
+    publish_to = models.CharField(max_length=16, choices=PublishTo.choices, default=PublishTo.WEBSITE, db_index=True)
     is_published = models.BooleanField(default=False, db_index=True)
     published_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -60,3 +68,10 @@ class Announcement(models.Model):
 
     def __str__(self):
         return self.title
+
+
+# The destinations each surface shows. Only published posts appear on either (apps.cms.services.on_surface).
+SURFACES = {
+    'website': (Announcement.PublishTo.WEBSITE, Announcement.PublishTo.BOTH),
+    'dashboard': (Announcement.PublishTo.DASHBOARD, Announcement.PublishTo.BOTH),
+}

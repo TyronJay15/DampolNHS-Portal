@@ -5,6 +5,7 @@ import DeskMark from '../../components/DeskMark/DeskMark';
 import YearChip from '../../components/YearChip';
 import { useAuth } from '../../context/AuthContext';
 import WelcomeBanner from '../../components/WelcomeBanner/WelcomeBanner';
+import DashboardAnnouncements from '../../components/DashboardAnnouncements/DashboardAnnouncements';
 import UpcomingEvents from '../../components/UpcomingEvents/UpcomingEvents';
 import PublicLinks from '../../components/PublicLinks/PublicLinks';
 import { fetchTeacherAssignments } from '../../services/teacherService';
@@ -60,7 +61,10 @@ export default function TeacherOverview() {
       </section>
 
       <div className="desk-extras">
-        <UpcomingEvents to="/teacher/events" />
+        <div className="desk-main">
+          <DashboardAnnouncements />
+          <UpcomingEvents to="/teacher/events" />
+        </div>
         <PublicLinks />
       </div>
 

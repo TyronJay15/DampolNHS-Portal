@@ -5,6 +5,7 @@ from io import StringIO
 from unittest import mock
 from urllib.error import HTTPError
 
+from django.conf import settings
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
@@ -16,6 +17,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 from apps.accounts import mail as portal_mail
 from apps.accounts.codes import issue_code
 from apps.accounts.models import StudentProfile, User
+from apps.audit.models import AuditLog
 from apps.cms.tests import TINY_PNG
 from apps.notifications.models import Notification
 from apps.people.models import TeacherAssignment
@@ -261,3 +263,89 @@ class BrevoTransportTests(TestCase):
                     portal_mail.send_message('student@x.com', 'Subject', 'Body')
             self.assertEqual(raised.exception.permanent, permanent)
             self.assertNotIn('test-key', str(raised.exception))
+
+
+class PasswordSignInTests(TestCase):
+    """Admin and Head Teacher sign in with email and password. There is no authenticator step."""
+
+    def setUp(self):
+        cache.clear()
+        self.admin = User.objects.create_user(email='admin@x.com', password=PASSWORD, role=User.Role.ADMIN)
+        self.head = User.objects.create_user(email='head@x.com', password=PASSWORD, role=User.Role.HEAD_TEACHER)
+        User.objects.create_user(email='teacher@x.com', password=PASSWORD, role=User.Role.TEACHER)
+
+    def test_admin_and_head_teacher_sign_in_without_an_authenticator_step(self):
+        for email in ('admin@x.com', 'head@x.com'):
+            response = APIClient().post(
+                '/api/auth/login/', {'identifier': email, 'password': PASSWORD}, format='json'
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('access', response.data)
+            self.assertNotIn('mfa', response.data)
+            self.assertEqual(response.data['user']['email'], email)
+
+    def test_archived_suspended_and_removed_accounts_still_cannot_sign_in(self):
+        for status in (User.AccountStatus.ARCHIVED, User.AccountStatus.SUSPENDED, User.AccountStatus.REMOVED):
+            for user in (self.admin, self.head):
+                User.objects.filter(pk=user.pk).update(account_status=status)
+                response = APIClient().post(
+                    '/api/auth/login/', {'identifier': user.email, 'password': PASSWORD}, format='json'
+                )
+                self.assertEqual(response.status_code, 401, (status, user.role))
+                self.assertNotIn('access', response.data)
+
+    def test_the_session_refreshes_without_an_authenticator_step(self):
+        client = APIClient()
+        client.post('/api/auth/login/', {'identifier': 'head@x.com', 'password': PASSWORD}, format='json')
+        refreshed = client.post('/api/auth/refresh/')
+        self.assertEqual(refreshed.status_code, 200)
+        self.assertEqual(set(refreshed.data), {'access', 'user'})
+
+    def test_a_wrong_password_is_still_rejected(self):
+        response = APIClient().post(
+            '/api/auth/login/', {'identifier': 'admin@x.com', 'password': 'wrong-password'}, format='json'
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertNotIn('access', response.data)
+
+    def test_the_console_accepts_email_and_password(self):
+        call_command('console_access', '--maintenance', 'admin@x.com', stdout=StringIO())
+        path = f'/{settings.DJANGO_ADMIN_PATH}/login/'
+        denied = self.client.post(path, {'username': 'teacher@x.com', 'password': PASSWORD})
+        self.assertNotEqual(denied.status_code, 302)
+        signed_in = self.client.post(path, {'username': 'admin@x.com', 'password': PASSWORD})
+        self.assertEqual(signed_in.status_code, 302)
+        self.assertNotIn('otp_token', signed_in.content.decode())
+        self.assertTrue(AuditLog.objects.filter(action='django_admin_login').exists())
+        self.assertTrue(Notification.objects.filter(category='security', title='Maintenance console sign-in').exists())
+
+    def test_sensitive_records_are_read_only_in_the_console(self):
+        from django.contrib import admin as django_admin
+
+        from apps.grading.models import Grade
+        from apps.people.models import Registration
+
+        request = type('Request', (), {'user': self.admin})()
+        for model in (User, Grade, Registration, AuditLog):
+            model_admin = django_admin.site._registry[model]
+            self.assertFalse(model_admin.has_change_permission(request), model)
+            self.assertFalse(model_admin.has_delete_permission(request), model)
+            self.assertFalse(model_admin.has_add_permission(request), model)
+
+    def test_console_access_levels_are_set_by_the_server_command(self):
+        call_command('console_access', '--content-editor', 'head@x.com', stdout=StringIO())
+        self.head.refresh_from_db()
+        self.assertTrue(self.head.is_staff)
+        self.assertFalse(self.head.is_superuser)
+        self.assertTrue(self.head.has_perm('chatbot.change_faqentry'))
+        self.assertFalse(self.head.has_perm('grading.change_grade'))
+        call_command('console_access', '--revoke', 'head@x.com', stdout=StringIO())
+        self.head.refresh_from_db()
+        self.assertFalse(self.head.is_staff)
+
+    def test_authenticator_models_are_not_installed(self):
+        from django.apps import apps
+
+        names = {model.__name__ for model in apps.get_models()}
+        self.assertNotIn('AuthenticatorDevice', names)
+        self.assertNotIn('RecoveryCode', names)

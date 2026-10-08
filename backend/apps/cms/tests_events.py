@@ -97,6 +97,7 @@ class AnnouncementEventTests(TestCase):
                 'body': 'Campus program.',
                 'kind': 'event',
                 'event_date': self.today + timedelta(days=3),
+                'publish_to': 'both',
                 'is_published': True,
             },
             format='json',

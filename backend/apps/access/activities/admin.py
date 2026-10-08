@@ -220,7 +220,9 @@ class PostNews(Activity):
     work_slug = 'news'
     scope_label = ''
     scope_all = 'All posts'
-    FIELDS = ('title', 'body', 'image', 'category', 'kind', 'event_date', 'event_end_date', 'location', 'is_published')
+    FIELDS = (
+        'title', 'body', 'image', 'category', 'kind', 'event_date', 'event_end_date', 'location', 'publish_to', 'is_published',
+    )
 
     def scope_options(self, owner):
         return []

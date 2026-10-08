@@ -181,13 +181,6 @@
   "student": "allowed",
   "teacher": "allowed"
  },
- "GET /api/auth/mfa/": {
-  "admin": "allowed",
-  "anonymous": "sign-in",
-  "head_teacher": "allowed",
-  "student": "allowed",
-  "teacher": "allowed"
- },
  "GET /api/cms/content/": {
   "admin": "allowed",
   "anonymous": "allowed",
@@ -629,13 +622,6 @@
   "student": "refused",
   "teacher": "refused"
  },
- "POST /api/admin/accounts/1/reset-authenticator/": {
-  "admin": "allowed",
-  "anonymous": "sign-in",
-  "head_teacher": "refused",
-  "student": "refused",
-  "teacher": "refused"
- },
  "POST /api/admin/accounts/1/restore-pending/": {
   "admin": "allowed",
   "anonymous": "sign-in",
@@ -805,41 +791,6 @@
   "teacher": "allowed"
  },
  "POST /api/auth/logout/": {
-  "admin": "allowed",
-  "anonymous": "allowed",
-  "head_teacher": "allowed",
-  "student": "allowed",
-  "teacher": "allowed"
- },
- "POST /api/auth/mfa/disable/": {
-  "admin": "allowed",
-  "anonymous": "sign-in",
-  "head_teacher": "allowed",
-  "student": "allowed",
-  "teacher": "allowed"
- },
- "POST /api/auth/mfa/enroll/": {
-  "admin": "allowed",
-  "anonymous": "allowed",
-  "head_teacher": "allowed",
-  "student": "allowed",
-  "teacher": "allowed"
- },
- "POST /api/auth/mfa/enroll/confirm/": {
-  "admin": "allowed",
-  "anonymous": "allowed",
-  "head_teacher": "allowed",
-  "student": "allowed",
-  "teacher": "allowed"
- },
- "POST /api/auth/mfa/recovery-codes/": {
-  "admin": "allowed",
-  "anonymous": "sign-in",
-  "head_teacher": "allowed",
-  "student": "allowed",
-  "teacher": "allowed"
- },
- "POST /api/auth/mfa/verify/": {
   "admin": "allowed",
   "anonymous": "allowed",
   "head_teacher": "allowed",

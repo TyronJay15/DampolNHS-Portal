@@ -39,19 +39,11 @@ export function AuthProvider({ children }) {
       user,
       loading,
       notice,
-      // Returns { user } when signed in, or { step, challenge } when the authenticator app is needed.
       async login(credentials) {
         const result = await signIn(credentials);
-        if (result.user) {
-          setNotice('');
-          setUser(result.user);
-        }
-        return result;
-      },
-      // Called by the sign-in page once the authenticator step finished.
-      completeSignIn(nextUser) {
         setNotice('');
-        setUser(nextUser);
+        setUser(result.user);
+        return result;
       },
       async logout() {
         const confirmed = await signOut();

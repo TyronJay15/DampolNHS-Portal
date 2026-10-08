@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import DeskMark from '../DeskMark/DeskMark';
-import { fetchUpcomingEvents } from '../../services/publicService';
+import { fetchDashboardEvents } from '../../services/publicService';
 import { formatEventWhen, textPreview } from '../../utils/textPreview';
 
 export default function UpcomingEvents({ to }) {
@@ -9,7 +9,7 @@ export default function UpcomingEvents({ to }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchUpcomingEvents()
+    fetchDashboardEvents()
       .then((data) => setRows((Array.isArray(data) ? data : []).slice(0, 3)))
       .catch((err) => setError(err.message));
   }, []);
@@ -25,7 +25,7 @@ export default function UpcomingEvents({ to }) {
       </h2>
       {error ? <p className="desk-empty">{error}</p> : null}
       {!error && rows.length === 0 ? (
-        <p className="desk-empty">Publish an Upcoming event in CMS News. Ordinary news stays on the public site.</p>
+        <p className="desk-empty">No upcoming events. Events published to Dashboard or Both in CMS News appear here.</p>
       ) : null}
       {rows.length ? (
         <ul className="desk-event-list">

@@ -121,6 +121,24 @@ PARAPHRASES = {
         'latest school news and notices',
         'where can parents see upcoming activities',
     ),
+    # Answered from live data (apps.chatbot.live_data); never with a stored number.
+    # English and Filipino are mixed, because the last fifth of each topic is held out to measure accuracy.
+    'enrollment_stats': (
+        'how many students are currently enrolled',
+        'ilang estudyante ang kasalukuyang enrolled',
+        'how many students are enrolled',
+        'ilan ang enrolled students',
+        'current enrolled students',
+        'ilan ang students ngayon',
+        'current student population',
+        'ilang estudyante ang enrolled',
+        'what is the current student population',
+        'number of enrolled students',
+        'total enrolled students',
+        'how many students this school year',
+        'total students this school year',
+        'enrollment count this year',
+    ),
 }
 
 FAQ_STOP_WORDS = frozenset(

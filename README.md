@@ -99,8 +99,6 @@ CORS_ALLOWED_ORIGINS       the same frontend address
 CSRF_TRUSTED_ORIGINS       the same frontend address
 NUM_PROXIES=1              Railway's proxy, so request limits apply per visitor (required)
 AUTH_COOKIE_SAMESITE       Lax (same site, recommended) or None (cross-site); see "Sign-in cookies and domains"
-MFA_ENCRYPTION_KEY         a Fernet key; encrypts the authenticator secrets (required, never change it casually)
-MFA_ENFORCED               false until two administrators set up the app, then true
 DB_NAME DB_USER DB_PASSWORD DB_HOST DB_PORT   from the MySQL service's private variables
 MAIL_TRANSPORT=brevo_api   Railway Hobby blocks SMTP
 BREVO_API_KEY
@@ -115,8 +113,8 @@ SECURE_HSTS_SECONDS        starts at 3600; raise to 31536000 once HTTPS on the f
 ```
 
 With `DEBUG=false` the API refuses to start if the secret key, hosts, frontend address, reCAPTCHA secret, mail
-settings, `NUM_PROXIES` or `MFA_ENCRYPTION_KEY` are missing, if a CORS origin is not `https://`, or if
-`MAIL_PRINT_CODES` is on. Railway's health-check host is allowed automatically.
+settings, or `NUM_PROXIES` are missing, if a CORS origin is not `https://`, or if `MAIL_PRINT_CODES` is on.
+Railway's health-check host is allowed automatically.
 
 The app's database user should not be `root`. Create one with rights on the portal database only, and put it in
 `DB_USER` / `DB_PASSWORD`:
@@ -140,21 +138,11 @@ Give the frontend and the API addresses on the **same site**, for example `porta
 (`*.up.railway.app`) are different sites to a browser: the cookie would need `AUTH_COOKIE_SAMESITE=None`, and
 browsers that block third-party cookies (Safari, private windows) would sign people out on every page reload.
 
-### Authenticator app (Admin and Head Teacher)
+### Maintenance console
 
-1. Generate the key once and keep a copy in the school's password safe:
-   `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` → `MFA_ENCRYPTION_KEY`.
-2. Each administrator signs in and sets up the app under **Account → Authenticator app**, and stores the
-   recovery codes safely.
-3. When at least two administrators have it, set `MFA_ENFORCED=true`. Admin and Head Teacher accounts without
-   the app are then asked to set it up at their next sign-in. Setting it back to `false` pauses enforcement in an
-   emergency without deleting anyone's set-up.
-
-Lost phone: the person uses a recovery code; or an Admin uses **Reset authenticator** on the staff account; if
-every administrator is locked out, someone with server access runs `python manage.py reset_authenticator <email>`
-(audited). The Django admin console also needs the code. Grant console access only with
-`python manage.py console_access --maintenance <email>` (full, for maintainers) or `--content-editor <email>`
-(chatbot FAQs only, for the portal Admin); `--revoke <email>` removes it.
+Grant console access only with `python manage.py console_access --maintenance <email>` (full, for maintainers)
+or `--content-editor <email>` (chatbot FAQs only, for the portal Admin); `--revoke <email>` removes it. Sign-in
+is email and password. The console path is `DJANGO_ADMIN_PATH`.
 
 ### Email sender (cron service, same repository, root `backend`)
 

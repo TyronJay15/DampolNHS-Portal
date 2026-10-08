@@ -103,11 +103,6 @@ const ACTION_LABELS = {
   session_replay_detected: 'Stolen sign-in token blocked',
   sessions_ended_by_admin: 'Signed out on every device',
   register_duplicate: 'Registration repeated existing details',
-  mfa_enrolled: 'Authenticator app set up',
-  mfa_disabled: 'Authenticator app turned off',
-  mfa_reset: 'Authenticator app reset',
-  mfa_recovery_used: 'Recovery code used to sign in',
-  mfa_recovery_codes_renewed: 'New recovery codes made',
   django_admin_login: 'Maintenance console sign-in',
   console_access_changed: 'Maintenance console access changed',
 };

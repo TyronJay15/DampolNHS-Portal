@@ -4,7 +4,6 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from django.utils import timezone
-from django_otp.models import Device, ThrottlingMixin, TimestampMixin
 
 
 class PortalUserManager(UserManager):
@@ -262,42 +261,3 @@ class SessionToken(models.Model):
 
     def __str__(self):
         return f'Refresh token {self.pk} of session {self.session_id}'
-
-
-class AuthenticatorDevice(TimestampMixin, ThrottlingMixin, Device):
-    """An authenticator app (TOTP) for the second sign-in step. Required for Admin and Head Teacher accounts.
-
-    The shared secret is stored encrypted with MFA_ENCRYPTION_KEY, never in plain text. Code checking, replay
-    protection and the wrong-code back-off are django-otp's (see apps.accounts.mfa).
-    """
-
-    secret = models.TextField()
-    drift = models.SmallIntegerField(default=0)
-    last_t = models.BigIntegerField(default=-1)
-
-    class Meta(Device.Meta):
-        db_table = 'accounts_authenticator_devices'
-
-    def verify_token(self, token):
-        from apps.accounts.mfa import verify_totp
-
-        return verify_totp(self, token)
-
-    def get_throttle_factor(self):
-        # Wrong codes wait 10, 20, 40, 80 ... seconds (django-otp caps the wait), so guessing is hopeless.
-        return settings.MFA_THROTTLE_FACTOR
-
-
-class RecoveryCode(models.Model):
-    """A one-time code for signing in when the phone is lost. Only a keyed hash is stored."""
-
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='recovery_codes')
-    code_hash = models.CharField(max_length=64, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    used_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = 'accounts_recovery_codes'
-
-    def __str__(self):
-        return f'Recovery code {self.pk} of user {self.user_id}'

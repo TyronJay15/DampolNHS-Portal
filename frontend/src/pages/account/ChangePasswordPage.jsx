@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import AuthenticatorSettings from '../../components/auth/AuthenticatorSettings';
 import PasswordRules from '../../components/auth/PasswordRules';
 import ResendCodeButton from '../../components/auth/ResendCodeButton';
 import { nextResendAt } from '../../components/auth/resendTime';
@@ -262,7 +261,6 @@ export default function ChangePasswordPage() {
           ) : null}
         </section>
       </div>
-      {user?.role === 'admin' || user?.role === 'head_teacher' ? <AuthenticatorSettings /> : null}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import PublicLayout from './PublicLayout';
 import AnnouncementReader from '../../components/AnnouncementReader/AnnouncementReader';
 import BulletinCarousel from '../../components/BulletinCarousel/BulletinCarousel';
-import { fetchAnnouncements } from '../../services/publicService';
+import { fetchPublicBulletin } from '../../services/publicService';
 import { DEFAULT_CMS } from '../../utils/cmsDefaults';
 import { fileUrl } from '../../services/api';
 import './LandingPage.css';
@@ -30,8 +30,8 @@ function LandingContent({ landing }) {
   }, [slides.length]);
 
   useEffect(() => {
-    fetchAnnouncements({ kind: 'news' })
-      .then((data) => setNews((Array.isArray(data) ? data : data.results || []).slice(0, 8)))
+    fetchPublicBulletin()
+      .then((rows) => setNews(rows.slice(0, 8)))
       .catch(() => setNews([]));
   }, []);
 
@@ -132,7 +132,7 @@ function LandingContent({ landing }) {
           {news.length ? (
             <BulletinCarousel items={news} onOpen={setOpenNews} />
           ) : (
-            <p className="lp-bulletin-empty">No announcements yet. New posts from News appear here.</p>
+            <p className="lp-bulletin-empty">No announcements or upcoming events yet. Published posts appear here.</p>
           )}
         </div>
       </section>

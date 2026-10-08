@@ -9,7 +9,7 @@ from apps.audit import services as audit
 from apps.audit.catalog import ANNOUNCEMENTS
 from apps.cms.links import require_safe_links
 from apps.cms.media import uploaded_name
-from apps.cms.models import Announcement, SiteContent
+from apps.cms.models import SURFACES, Announcement, SiteContent
 from apps.notifications.services import active_users, notify
 
 
@@ -45,17 +45,23 @@ def save_document(document, payload, actor):
 
 
 def save_new_announcement(serializer, actor):
-    """Save a validated new post; an event published now is announced on every dashboard."""
+    """Save a validated new post; a post published to the dashboards now is announced there."""
     published = serializer.validated_data.get('is_published')
     row = serializer.save(created_by=actor, published_at=timezone.now() if published else None)
-    _notify_event(row, was_published=False)
+    _notify_dashboard(row, was_on_dashboard=False)
     return row
+
+
+def on_surface(queryset, surface):
+    """The posts a surface shows: published, with a destination that includes it ('website' or 'dashboard').
+    The one place this rule lives, so the website and the dashboards cannot drift apart."""
+    return queryset.filter(is_published=True, publish_to__in=SURFACES[surface])
 
 
 def save_announcement_changes(serializer):
     """Save validated changes to a post, keeping published_at in step with is_published."""
     instance = serializer.instance
-    was_published = instance.is_published
+    was_on_dashboard = _on_dashboard(instance)
     published = serializer.validated_data.get('is_published', instance.is_published)
     extra = {}
     if published and not instance.published_at:
@@ -63,20 +69,27 @@ def save_announcement_changes(serializer):
     if not published:
         extra['published_at'] = None
     row = serializer.save(**extra)
-    _notify_event(row, was_published=was_published)
+    _notify_dashboard(row, was_on_dashboard=was_on_dashboard)
     return row
 
 
-def _notify_event(row, was_published):
-    if row.kind != Announcement.Kind.EVENT or not row.is_published or was_published:
+def _on_dashboard(row):
+    return row.is_published and row.publish_to in SURFACES['dashboard']
+
+
+def _notify_dashboard(row, was_on_dashboard):
+    """Tell portal users once, when a post first appears on the dashboards (published there, or moved there).
+    "Both" is one record, so it notifies once; website-only posts never notify."""
+    if was_on_dashboard or not _on_dashboard(row):
         return
-    when = row.event_date.strftime('%b %d, %Y') if row.event_date else 'soon'
-    notify(
-        active_users(),
-        title=f'Upcoming event: {row.title}',
-        body=f'{row.title} is on {when}{f" · {row.location}" if row.location else ""}.',
-        category=ANNOUNCEMENTS,
-    )
+    if row.kind == Announcement.Kind.EVENT:
+        when = row.event_date.strftime('%b %d, %Y') if row.event_date else 'soon'
+        title = f'Upcoming event: {row.title}'
+        body = f'{row.title} is on {when}{f" · {row.location}" if row.location else ""}.'
+    else:
+        title = f'Announcement: {row.title}'
+        body = 'A new announcement is on your dashboard.'
+    notify(active_users(), title=title, body=body, category=ANNOUNCEMENTS)
 
 
 def upload_urls(value):

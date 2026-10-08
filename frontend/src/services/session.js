@@ -166,26 +166,11 @@ async function expectOk(path, body) {
 
 // ---- Signing in ----
 
-/** Password step. Returns { user } when signed in, or { step: 'verify' | 'enroll', challenge } when the
- * authenticator app is needed first. */
+/** Returns { user } after the password and reCAPTCHA are accepted. */
 export async function signIn(credentials) {
   const data = await expectOk('/auth/login/', credentials);
   noteActivity();
-  if (data.mfa) return { step: data.mfa, challenge: data.challenge };
   return { user: accept(data) };
-}
-
-export async function verifyMfa(challenge, code) {
-  return accept(await expectOk('/auth/mfa/verify/', { challenge, code }));
-}
-
-export async function startMfaEnrollment(challenge) {
-  return expectOk('/auth/mfa/enroll/', { challenge });
-}
-
-export async function confirmMfaEnrollment(challenge, code) {
-  const data = await expectOk('/auth/mfa/enroll/confirm/', { challenge, code });
-  return { user: accept(data), recoveryCodes: data.recovery_codes };
 }
 
 // ---- Keeping the sign-in ----

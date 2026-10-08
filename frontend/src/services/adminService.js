@@ -207,13 +207,9 @@ export function deactivateAccount(id, reason = '') {
   return apiRequest(`/admin/accounts/${id}/deactivate/`, { method: 'POST', auth: true, body: { reason } });
 }
 
-// Security actions: end every sign-in of a person, or remove their authenticator app after a lost phone.
+// Security action: end every sign-in of a person.
 export function signOutEverywhere(id) {
   return apiRequest(`/admin/accounts/${id}/sign-out/`, { method: 'POST', auth: true, body: {} });
-}
-
-export function resetAuthenticator(id) {
-  return apiRequest(`/admin/accounts/${id}/reset-authenticator/`, { method: 'POST', auth: true, body: {} });
 }
 
 export function reactivateAccount(id) {

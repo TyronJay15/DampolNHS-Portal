@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Loading from '../../components/Loading/Loading';
 import PageHead from '../../components/PageHead/PageHead';
 import { fileUrl } from '../../services/api';
-import { fetchUpcomingEvents } from '../../services/publicService';
+import { fetchDashboardEvents } from '../../services/publicService';
 import { formatEventWhen } from '../../utils/textPreview';
 
 export default function EventsPage() {
@@ -11,7 +11,7 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchUpcomingEvents()
+    fetchDashboardEvents()
       .then((data) => setRows(Array.isArray(data) ? data : []))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -22,12 +22,12 @@ export default function EventsPage() {
   return (
     <div className="desk studio">
       <PageHead kicker="Campus" title="Upcoming events" icon="year">
-        <p>Published events for dashboards. Ordinary news stays on the public website.</p>
+        <p>Upcoming events published to the portal dashboards. Events published to Both also appear on the public website.</p>
       </PageHead>
       {error ? <p className="alert alert-error">{error}</p> : null}
       {!error && rows.length === 0 ? (
         <p className="card desk-tile desk-empty">
-          No upcoming events yet. Publish an Upcoming event in CMS News.
+          No upcoming events yet. Publish an Upcoming event to Dashboard or Both in CMS News.
         </p>
       ) : null}
       {rows.length ? (

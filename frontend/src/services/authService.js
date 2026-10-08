@@ -1,7 +1,7 @@
 import { apiRequest } from './api';
 
 // Signing in, out and the sign-in session itself live in session.js; these are the account requests.
-export { confirmMfaEnrollment, restore, signIn, signOut, startMfaEnrollment, verifyMfa } from './session';
+export { restore, signIn, signOut } from './session';
 
 export async function fetchMe() {
   return apiRequest('/auth/me/', { auth: true });
@@ -68,25 +68,4 @@ export function homePathForRole(role) {
   if (role === 'head_teacher') return '/head';
   if (role === 'teacher') return '/teacher';
   return '/student';
-}
-
-// Authenticator app while signed in (Admin and Head Teacher). Changes need the password, and a code once set up.
-export function fetchMfaStatus() {
-  return apiRequest('/auth/mfa/', { auth: true });
-}
-
-export function startMfaSetup(password) {
-  return apiRequest('/auth/mfa/enroll/', { method: 'POST', auth: true, body: { password } });
-}
-
-export function confirmMfaSetup(code) {
-  return apiRequest('/auth/mfa/enroll/confirm/', { method: 'POST', auth: true, body: { code } });
-}
-
-export function renewRecoveryCodes({ password, code }) {
-  return apiRequest('/auth/mfa/recovery-codes/', { method: 'POST', auth: true, body: { password, code } });
-}
-
-export function turnOffMfa({ password, code }) {
-  return apiRequest('/auth/mfa/disable/', { method: 'POST', auth: true, body: { password, code } });
 }

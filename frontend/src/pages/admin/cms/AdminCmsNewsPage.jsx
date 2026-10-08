@@ -23,8 +23,25 @@ const EMPTY = {
   event_date: '',
   event_end_date: '',
   location: '',
+  publish_to: '',
   is_published: false,
 };
+
+// Where a published post appears. "Both" is the same post in both places, not a copy.
+const PUBLISH_TO = [
+  { value: 'website', label: 'Website', help: 'Display on the public school website.' },
+  { value: 'dashboard', label: 'Dashboard', help: 'Display inside the school portal dashboard.' },
+  { value: 'both', label: 'Both', help: 'Display in both locations.' },
+];
+const PLACES = { website: 'the public website', dashboard: 'the portal dashboards', both: 'the public website and the portal dashboards' };
+
+// What the post's card says about where it shows. Dashboards list upcoming events only, so dashboard news shows nowhere.
+function placement(row) {
+  if (!row.is_published) return { text: 'Draft', draft: true };
+  if (row.kind !== 'event' && row.publish_to === 'dashboard') return { text: 'Not shown: dashboards list events only', draft: true };
+  if (row.kind !== 'event' || row.publish_to === 'website') return { text: 'On website', draft: false };
+  return { text: row.publish_to === 'both' ? 'On dashboards and website' : 'On dashboards', draft: false };
+}
 
 function eventMeta(row) {
   if (row.kind !== 'event') return row.category || 'General';
@@ -90,7 +107,7 @@ export default function AdminCmsNewsPage() {
     if (form.is_published) {
       const answer = await confirm({
         title: `Publish this ${form.kind === 'event' ? 'event' : 'announcement'}?`,
-        body: 'It appears on the public website as soon as you confirm.',
+        body: `It appears on ${PLACES[form.publish_to]} as soon as you confirm.`,
         confirmLabel: 'Publish',
       });
       if (!answer) return;
@@ -117,8 +134,8 @@ export default function AdminCmsNewsPage() {
     const answer = await confirm({
       title: publishing ? `Publish "${row.title}"?` : `Unpublish "${row.title}"?`,
       body: publishing
-        ? 'It appears on the public website as soon as you confirm.'
-        : 'It is removed from the public website but stays here as a draft.',
+        ? `It appears on ${PLACES[row.publish_to]} as soon as you confirm.`
+        : `It is removed from ${PLACES[row.publish_to]} but stays here as a draft.`,
       confirmLabel: publishing ? 'Publish' : 'Unpublish',
       tone: publishing ? 'standard' : 'warning',
     });
@@ -126,6 +143,23 @@ export default function AdminCmsNewsPage() {
     setError('');
     try {
       await updateAnnouncement(row.id, { is_published: !row.is_published });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function changePublishTo(row, publishTo) {
+    if (publishTo === row.publish_to) return;
+    if (proposal) {
+      return propose(
+        { action: 'update', announcement: row.id, fields: { publish_to: publishTo } },
+        `Propose publishing "${row.title}" to ${PLACES[publishTo]}?`,
+      );
+    }
+    setError('');
+    try {
+      await updateAnnouncement(row.id, { publish_to: publishTo });
       await load();
     } catch (err) {
       setError(err.message);
@@ -189,9 +223,17 @@ export default function AdminCmsNewsPage() {
           {row.title}
         </h3>
         <p className="admin-meta">{eventMeta(row)}</p>
-        <span className={`cms-chip${row.is_published ? '' : ' is-draft'}`}>
-          {row.is_published ? (row.kind === 'event' ? 'On dashboards' : 'On website') : 'Draft'}
-        </span>
+        <span className={`cms-chip${placement(row).draft ? ' is-draft' : ''}`}>{placement(row).text}</span>
+        <label className="form-field cms-publish-to">
+          <FieldLabel>Publish to</FieldLabel>
+          <select value={row.publish_to} onChange={(event) => changePublishTo(row, event.target.value)}>
+            {PUBLISH_TO.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <p>{row.body}</p>
         <div className="cms-news-actions">
           <button className="btn" type="button" onClick={() => togglePublish(row)}>
@@ -220,7 +262,7 @@ export default function AdminCmsNewsPage() {
             New post
           </h2>
           <p className="admin-meta">
-            News stays on the public site. Upcoming events need a date and appear on every dashboard.
+            Choose where each post appears. An upcoming event needs a date. Dashboards list upcoming events only.
           </p>
           <label className="form-field">
             <FieldLabel>Title</FieldLabel>
@@ -229,9 +271,25 @@ export default function AdminCmsNewsPage() {
           <label className="form-field">
             <FieldLabel>Type</FieldLabel>
             <select value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value })}>
-              <option value="news">News — public website only</option>
-              <option value="event">Upcoming event — dashboards</option>
+              <option value="news">News</option>
+              <option value="event">Upcoming event</option>
             </select>
+          </label>
+          <label className="form-field">
+            <FieldLabel>Publish to</FieldLabel>
+            <select required value={form.publish_to} onChange={(event) => setForm({ ...form, publish_to: event.target.value })}>
+              <option value="" disabled>
+                Choose where it appears
+              </option>
+              {PUBLISH_TO.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label} — {option.help}
+                </option>
+              ))}
+            </select>
+            {form.kind !== 'event' && form.publish_to && form.publish_to !== 'website' ? (
+              <span className="admin-meta">Dashboards list upcoming events only, so news shows on the website alone.</span>
+            ) : null}
           </label>
           <label className="form-field">
             <FieldLabel>Category</FieldLabel>
@@ -307,7 +365,7 @@ export default function AdminCmsNewsPage() {
             <section className="cms-news-group">
               <h3 className="desk-line">
                 <LineMark name="bell" size={14} />
-                Website news
+                News
               </h3>
               {news.map(renderRow)}
             </section>

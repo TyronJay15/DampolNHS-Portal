@@ -7,7 +7,7 @@ from django.views.static import serve
 from apps.accounts.views_health import HealthView, ReadyView
 from config.admin_site import PortalAdminSite
 
-# Every console sign-in needs the authenticator code too (django-otp), and failures are limited.
+# Console sign-in failures are limited (config.admin_site). The path stays DJANGO_ADMIN_PATH.
 admin.site.__class__ = PortalAdminSite
 
 urlpatterns = [

@@ -17,6 +17,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             'event_date',
             'event_end_date',
             'location',
+            'publish_to',
             'is_published',
             'published_at',
             'created_at',

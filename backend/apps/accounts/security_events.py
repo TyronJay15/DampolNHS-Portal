@@ -48,8 +48,3 @@ def account_locked(user):
         category='security',
     )
     logger.warning('Sign-in paused for user %s after repeated failures', user.pk)
-
-
-def mfa_failed(request, user):
-    """A wrong authenticator or recovery code. django-otp's back-off already slows the next try."""
-    logger.warning('Wrong authenticator code for user %s from %s', user.pk, client_ip(request))

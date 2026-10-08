@@ -9,7 +9,6 @@ import {
   reactivateAccount,
   removeAccount,
   resendStaffActivation,
-  resetAuthenticator,
   signOutEverywhere,
 } from '../../services/adminService';
 import { firstApiError } from '../../utils/authRules';
@@ -156,17 +155,6 @@ export default function AdminStaffPage() {
       action: signOutEverywhere,
       done: 'Signed out everywhere',
       next: 'They can sign in again with their password.',
-    });
-  }
-
-  function handleResetMfa(row) {
-    return securityAction(row, {
-      title: `Reset ${row.name}'s authenticator app?`,
-      body: 'Use this only after checking in person that they lost their phone and recovery codes. They are signed out and set up the app again at their next sign-in.',
-      confirmLabel: 'Reset authenticator',
-      action: resetAuthenticator,
-      done: 'Authenticator reset',
-      next: 'They set up the app again at their next sign-in.',
     });
   }
 
@@ -401,11 +389,6 @@ export default function AdminStaffPage() {
                         <button className="acct-btn" type="button" disabled={saving} onClick={() => handleSignOut(row)}>
                           Sign out everywhere
                         </button>
-                        {row.role === 'head_teacher' ? (
-                          <button className="acct-btn" type="button" disabled={saving} onClick={() => handleResetMfa(row)}>
-                            Reset authenticator
-                          </button>
-                        ) : null}
                         <button className="acct-btn acct-btn-no" type="button" disabled={saving} onClick={() => handleArchive(row)}>
                           Archive
                         </button>

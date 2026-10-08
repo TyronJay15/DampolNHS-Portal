@@ -6,6 +6,7 @@ import YearChip from '../../components/YearChip';
 import { useAuth } from '../../context/AuthContext';
 import { fetchNotifications, fetchStudentGrades, fetchStudentMe } from '../../services/studentService';
 import WelcomeBanner from '../../components/WelcomeBanner/WelcomeBanner';
+import DashboardAnnouncements from '../../components/DashboardAnnouncements/DashboardAnnouncements';
 import UpcomingEvents from '../../components/UpcomingEvents/UpcomingEvents';
 import PublicLinks from '../../components/PublicLinks/PublicLinks';
 import GuidanceSummaryCard from './guidance/GuidanceSummaryCard';
@@ -100,7 +101,10 @@ export default function StudentOverview() {
       </section>
 
       <div className="desk-extras">
-        <UpcomingEvents to="/student/events" />
+        <div className="desk-main">
+          <DashboardAnnouncements />
+          <UpcomingEvents to="/student/events" />
+        </div>
         <PublicLinks />
       </div>
 

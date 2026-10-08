@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { fileUrl } from '../../services/api';
-import { formatPostedOn } from '../../utils/textPreview';
+import { formatEventWhen, formatPostedOn } from '../../utils/textPreview';
 import './AnnouncementReader.css';
 
 export default function AnnouncementReader({ item, onClose }) {
@@ -31,8 +31,12 @@ export default function AnnouncementReader({ item, onClose }) {
       >
         <div className="announce-reader-bar">
           <p className="announce-reader-meta">
+            {item.kind === 'event' && formatEventWhen(item, { long: true }) ? (
+              <time>{formatEventWhen(item, { long: true })}</time>
+            ) : null}
+            {item.location ? <span>{item.location}</span> : null}
             {item.category ? <span>{item.category}</span> : null}
-            {item.published_at ? <time>{formatPostedOn(item.published_at)}</time> : null}
+            {item.kind !== 'event' && item.published_at ? <time>{formatPostedOn(item.published_at)}</time> : null}
           </p>
           <button type="button" className="announce-reader-close" onClick={onClose}>
             Close

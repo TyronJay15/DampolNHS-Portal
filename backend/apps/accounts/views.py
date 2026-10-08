@@ -5,7 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts import mfa, sessions
+from apps.accounts import sessions
 from apps.accounts.codes import RESEND_SECONDS
 from apps.accounts.csrf import enforce_csrf
 from apps.accounts.mail import account_ready_email
@@ -95,11 +95,7 @@ class LoginView(APIView):
                 failed_sign_in(request, request.data.get('identifier'))
             raise
         user = serializer.validated_data['user']
-        step = mfa.sign_in_step(user)
-        if step is None:
-            return complete_sign_in(user)
-        # The password was right; nothing that signs in exists until the authenticator step is done too.
-        return Response({'mfa': step, 'challenge': mfa.issue_challenge(user, step)})
+        return complete_sign_in(user)
 
 
 class RefreshView(APIView):

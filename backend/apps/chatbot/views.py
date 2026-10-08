@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.throttles import ScopedThrottle
+from apps.chatbot.live_data import is_live, live_answer
 from apps.chatbot.privacy import redact
 from apps.ml.gemini import phrase_answer
 from apps.ml.intent import FALLBACK, answers_for, classify_question, matching_faq_answer, school_pack
@@ -12,8 +13,10 @@ MAX_QUESTION = 400  # characters; longer text is refused before any model or Gem
 
 
 class ChatbotAskView(APIView):
+    """Public chatbot. Anyone may ask; a signed-in user is recognized through the normal API authentication, so
+    live topics (apps.chatbot.live_data) can answer the roles allowed to see them."""
+
     permission_classes = [AllowAny]
-    authentication_classes = []
     throttle_classes = [ScopedThrottle]
     throttle_scope = 'chatbot'
 
@@ -29,6 +32,11 @@ class ChatbotAskView(APIView):
         # Prediction only: the intent model is trained by setup_school or train_intent, never here.
         topic, confidence = classify_question(question)
 
+        if is_live(topic):
+            # Today's numbers come from the database and Django writes the sentence; Gemini never sees them.
+            answer, source = live_answer(topic, request.user)
+            return self._reply(question, topic, confidence, answer, source)
+
         pack = school_pack(topic)
         answers = answers_for(topic)
         source = 'fallback'
@@ -42,10 +50,11 @@ class ChatbotAskView(APIView):
                 answer = matching_faq_answer(question, topic) or answers[0]
                 source = 'faq'
 
-        ChatQuestion.objects.create(
-            question=question,
-            topic=topic,
-            confidence=round(float(confidence), 4),
-            source=source,
-        )
-        return Response({'answer': answer, 'topic': topic, 'confidence': round(float(confidence), 4)})
+        return self._reply(question, topic, confidence, answer, source)
+
+    @staticmethod
+    def _reply(question, topic, confidence, answer, source):
+        """Store the redacted question (never the answer) and send the reply."""
+        confidence = round(float(confidence), 4)
+        ChatQuestion.objects.create(question=question, topic=topic, confidence=confidence, source=source)
+        return Response({'answer': answer, 'topic': topic, 'confidence': confidence})

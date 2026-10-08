@@ -9,7 +9,6 @@ from datetime import timedelta
 from pathlib import Path
 
 import pymysql
-from cryptography.fernet import Fernet
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
@@ -49,7 +48,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
-    'django_otp',
     'corsheaders',
     'django_filters',
     'apps.accounts',
@@ -74,7 +72,6 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django_otp.middleware.OTPMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -198,16 +195,6 @@ AUTH_COOKIE_SECURE = not DEBUG and not TESTING
 if AUTH_COOKIE_SAMESITE == 'None' and not AUTH_COOKIE_SECURE and not TESTING:
     raise ImproperlyConfigured('AUTH_COOKIE_SAMESITE=None needs HTTPS: it is refused while DEBUG is on.')
 
-# ---- Authenticator app (apps.accounts.mfa). ----
-# Admin and Head Teacher accounts must use it once MFA_ENFORCED is on. Turn it on after at least two
-# administrators have set it up (README, "Authenticator app"); setting it back to false pauses enforcement in an
-# emergency without deleting anyone's set-up. Accounts that already set it up always need their code.
-MFA_ENFORCED = _flag('MFA_ENFORCED')
-# A Fernet key (python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())").
-# It encrypts the authenticator secrets. Required when DEBUG is false; changing it invalidates every set-up.
-MFA_ENCRYPTION_KEY = os.environ.get('MFA_ENCRYPTION_KEY', '').strip()
-MFA_THROTTLE_FACTOR = 10
-
 # ---- Retention (apps.accounts.management.commands.daily_maintenance). ----
 SESSION_KEEP_DAYS = int(os.environ.get('SESSION_KEEP_DAYS', '30'))
 CHAT_QUESTION_KEEP_DAYS = int(os.environ.get('CHAT_QUESTION_KEEP_DAYS', '90'))
@@ -258,12 +245,6 @@ if not DEBUG and not TESTING:
         )
     if not CORS_ALLOWED_ORIGINS or any(origin == '*' or not origin.startswith('https://') for origin in CORS_ALLOWED_ORIGINS):
         raise ImproperlyConfigured('CORS_ALLOWED_ORIGINS must list only the https:// frontend address(es) when DEBUG is false.')
-    try:
-        Fernet(os.environ.get('MFA_ENCRYPTION_KEY', '').strip().encode())
-    except ValueError as exc:
-        raise ImproperlyConfigured(
-            'MFA_ENCRYPTION_KEY must be a Fernet key when DEBUG is false (see README, "Authenticator app").'
-        ) from exc
     if SECRET_KEY in ('django-insecure-dev-only', 'dev-only-change-me-use-a-long-random-string-32b') or len(SECRET_KEY) < 50:
         raise ImproperlyConfigured('SECRET_KEY must be a unique random value of at least 50 characters when DEBUG is false.')
     if not ALLOWED_HOSTS or set(ALLOWED_HOSTS) <= {'localhost', '127.0.0.1', 'testserver'}:
@@ -299,7 +280,6 @@ API_THROTTLE_RATES = {} if TESTING else {
     'login': os.environ.get('THROTTLE_LOGIN', '30/min'),
     'login_account': os.environ.get('THROTTLE_LOGIN_ACCOUNT', '20/hour'),
     'refresh': os.environ.get('THROTTLE_REFRESH', '60/min'),
-    'mfa': os.environ.get('THROTTLE_MFA', '20/hour'),
     'reports': os.environ.get('THROTTLE_REPORTS', '30/min'),
     'register': os.environ.get('THROTTLE_REGISTER', '60/hour'),
     'codes': os.environ.get('THROTTLE_CODES', '30/hour'),
